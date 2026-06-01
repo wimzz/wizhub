@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB • Resume & Delete</title>
+  <title>WizhuB • One Card Per Show</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -129,6 +129,7 @@
         </div>
         <p id="detailOverview" class="text-gray-300 text-sm mt-2 line-clamp-3"></p>
         
+        <!-- TV Controls (season/episode) -->
         <div id="tvControls" class="hidden mt-4 flex flex-wrap gap-3">
           <select id="seasonSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
           <select id="episodeSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
@@ -145,7 +146,7 @@
             <input type="number" id="progressMinutes" value="0" step="1" min="0" class="w-24 bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm">
             <button id="saveProgressBtn" class="text-xs bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded-full"><i class="fas fa-save"></i> Save Time</button>
           </div>
-          <p class="text-xs text-gray-400">Enter the minutes you have watched. Your progress will sync across all devices and embed sources.</p>
+          <p class="text-xs text-gray-400">Enter the minutes you have watched. This applies to the entire show (all episodes).</p>
         </div>
 
         <div class="embed-container mt-3">
@@ -227,7 +228,7 @@
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let currentUser = null;
-  let currentMedia = null;
+  let currentMedia = null;      // { type, id, title, posterPath, year, rating, overview }
   let currentSeason = 1, currentEpisode = 1;
   let currentProgressMinutes = 0;
 
@@ -271,11 +272,9 @@
     else embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
   }
 
-  // Add or update entry
+  // Add or update entry (one per show/movie)
   async function ensureWatchHistoryEntry() {
     if (!currentUser || !currentMedia) return;
-    const season = currentMedia.type === 'tv' ? currentSeason : 0;
-    const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
     const record = {
       user_id: currentUser.id,
       media_type: currentMedia.type,
@@ -285,27 +284,23 @@
       media_year: currentMedia.year,
       rating: currentMedia.rating,
       progress_minutes: 0,
-      season_number: season,
-      episode_number: episode,
       last_watched: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
     const { error } = await sb
       .from('watch_history')
       .upsert(record, { 
-        onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number',
+        onConflict: 'user_id, media_type, tmdb_id',
         ignoreDuplicates: false
       });
     if (error) console.error("Auto-add error:", error);
   }
 
-  // Save progress
+  // Save progress (updates the same row for the whole show/movie)
   async function saveProgressToDB() {
     if (!currentUser) { alert('Please login first'); return; }
     if (!currentMedia) return;
     const minutes = parseInt(progressMinutesInput.value) || 0;
-    const season = currentMedia.type === 'tv' ? currentSeason : 0;
-    const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
     const record = {
       user_id: currentUser.id,
       media_type: currentMedia.type,
@@ -315,15 +310,13 @@
       media_year: currentMedia.year,
       rating: currentMedia.rating,
       progress_minutes: minutes,
-      season_number: season,
-      episode_number: episode,
       last_watched: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
     const { error } = await sb
       .from('watch_history')
       .upsert(record, { 
-        onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number',
+        onConflict: 'user_id, media_type, tmdb_id',
         ignoreDuplicates: false
       });
     if (error) alert('Save error: ' + error.message);
@@ -333,34 +326,28 @@
     }
   }
 
-  // Delete entry
-  async function deleteHistoryEntry(mediaType, tmdbId, season, episode) {
+  // Delete entry (show/movie)
+  async function deleteHistoryEntry(mediaType, tmdbId) {
     if (!currentUser) return;
     const { error } = await sb
       .from('watch_history')
       .delete()
       .eq('user_id', currentUser.id)
       .eq('media_type', mediaType)
-      .eq('tmdb_id', tmdbId)
-      .eq('season_number', season)
-      .eq('episode_number', episode);
+      .eq('tmdb_id', tmdbId);
     if (error) console.error("Delete error:", error);
     else await renderContinueWatching();
   }
 
-  // Load saved progress for current media
+  // Load saved progress for the current show/movie
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
-    const season = currentMedia.type === 'tv' ? currentSeason : 0;
-    const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
     const { data, error } = await sb
       .from('watch_history')
       .select('progress_minutes')
       .eq('user_id', currentUser.id)
       .eq('media_type', currentMedia.type)
       .eq('tmdb_id', currentMedia.id)
-      .eq('season_number', season)
-      .eq('episode_number', episode)
       .maybeSingle();
     if (error) console.error(error);
     if (data && data.progress_minutes !== undefined) {
@@ -372,7 +359,7 @@
     }
   }
 
-  // Render Continue Watching with delete button
+  // Render Continue Watching (one card per show/movie)
   async function renderContinueWatching() {
     if (!currentUser) {
       continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🔒 Log in to see your continue watching list.</div>';
@@ -384,48 +371,39 @@
       .eq('user_id', currentUser.id)
       .order('last_watched', { ascending: false });
     if (error || !data) return;
-    // Deduplicate using Map (unique per media_type+tmdb_id+season+episode)
-    const uniqueMap = new Map();
-    for (const item of data) {
-      const key = `${item.media_type}_${item.tmdb_id}_${item.season_number}_${item.episode_number}`;
-      if (!uniqueMap.has(key)) uniqueMap.set(key, item);
-    }
-    const uniqueData = Array.from(uniqueMap.values()).slice(0, 20);
-    if (uniqueData.length === 0) {
+    if (data.length === 0) {
       continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet. Start watching!</div>';
       return;
     }
     continueContainer.innerHTML = '';
-    for (const item of uniqueData) {
+    for (const item of data) {
       const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
       const card = document.createElement('div');
       card.className = 'movie-card relative';
       card.style.flex = '0 0 160px';
       const progressPercent = Math.min((item.progress_minutes / 120) * 100, 100);
       card.innerHTML = `
-        <div class="delete-btn" data-id="${item.id}" data-media-type="${item.media_type}" data-tmdb="${item.tmdb_id}" data-season="${item.season_number}" data-episode="${item.episode_number}">
+        <div class="delete-btn" data-media-type="${item.media_type}" data-tmdb="${item.tmdb_id}">
           <i class="fas fa-trash-alt text-xs"></i>
         </div>
         <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
         <div class="p-2">
           <div class="font-semibold text-sm truncate">${item.title}</div>
-          <div class="text-xs text-gray-400">${item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie'} • ${item.progress_minutes} min</div>
+          <div class="text-xs text-gray-400">${item.media_type === 'tv' ? 'TV Show' : 'Movie'} • ${item.progress_minutes} min</div>
         </div>
         <div class="progress-overlay" style="width: ${progressPercent}%;"></div>
       `;
-      // Add delete event
+      // Delete event
       const deleteBtn = card.querySelector('.delete-btn');
       deleteBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const mediaType = deleteBtn.dataset.mediaType;
         const tmdbId = parseInt(deleteBtn.dataset.tmdb);
-        const season = parseInt(deleteBtn.dataset.season);
-        const episode = parseInt(deleteBtn.dataset.episode);
         if (confirm(`Delete "${item.title}" from Continue Watching?`)) {
-          await deleteHistoryEntry(mediaType, tmdbId, season, episode);
+          await deleteHistoryEntry(mediaType, tmdbId);
         }
       });
-      // Add click to resume
+      // Resume event
       card.addEventListener('click', async (e) => {
         if (e.target.closest('.delete-btn')) return;
         if (item.media_type === 'movie') {
@@ -439,9 +417,11 @@
           const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
           const tv = await res.json();
           await showDetails(tv, 'tv');
-          currentSeason = item.season_number;
-          currentEpisode = item.episode_number;
-          await loadTVSeasons(currentMedia.id);
+          // Do NOT reset season/episode – preserve current selection
+          // Ensure TV controls are loaded
+          if (!seasonSelect.options.length) {
+            await loadTVSeasons(currentMedia.id);
+          }
           seasonSelect.value = currentSeason;
           episodeSelect.value = currentEpisode;
           currentProgressMinutes = item.progress_minutes;
@@ -453,7 +433,7 @@
     }
   }
 
-  // TV helpers
+  // TV helpers (same as before, but progress is show-wide)
   async function loadTVSeasons(tvId) {
     const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
     const data = await res.json();
@@ -471,15 +451,12 @@
     seasonSelect.onchange = async () => {
       currentSeason = parseInt(seasonSelect.value);
       await loadEpisodes(tvId, currentSeason);
-      await loadProgress();
+      // No need to loadProgress again – same show progress
       updateEmbedStream();
-      await ensureWatchHistoryEntry();
     };
     episodeSelect.onchange = async () => {
       currentEpisode = parseInt(episodeSelect.value);
-      await loadProgress();
       updateEmbedStream();
-      await ensureWatchHistoryEntry();
     };
   }
 
@@ -515,15 +492,19 @@
     
     if (type === 'tv') {
       tvControlsDiv.classList.remove('hidden');
-      currentSeason = 1;
-      currentEpisode = 1;
-      await loadTVSeasons(item.id);
+      // Preserve current season/episode if already set, else default 1
+      if (!seasonSelect.options.length) {
+        currentSeason = 1;
+        currentEpisode = 1;
+        await loadTVSeasons(item.id);
+      }
     } else {
       tvControlsDiv.classList.add('hidden');
     }
     
+    // Load saved progress (shared for show)
     await loadProgress();
-    await ensureWatchHistoryEntry();
+    await ensureWatchHistoryEntry(); // ensures row exists
     updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -602,7 +583,7 @@
     }).catch(console.error);
   }
 
-  // Modal handlers
+  // Modal handlers (unchanged)
   const loginModal = document.getElementById('loginModal');
   const signupModal = document.getElementById('signupModal');
   document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
