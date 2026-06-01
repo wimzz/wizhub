@@ -3,567 +3,126 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB · Stream & Sync</title>
-  <!-- Tailwind CSS + Font Awesome -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>WizhuB – Stream & Sync</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <!-- Supabase JS Client -->
+  <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    body {
-      background: linear-gradient(145deg, #0b0f1c 0%, #0a0e1a 100%);
-      font-family: 'Inter', system-ui, sans-serif;
-    }
-    .glass-card {
-      background: rgba(15, 25, 45, 0.65);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    .glass-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.5);
-      border-color: rgba(255, 215, 0, 0.3);
-    }
-    .embed-container {
-      position: relative;
-      overflow: hidden;
-      background: #00000055;
-      border-radius: 1.2rem;
-      box-shadow: 0 10px 25px -5px black;
-    }
-    iframe {
-      border: none;
-      width: 100%;
-      height: 100%;
-      min-height: 420px;
-      background: #03060e;
-    }
-    @media (max-width: 768px) {
-      iframe { min-height: 280px; }
-    }
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #1e293b;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #facc15;
-      border-radius: 10px;
-    }
-    .modal {
-      transition: opacity 0.2s ease;
-    }
-  </style>
 </head>
-<body class="text-gray-200">
-
-<div class="max-w-7xl mx-auto px-4 py-6 md:px-6 lg:px-8">
-  
-  <!-- Header with Auth & Brand -->
-  <div class="flex flex-wrap justify-between items-center gap-4 border-b border-gray-800 pb-5 mb-6">
-    <div class="flex items-center gap-3">
-      <i class="fas fa-crown text-3xl text-yellow-400"></i>
-      <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-yellow-300 to-yellow-500 bg-clip-text text-transparent">WizhuB</h1>
-      <span class="hidden md:inline-block text-xs bg-gray-800/70 px-3 py-1 rounded-full"><i class="fas fa-sync-alt mr-1"></i> Multi‑Embed + Sync</span>
-    </div>
-    <div id="authButtons" class="flex gap-3">
-      <button id="loginBtn" class="bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded-full text-sm font-semibold transition"><i class="fas fa-sign-in-alt mr-1"></i> Login</button>
-      <button id="signupBtn" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-full text-sm font-semibold transition"><i class="fas fa-user-plus mr-1"></i> Sign Up</button>
-      <div id="userPanel" class="hidden items-center gap-3">
-        <span id="userEmail" class="text-sm text-yellow-300 truncate max-w-[150px]"></span>
-        <button id="logoutBtn" class="bg-red-800/50 hover:bg-red-700 px-3 py-1.5 rounded-full text-xs"><i class="fas fa-sign-out-alt"></i> Logout</button>
+<body>
+  <div class="app-container">
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="nav-brand">
+        <i class="fas fa-crown"></i>
+        <span>WizhuB</span>
       </div>
-    </div>
-  </div>
+      <div class="nav-search">
+        <i class="fas fa-search"></i>
+        <input type="text" id="searchInput" placeholder="Search movies or TV series...">
+      </div>
+      <div class="nav-auth" id="authButtons">
+        <button id="loginBtn" class="btn-outline">Login</button>
+        <button id="signupBtn" class="btn-primary">Sign Up</button>
+      </div>
+      <div class="nav-user" id="userPanel" style="display: none;">
+        <span id="userEmail"></span>
+        <button id="logoutBtn" class="btn-outline-small">Logout</button>
+      </div>
+    </nav>
 
-  <!-- Search & Continue Watching row -->
-  <div class="flex flex-col md:flex-row justify-between gap-4 mb-6">
-    <div class="relative w-full md:w-96">
-      <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-      <input type="text" id="searchInput" placeholder="Search movies or TV series..." class="w-full bg-gray-900/70 border border-gray-700 rounded-full py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-yellow-500/60">
-    </div>
-    <div id="continueWatchingContainer" class="hidden md:block">
-      <button id="showContinueBtn" class="text-xs bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-full"><i class="fas fa-clock mr-1"></i> Continue Watching</button>
-    </div>
-  </div>
-
-  <!-- Main Grid Section (Trending / Search results) -->
-  <div>
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-semibold flex items-center gap-2"><i class="fas fa-fire-flame text-orange-400"></i> <span id="sectionTitle">Trending Movies</span></h2>
-      <button id="clearDetailBtn" class="text-xs text-gray-400 hover:text-yellow-400 transition"><i class="fas fa-arrow-left mr-1"></i> close player</button>
-    </div>
-    <div id="moviesGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
-      <!-- loading skeleton appears dynamically -->
-    </div>
-  </div>
-
-  <!-- DETAIL + EMBED PLAYER SECTION -->
-  <div id="detailPanel" class="mt-12 rounded-2xl glass-card p-5 md:p-6 hidden">
-    <div class="flex flex-col lg:flex-row gap-6">
-      <!-- left poster + info -->
-      <div class="lg:w-1/4 flex-shrink-0">
-        <img id="detailPoster" class="w-full rounded-xl shadow-2xl object-cover border border-gray-700" src="https://via.placeholder.com/300x450?text=Poster" alt="poster">
-        <div class="mt-4 space-y-2 text-sm">
-          <p><i class="fas fa-star text-yellow-400 w-5"></i> <span id="detailRating">—</span> / 10</p>
-          <p><i class="fas fa-calendar-alt w-5 text-gray-400"></i> <span id="detailYear">—</span></p>
-          <p><i class="fas fa-tag w-5 text-gray-400"></i> <span id="detailType" class="capitalize">—</span></p>
+    <!-- Main Content -->
+    <main>
+      <!-- Hero / Trending section -->
+      <section class="trending-section">
+        <div class="section-header">
+          <h2><i class="fas fa-fire-flame"></i> Trending Now</h2>
+          <button id="clearDetailBtn" class="close-player-btn">✕ Close Player</button>
         </div>
-      </div>
-      <!-- right content -->
-      <div class="flex-1">
-        <h2 id="detailTitle" class="text-2xl md:text-3xl font-bold leading-tight">Movie Title</h2>
-        <p id="detailOverview" class="text-gray-300 text-sm md:text-base mt-3 leading-relaxed">Overview...</p>
-        
-        <!-- TV show controls -->
-        <div id="tvControls" class="mt-5 hidden space-y-3 p-3 rounded-xl bg-black/30 border border-gray-700/60">
-          <div class="flex flex-wrap gap-4 items-end">
-            <div><label class="text-xs text-yellow-400 uppercase">Season</label><select id="seasonSelect" class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm w-28"></select></div>
-            <div><label class="text-xs text-yellow-400 uppercase">Episode</label><select id="episodeSelect" class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm w-28"></select></div>
+        <div id="moviesGrid" class="movies-grid">
+          <!-- cards injected here -->
+        </div>
+      </section>
+
+      <!-- Player & Details Panel (hidden initially) -->
+      <div id="detailPanel" class="detail-panel hidden">
+        <div class="detail-container">
+          <div class="detail-poster">
+            <img id="detailPoster" alt="Poster">
           </div>
-        </div>
-
-        <!-- EMBED SOURCES + PROGRESS SAVE -->
-        <div class="mt-5">
-          <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-sm font-medium">Stream source:</span>
-              <select id="sourceSelect" class="bg-gray-800 border border-gray-600 rounded-full text-sm py-1.5 px-3"></select>
+          <div class="detail-info">
+            <h1 id="detailTitle"></h1>
+            <div class="detail-meta">
+              <span><i class="fas fa-star"></i> <span id="detailRating"></span> / 10</span>
+              <span><i class="fas fa-calendar"></i> <span id="detailYear"></span></span>
+              <span id="detailType" class="media-type-badge"></span>
             </div>
-            <div class="flex gap-2">
-              <button id="saveProgressBtn" class="text-xs bg-blue-600/70 hover:bg-blue-600 px-3 py-1.5 rounded-full transition"><i class="fas fa-save mr-1"></i> Save Progress</button>
-              <button id="refreshEmbedBtn" class="text-xs bg-yellow-600/20 hover:bg-yellow-600/40 px-3 py-1.5 rounded-full"><i class="fas fa-sync-alt mr-1"></i> Reload</button>
+            <p id="detailOverview" class="overview"></p>
+            
+            <!-- TV Controls (hidden for movies) -->
+            <div id="tvControls" class="tv-controls hidden">
+              <select id="seasonSelect"></select>
+              <select id="episodeSelect"></select>
+            </div>
+
+            <!-- Embed Source & Progress -->
+            <div class="embed-controls">
+              <div class="source-row">
+                <label>Stream source:</label>
+                <select id="sourceSelect"></select>
+                <button id="refreshEmbedBtn" class="icon-btn"><i class="fas fa-sync-alt"></i> Reload</button>
+              </div>
+              <div class="progress-row">
+                <label><i class="fas fa-clock"></i> Resume at (min):</label>
+                <input type="number" id="progressMinutes" value="0" step="1" min="0">
+                <button id="jumpToTimeBtn" class="secondary-btn">Jump</button>
+                <button id="saveProgressBtn" class="primary-btn"><i class="fas fa-save"></i> Save Progress</button>
+                <span id="savedProgressBadge" class="saved-badge hidden">✓ Saved</span>
+              </div>
+            </div>
+
+            <!-- Embed Iframe -->
+            <div class="embed-wrapper">
+              <iframe id="embedIframe" allowfullscreen allow="autoplay; encrypted-media"></iframe>
             </div>
           </div>
-          <!-- Manual progress input (minutes) -->
-          <div class="flex items-center gap-3 mb-3 bg-black/30 p-2 rounded-lg text-sm flex-wrap">
-            <i class="fas fa-hourglass-half text-yellow-400"></i>
-            <span>Resume time (minutes):</span>
-            <input type="number" id="progressMinutes" value="0" step="1" min="0" class="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white">
-            <button id="jumpToTimeBtn" class="text-xs bg-gray-700 px-2 py-1 rounded">⏩ Jump (reload embed)</button>
-            <span id="savedProgressBadge" class="text-green-400 text-xs hidden"><i class="fas fa-check-circle"></i> Saved</span>
-          </div>
-          <div class="embed-container rounded-xl overflow-hidden border border-gray-700">
-            <iframe id="embedIframe" title="movie embed" allowfullscreen allow="autoplay; encrypted-media" referrerpolicy="origin"></iframe>
-          </div>
-          <p class="text-[11px] text-gray-500 mt-2 text-center">External providers: vidsrc, 2embed, embed.su, vidplay. Progress saved manually.</p>
         </div>
       </div>
+    </main>
+
+    <!-- Continue Watching Sidebar -->
+    <aside id="continuePanel" class="continue-sidebar">
+      <div class="sidebar-header">
+        <h3><i class="fas fa-history"></i> Continue Watching</h3>
+        <button id="closeContinueBtn"><i class="fas fa-times"></i></button>
+      </div>
+      <div id="continueList" class="continue-list"></div>
+    </aside>
+  </div>
+
+  <!-- Login/ Signup Modals -->
+  <div id="loginModal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal">&times;</span>
+      <h3>Login to WizhuB</h3>
+      <input type="email" id="loginEmail" placeholder="Email">
+      <input type="password" id="loginPassword" placeholder="Password">
+      <button id="doLoginBtn" class="btn-primary">Login</button>
+      <p>No account? <a id="switchToSignup">Sign up</a></p>
+    </div>
+  </div>
+  <div id="signupModal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal">&times;</span>
+      <h3>Create Account</h3>
+      <input type="email" id="signupEmail" placeholder="Email">
+      <input type="password" id="signupPassword" placeholder="Password (min 6 chars)">
+      <button id="doSignupBtn" class="btn-primary">Sign Up</button>
+      <p>Already have an account? <a id="switchToLogin">Login</a></p>
     </div>
   </div>
 
-  <!-- Modals (Login / Signup) -->
-  <div id="loginModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden modal">
-    <div class="bg-gray-900 rounded-2xl p-6 w-96 max-w-[90%] shadow-2xl border border-yellow-500/30">
-      <h3 class="text-xl font-bold mb-4"><i class="fas fa-sign-in-alt mr-2"></i>Login to WizhuB</h3>
-      <input type="email" id="loginEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3">
-      <input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4">
-      <button id="doLoginBtn" class="bg-yellow-600 w-full py-2 rounded-lg font-semibold">Login</button>
-      <p class="text-center text-sm mt-3 text-gray-400">No account? <span id="switchToSignup" class="text-yellow-400 cursor-pointer">Sign up</span></p>
-      <button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button>
-    </div>
-  </div>
-  <div id="signupModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden modal">
-    <div class="bg-gray-900 rounded-2xl p-6 w-96 max-w-[90%] shadow-2xl border border-yellow-500/30">
-      <h3 class="text-xl font-bold mb-4"><i class="fas fa-user-plus mr-2"></i>Create Account</h3>
-      <input type="email" id="signupEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3">
-      <input type="password" id="signupPassword" placeholder="Password (min 6 chars)" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4">
-      <button id="doSignupBtn" class="bg-yellow-600 w-full py-2 rounded-lg font-semibold">Sign Up</button>
-      <p class="text-center text-sm mt-3 text-gray-400">Already have account? <span id="switchToLogin" class="text-yellow-400 cursor-pointer">Login</span></p>
-      <button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button>
-    </div>
-  </div>
-
-  <!-- Continue Watching Side Panel (floating) -->
-  <div id="continuePanel" class="fixed right-0 top-20 bottom-0 w-80 bg-gray-900/95 backdrop-blur-md border-l border-yellow-500/30 shadow-2xl z-40 transform translate-x-full transition-transform duration-300 p-4 overflow-y-auto">
-    <div class="flex justify-between items-center mb-4"><h3 class="font-bold"><i class="fas fa-history"></i> Continue Watching</h3><button id="closeContinueBtn" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button></div>
-    <div id="continueList" class="space-y-3 text-sm"></div>
-  </div>
-</div>
-
-<script>
-  // ================= CONFIGURATION =================
-  const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
-  const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
-  const EMBED_SOURCES = [
-    { name: '🎬 Vidsrc', getUrl: (type, id, season, ep) => type === 'movie' ? `https://vidsrc.to/embed/movie/${id}` : `https://vidsrc.to/embed/tv/${id}/${season}/${ep}` },
-    { name: '📺 2Embed', getUrl: (type, id, season, ep) => type === 'movie' ? `https://2embed.sx/embed/movie?tmdb=${id}` : `https://2embed.sx/embed/tv?tmdb=${id}&season=${season}&episode=${ep}` },
-    { name: '🌀 Embed.su', getUrl: (type, id, season, ep) => type === 'movie' ? `https://embed.su/embed/movie/${id}` : `https://embed.su/embed/tv/${id}/${season}/${ep}` },
-    { name: '⚡ Vidplay', getUrl: (type, id, season, ep) => type === 'movie' ? `https://vidplay.site/embed/movie/${id}` : `https://vidplay.site/embed/tv/${id}/${season}/${ep}` }
-  ];
-
-  // ================= SUPABASE SETUP =================
-  // 🔥 IMPORTANT: Replace with your actual Supabase URL and anon key (from Supabase project settings)
-  const SUPABASE_URL = 'https://evhtzfkxolnlqlmjewew.supabase.co';        // e.g., 'https://xyzcompany.supabase.co'
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHR6Zmt4b2xubHFsbWpld2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTMzOTUsImV4cCI6MjA5NTg2OTM5NX0.42bpsGRyKSZcQ3EUj1k3grsUVuXtZWKsce7OKv8J5YU';
-  
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  // ================= GLOBAL STATE =================
-  let currentUser = null;
-  let currentMedia = null;        // { type, id, title, posterPath, overview, rating, year, season?, episode? }
-  let currentTVSeasons = [];
-  let currentSeasonNumber = 1, currentEpisodeNumber = 1;
-
-  // DOM elements
-  const moviesGrid = document.getElementById('moviesGrid');
-  const detailPanel = document.getElementById('detailPanel');
-  const searchInput = document.getElementById('searchInput');
-  const sectionTitleSpan = document.getElementById('sectionTitle');
-  const sourceSelect = document.getElementById('sourceSelect');
-  const embedIframe = document.getElementById('embedIframe');
-  const tvControlsDiv = document.getElementById('tvControls');
-  const seasonSelect = document.getElementById('seasonSelect');
-  const episodeSelect = document.getElementById('episodeSelect');
-  const progressMinutesInput = document.getElementById('progressMinutes');
-  const saveProgressBtn = document.getElementById('saveProgressBtn');
-  const jumpToTimeBtn = document.getElementById('jumpToTimeBtn');
-  const savedProgressBadge = document.getElementById('savedProgressBadge');
-  const continuePanel = document.getElementById('continuePanel');
-  const continueList = document.getElementById('continueList');
-  const showContinueBtn = document.getElementById('showContinueBtn');
-  const closeContinueBtn = document.getElementById('closeContinueBtn');
-
-  // Helper: populate source dropdown
-  function populateSources() {
-    sourceSelect.innerHTML = '';
-    EMBED_SOURCES.forEach((src, idx) => {
-      let opt = document.createElement('option');
-      opt.value = idx;
-      opt.textContent = src.name;
-      sourceSelect.appendChild(opt);
-    });
-  }
-
-  // Update embed URL based on current media, source & progress time
-  function updateEmbedStream() {
-    if (!currentMedia) return;
-    const srcIdx = parseInt(sourceSelect.value);
-    const source = EMBED_SOURCES[srcIdx];
-    let embedUrl = '';
-    if (currentMedia.type === 'movie') {
-      embedUrl = source.getUrl('movie', currentMedia.id, null, null);
-    } else {
-      embedUrl = source.getUrl('tv', currentMedia.id, currentSeasonNumber, currentEpisodeNumber);
-    }
-    // Append time parameter (some embeds support start time via ?t=seconds)
-    let minutes = parseInt(progressMinutesInput.value) || 0;
-    let seconds = minutes * 60;
-    if (seconds > 0 && embedUrl) {
-      embedUrl += (embedUrl.includes('?') ? '&' : '?') + `t=${seconds}`;
-    }
-    if (embedUrl) embedIframe.src = embedUrl;
-    else embedIframe.srcdoc = "<div style='padding:2rem;text-align:center'>⚠️ Source unavailable</div>";
-  }
-
-  // ================= SUPABASE: Watch History Functions =================
-  async function saveWatchProgress() {
-    if (!currentUser) { alert("Login required to save progress"); return; }
-    if (!currentMedia) return;
-    const progressMins = parseInt(progressMinutesInput.value) || 0;
-    
-    const watchRecord = {
-      user_id: currentUser.id,
-      media_type: currentMedia.type,
-      tmdb_id: currentMedia.id,
-      title: currentMedia.title,
-      poster_path: currentMedia.posterPath || null,
-      media_year: currentMedia.year || null,
-      rating: currentMedia.rating || null,
-      progress_minutes: progressMins,
-      last_watched: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    if (currentMedia.type === 'tv') {
-      watchRecord.season_number = currentSeasonNumber;
-      watchRecord.episode_number = currentEpisodeNumber;
-    }
-    
-    const { data, error } = await supabase
-      .from('watch_history')
-      .upsert(watchRecord, { onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number' });
-    
-    if (error) {
-      console.error(error);
-      alert("Error saving progress: " + error.message);
-    } else {
-      savedProgressBadge.classList.remove('hidden');
-      setTimeout(() => savedProgressBadge.classList.add('hidden'), 2000);
-      loadContinueWatching();  // refresh sidebar
-    }
-  }
-
-  async function loadProgressForCurrent() {
-    if (!currentUser || !currentMedia) return;
-    let query = supabase
-      .from('watch_history')
-      .select('progress_minutes')
-      .eq('user_id', currentUser.id)
-      .eq('media_type', currentMedia.type)
-      .eq('tmdb_id', currentMedia.id);
-    
-    if (currentMedia.type === 'tv') {
-      query = query.eq('season_number', currentSeasonNumber).eq('episode_number', currentEpisodeNumber);
-    } else {
-      query = query.is('season_number', null).is('episode_number', null);
-    }
-    
-    const { data, error } = await query.maybeSingle();
-    if (!error && data) {
-      progressMinutesInput.value = data.progress_minutes || 0;
-      if (data.progress_minutes > 0) alert(`⏪ Saved progress: ${data.progress_minutes} minutes. Use Jump button to resume.`);
-    } else {
-      progressMinutesInput.value = 0;
-    }
-  }
-
-  async function loadContinueWatching() {
-    if (!currentUser) {
-      continuePanel.classList.add('translate-x-full');
-      return;
-    }
-    const { data, error } = await supabase
-      .from('watch_history')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .order('last_watched', { ascending: false })
-      .limit(10);
-    
-    if (error) {
-      console.error(error);
-      return;
-    }
-    continueList.innerHTML = '';
-    if (!data || data.length === 0) {
-      continueList.innerHTML = '<p class="text-gray-400 text-xs">No history yet. Watch something and save progress.</p>';
-      return;
-    }
-    data.forEach(record => {
-      let display = `${record.title} ${record.media_type === 'tv' ? `(S${record.season_number}E${record.episode_number})` : ''} — ${record.progress_minutes} min`;
-      let div = document.createElement('div');
-      div.className = 'bg-gray-800 p-2 rounded-lg cursor-pointer hover:bg-gray-700';
-      div.innerHTML = `<div class="font-semibold truncate">${record.title}</div><div class="text-xs text-yellow-400">${display}</div>`;
-      div.onclick = async () => {
-        // restore media
-        if (record.media_type === 'movie') {
-          let url = `https://api.themoviedb.org/3/movie/${record.tmdb_id}?api_key=${TMDB_API_KEY}&language=en-US`;
-          let res = await fetch(url);
-          let movie = await res.json();
-          await loadAndDisplayDetails(movie, 'movie');
-          progressMinutesInput.value = record.progress_minutes || 0;
-          updateEmbedStream();
-        } else {
-          let url = `https://api.themoviedb.org/3/tv/${record.tmdb_id}?api_key=${TMDB_API_KEY}&language=en-US`;
-          let res = await fetch(url);
-          let tv = await res.json();
-          await loadAndDisplayDetails(tv, 'tv');
-          currentSeasonNumber = record.season_number;
-          currentEpisodeNumber = record.episode_number;
-          if (seasonSelect) seasonSelect.value = currentSeasonNumber;
-          await populateEpisodesForTV(currentMedia.id, currentSeasonNumber);
-          episodeSelect.value = currentEpisodeNumber;
-          progressMinutesInput.value = record.progress_minutes || 0;
-          updateEmbedStream();
-        }
-        continuePanel.classList.add('translate-x-full');
-      };
-      continueList.appendChild(div);
-    });
-  }
-
-  // ================= TV SHOW HELPERS =================
-  async function populateEpisodesForTV(tvId, seasonNum) {
-    let url = `https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNum}?api_key=${TMDB_API_KEY}&language=en-US`;
-    let res = await fetch(url);
-    let data = await res.json();
-    let episodes = data.episodes || [];
-    episodeSelect.innerHTML = '';
-    if (episodes.length === 0) {
-      let opt = document.createElement('option');
-      opt.value = 1;
-      opt.textContent = 'Episode 1';
-      episodeSelect.appendChild(opt);
-    } else {
-      episodes.forEach(ep => {
-        let opt = document.createElement('option');
-        opt.value = ep.episode_number;
-        opt.textContent = `Episode ${ep.episode_number}: ${ep.name.substring(0,40)}`;
-        episodeSelect.appendChild(opt);
-      });
-    }
-    if (!currentEpisodeNumber) currentEpisodeNumber = episodes[0]?.episode_number || 1;
-    episodeSelect.value = currentEpisodeNumber;
-  }
-
-  async function setupTVControls(tvId, seasonsArray) {
-    if (!seasonsArray.length) { tvControlsDiv.classList.add('hidden'); return; }
-    tvControlsDiv.classList.remove('hidden');
-    seasonSelect.innerHTML = '';
-    seasonsArray.forEach(s => {
-      let opt = document.createElement('option');
-      opt.value = s.season_number;
-      opt.textContent = `Season ${s.season_number}`;
-      seasonSelect.appendChild(opt);
-    });
-    currentSeasonNumber = seasonsArray[0].season_number;
-    seasonSelect.value = currentSeasonNumber;
-    await populateEpisodesForTV(tvId, currentSeasonNumber);
-    seasonSelect.onchange = async () => {
-      currentSeasonNumber = parseInt(seasonSelect.value);
-      await populateEpisodesForTV(tvId, currentSeasonNumber);
-      await loadProgressForCurrent();
-      updateEmbedStream();
-    };
-    episodeSelect.onchange = async () => {
-      currentEpisodeNumber = parseInt(episodeSelect.value);
-      await loadProgressForCurrent();
-      updateEmbedStream();
-    };
-  }
-
-  // ================= LOAD DETAILS & RENDER =================
-  async function loadAndDisplayDetails(item, mediaType) {
-    detailPanel.classList.remove('hidden');
-    const id = item.id;
-    const title = item.title || item.name;
-    const posterPath = item.poster_path;
-    const overview = item.overview || "No overview available.";
-    const rating = item.vote_average ? item.vote_average.toFixed(1) : "—";
-    const year = mediaType === 'movie' ? (item.release_date?.split('-')[0] || 'N/A') : (item.first_air_date?.split('-')[0] || 'N/A');
-    document.getElementById('detailPoster').src = posterPath ? IMG_BASE + posterPath : 'https://via.placeholder.com/300x450?text=No+Image';
-    document.getElementById('detailTitle').innerText = title;
-    document.getElementById('detailOverview').innerText = overview;
-    document.getElementById('detailRating').innerText = rating;
-    document.getElementById('detailYear').innerText = year;
-    document.getElementById('detailType').innerText = mediaType === 'movie' ? 'Movie' : 'TV Series';
-    currentMedia = { type: mediaType, id, title, posterPath, overview, rating, year };
-    
-    if (mediaType === 'tv') {
-      let tvDetails = await fetch(`https://api.themoviedb.org/3/tv/${id}?api_key=${TMDB_API_KEY}&language=en-US`).then(r=>r.json());
-      let seasons = (tvDetails.seasons || []).filter(s=>s.season_number>0);
-      await setupTVControls(id, seasons);
-    } else {
-      tvControlsDiv.classList.add('hidden');
-    }
-    await loadProgressForCurrent();
-    updateEmbedStream();
-  }
-
-  // Render grid (trending / search)
-  async function fetchTrending() {
-    let url = `https://api.themoviedb.org/3/trending/movie/week?api_key=${TMDB_API_KEY}`;
-    let res = await fetch(url);
-    let data = await res.json();
-    renderItems(data.results.slice(0,18).map(m=>({...m, media_type:'movie'})), "🔥 Trending Movies");
-  }
-  
-  async function searchMulti(query) {
-    if(!query.trim()){ fetchTrending(); return; }
-    let url = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`;
-    let res = await fetch(url);
-    let data = await res.json();
-    let filtered = data.results.filter(r=>r.media_type==='movie'||r.media_type==='tv').slice(0,20);
-    renderItems(filtered, `Results: "${query}"`);
-  }
-  
-  function renderItems(items, titleText) {
-    sectionTitleSpan.innerText = titleText;
-    if(!items.length){ moviesGrid.innerHTML='<div class="col-span-full text-center p-8">Nothing found</div>'; return; }
-    moviesGrid.innerHTML = items.map(item=>{
-      let mediaType = item.media_type || (item.title?'movie':'tv');
-      let title = item.title||item.name;
-      let poster = item.poster_path?IMG_BASE+item.poster_path:'https://via.placeholder.com/300x450?text=No+Cover';
-      let year = (item.release_date||item.first_air_date||'').slice(0,4);
-      let rating = item.vote_average?.toFixed(1)||'';
-      return `<div class="glass-card rounded-xl overflow-hidden cursor-pointer hover:scale-105 transition" data-id="${item.id}" data-type="${mediaType}">
-        <img class="w-full h-64 object-cover" src="${poster}"><div class="p-3"><div class="font-semibold truncate">${title}</div><div class="flex justify-between text-xs text-gray-400"><span>${year||'—'}</span><span><i class="fas fa-star text-yellow-400"></i> ${rating||'—'}</span></div><span class="text-[10px] bg-gray-800 px-2 rounded-full capitalize">${mediaType}</span></div></div>`;
-    }).join('');
-    document.querySelectorAll('[data-id]').forEach(card=>{
-      card.addEventListener('click',(e)=>{
-        let id = parseInt(card.dataset.id);
-        let type = card.dataset.type;
-        let url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}&language=en-US`;
-        fetch(url).then(r=>r.json()).then(data=>loadAndDisplayDetails(data,type));
-      });
-    });
-  }
-
-  // ================= AUTH UI (Supabase) =================
-  const loginModal = document.getElementById('loginModal');
-  const signupModal = document.getElementById('signupModal');
-  document.getElementById('loginBtn').onclick = ()=>loginModal.classList.remove('hidden');
-  document.getElementById('signupBtn').onclick = ()=>signupModal.classList.remove('hidden');
-  document.querySelectorAll('.closeModal').forEach(btn=>btn.onclick=()=>{loginModal.classList.add('hidden');signupModal.classList.add('hidden');});
-  document.getElementById('switchToSignup').onclick = ()=>{loginModal.classList.add('hidden');signupModal.classList.remove('hidden');};
-  document.getElementById('switchToLogin').onclick = ()=>{signupModal.classList.add('hidden');loginModal.classList.remove('hidden');};
-  
-  document.getElementById('doLoginBtn').onclick = async()=>{
-    let email=document.getElementById('loginEmail').value, pass=document.getElementById('loginPassword').value;
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
-    if(error) alert(error.message);
-    else { alert("Logged in"); loginModal.classList.add('hidden'); updateAuthUI(); }
-  };
-  document.getElementById('doSignupBtn').onclick = async()=>{
-    let email=document.getElementById('signupEmail').value, pass=document.getElementById('signupPassword').value;
-    const { data, error } = await supabase.auth.signUp({ email, password: pass });
-    if(error) alert(error.message);
-    else { alert("Account created! You can now log in."); signupModal.classList.add('hidden'); }
-  };
-  document.getElementById('logoutBtn').onclick = async()=>{ await supabase.auth.signOut(); updateAuthUI(); detailPanel.classList.add('hidden'); };
-  
-  async function updateAuthUI() {
-    const { data: { user } } = await supabase.auth.getUser();
-    currentUser = user;
-    if (user) {
-      document.getElementById('authButtons').classList.add('hidden');
-      document.getElementById('userPanel').classList.remove('hidden');
-      document.getElementById('userEmail').innerText = user.email;
-      document.getElementById('continueWatchingContainer').classList.remove('hidden');
-      loadContinueWatching();
-    } else {
-      document.getElementById('authButtons').classList.remove('hidden');
-      document.getElementById('userPanel').classList.add('hidden');
-      document.getElementById('continueWatchingContainer').classList.add('hidden');
-      continuePanel.classList.add('translate-x-full');
-    }
-  }
-  
-  // Listen to auth state changes
-  supabase.auth.onAuthStateChange((event, session) => {
-    updateAuthUI();
-    if (event === 'SIGNED_OUT') {
-      // Optionally clear current media display
-      detailPanel.classList.add('hidden');
-      currentMedia = null;
-    }
-  });
-  
-  // ================= EVENT LISTENERS =================
-  clearDetailBtn.addEventListener('click', ()=>detailPanel.classList.add('hidden'));
-  refreshEmbedBtn.addEventListener('click', ()=>updateEmbedStream());
-  sourceSelect.addEventListener('change', ()=>updateEmbedStream());
-  saveProgressBtn.addEventListener('click', saveWatchProgress);
-  jumpToTimeBtn.addEventListener('click', ()=>updateEmbedStream());
-  showContinueBtn.addEventListener('click', ()=>continuePanel.classList.remove('translate-x-full'));
-  closeContinueBtn.addEventListener('click', ()=>continuePanel.classList.add('translate-x-full'));
-  
-  let debounceTimer;
-  searchInput.addEventListener('input', (e)=>{
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(()=>{
-      const q = e.target.value.trim();
-      if(q==="") fetchTrending();
-      else searchMulti(q);
-      if(currentMedia) detailPanel.classList.add('hidden');
-    }, 500);
-  });
-  
-  // ================= INIT =================
-  populateSources();
-  fetchTrending();
-  updateAuthUI();
-</script>
+  <script src="script.js"></script>
 </body>
 </html>
