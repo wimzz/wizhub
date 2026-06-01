@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB • Episode Progress & Navigation</title>
+  <title>WizhuB • Auto‑Save & Latest Episode</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -209,17 +209,16 @@
             <button id="orderSourcesBtn" class="text-xs bg-yellow-600 hover:bg-yellow-500 px-2 py-1 rounded-full" title="Reorder sources"><i class="fas fa-arrows-alt"></i></button>
           </div>
           <div class="flex flex-wrap items-center gap-4 bg-black/30 p-3 rounded-xl">
-            <span class="text-sm"><i class="fas fa-clock"></i> Watched (minutes):</span>
-            <input type="number" id="progressMinutes" value="0" step="1" min="0" class="w-24 bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm">
-            <button id="saveProgressBtn" class="text-xs bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded-full"><i class="fas fa-save"></i> Save Time</button>
+            <span class="text-sm"><i class="fas fa-clock"></i> Progress (auto-save every 30s):</span>
+            <span id="progressMinutesDisplay" class="text-sm text-yellow-400">0 min</span>
           </div>
-          <p class="text-xs text-gray-400">Enter minutes watched and save. Progress is saved per episode (for TV shows).</p>
+          <p class="text-xs text-gray-400">Progress saves automatically every 30 seconds. Switching episode updates the same Continue Watching card.</p>
         </div>
 
         <div class="embed-container mt-3">
           <iframe id="embedIframe" allowfullscreen></iframe>
         </div>
-        <p class="text-[10px] text-gray-500 text-center mt-2">Change server above, then reload. Your saved time works across all sources.</p>
+        <p class="text-[10px] text-gray-500 text-center mt-2">Change server above, then reload. Progress auto-saves.</p>
       </div>
     </div>
   </div>
@@ -283,31 +282,20 @@
   const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
   const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
   let EMBED_SOURCES = [
-    { name: '🎬 Vidsrc', url: (type, id, s, e) => {
-        return type === 'movie' ? `https://vidsrc.to/embed/movie/${id}` : `https://vidsrc.to/embed/tv/${id}/${s}/${e}`;
-      }
-    },
-    { name: '📺 2Embed', url: (type, id, s, e) => {
-        return type === 'movie' ? `https://2embed.sx/embed/movie?tmdb=${id}` : `https://2embed.sx/embed/tv?tmdb=${id}&season=${s}&episode=${e}`;
-      }
-    },
-    { name: '🌀 Embed.su', url: (type, id, s, e) => {
-        return type === 'movie' ? `https://embed.su/embed/movie/${id}` : `https://embed.su/embed/tv/${id}/${s}/${e}`;
-      }
-    },
-    { name: '⚡ Vidplay', url: (type, id, s, e) => {
-        return type === 'movie' ? `https://vidplay.site/embed/movie/${id}` : `https://vidplay.site/embed/tv/${id}/${s}/${e}`;
-      }
-    }
+    { name: '🎬 Vidsrc', url: (type, id, s, e) => type === 'movie' ? `https://vidsrc.to/embed/movie/${id}` : `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
+    { name: '📺 2Embed', url: (type, id, s, e) => type === 'movie' ? `https://2embed.sx/embed/movie?tmdb=${id}` : `https://2embed.sx/embed/tv?tmdb=${id}&season=${s}&episode=${e}` },
+    { name: '🌀 Embed.su', url: (type, id, s, e) => type === 'movie' ? `https://embed.su/embed/movie/${id}` : `https://embed.su/embed/tv/${id}/${s}/${e}` },
+    { name: '⚡ Vidplay', url: (type, id, s, e) => type === 'movie' ? `https://vidplay.site/embed/movie/${id}` : `https://vidplay.site/embed/tv/${id}/${s}/${e}` }
   ];
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let currentUser = null;
-  let currentMedia = null;      // { type, id, title, posterPath, year, rating, overview }
+  let currentMedia = null;
   let currentSeason = 1, currentEpisode = 1;
   let currentProgressMinutes = 0;
+  let autoSaveTimer = null;
   let currentTVDetails = null;
-  let currentEpisodesList = [];  // store episodes for current season
+  let currentEpisodesList = [];
 
   // DOM elements
   const continueContainer = document.getElementById('continueWatchingContainer');
@@ -322,8 +310,7 @@
   const episodeSelect = document.getElementById('episodeSelect');
   const prevEpisodeBtn = document.getElementById('prevEpisodeBtn');
   const nextEpisodeBtn = document.getElementById('nextEpisodeBtn');
-  const progressMinutesInput = document.getElementById('progressMinutes');
-  const saveProgressBtn = document.getElementById('saveProgressBtn');
+  const progressMinutesDisplay = document.getElementById('progressMinutesDisplay');
   const reloadEmbedBtn = document.getElementById('reloadEmbedBtn');
   const globalSearch = document.getElementById('globalSearch');
   const orderModal = document.getElementById('orderModal');
@@ -332,33 +319,23 @@
   const closeOrderBtn = document.getElementById('closeOrderBtn');
   const orderSourcesBtn = document.getElementById('orderSourcesBtn');
 
-  // Helper: show loading
   function showLoading(container) {
     container.innerHTML = '<div class="col-span-full flex justify-center py-10"><div class="loading-spinner"></div><span class="ml-2">Loading...</span></div>';
   }
 
-  // ================= SOURCE ORDER (per user) =================
+  // ================= SOURCE ORDER =================
   async function loadUserSourceOrder() {
     if (!currentUser) return;
-    const { data, error } = await sb
-      .from('user_settings')
-      .select('source_order')
-      .eq('id', currentUser.id)
-      .maybeSingle();
+    const { data, error } = await sb.from('user_settings').select('source_order').eq('id', currentUser.id).maybeSingle();
     if (!error && data && data.source_order && Array.isArray(data.source_order) && data.source_order.length === EMBED_SOURCES.length) {
       EMBED_SOURCES = data.source_order;
       populateSources();
     }
   }
-
   async function saveUserSourceOrder() {
     if (!currentUser) return;
-    const { error } = await sb
-      .from('user_settings')
-      .upsert({ id: currentUser.id, source_order: EMBED_SOURCES, updated_at: new Date().toISOString() });
-    if (error) console.error("Failed to save source order:", error);
+    await sb.from('user_settings').upsert({ id: currentUser.id, source_order: EMBED_SOURCES, updated_at: new Date().toISOString() });
   }
-
   function populateSources() {
     sourceSelect.innerHTML = '';
     EMBED_SOURCES.forEach((src, i) => {
@@ -368,7 +345,6 @@
       sourceSelect.appendChild(opt);
     });
   }
-
   function updateEmbedStream() {
     if (!currentMedia) return;
     const srcIdx = parseInt(sourceSelect.value);
@@ -381,11 +357,10 @@
     }
     if (url) embedIframe.src = url;
     else embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
-    console.log('Embed URL:', url);
   }
 
-  // ================= DATABASE FUNCTIONS (per episode) =================
-  async function ensureWatchHistoryEntry() {
+  // ================= AUTO-SAVE & DATABASE =================
+  async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
     const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
@@ -397,7 +372,7 @@
       poster_path: currentMedia.posterPath,
       media_year: currentMedia.year,
       rating: currentMedia.rating,
-      progress_minutes: 0,
+      progress_minutes: currentProgressMinutes,
       season_number: season,
       episode_number: episode,
       last_watched: new Date().toISOString(),
@@ -405,76 +380,67 @@
     };
     const { error } = await sb
       .from('watch_history')
-      .upsert(record, { onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number' });
-    if (error) console.error("Auto-add error:", error);
-  }
-
-  async function saveProgressToDB() {
-    if (!currentUser) { alert('Please login first'); return; }
-    if (!currentMedia) return;
-    const minutes = parseInt(progressMinutesInput.value) || 0;
-    const season = currentMedia.type === 'tv' ? currentSeason : 0;
-    const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
-    const record = {
-      user_id: currentUser.id,
-      media_type: currentMedia.type,
-      tmdb_id: currentMedia.id,
-      title: currentMedia.title,
-      poster_path: currentMedia.posterPath,
-      media_year: currentMedia.year,
-      rating: currentMedia.rating,
-      progress_minutes: minutes,
-      season_number: season,
-      episode_number: episode,
-      last_watched: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    const { error } = await sb
-      .from('watch_history')
-      .upsert(record, { onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number' });
-    if (error) alert('Save error: ' + error.message);
+      .upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
+    if (error) console.error("Auto-save error:", error);
     else {
-      currentProgressMinutes = minutes;
-      await renderContinueWatching();
-      console.log('Saved progress:', minutes, 'for episode', currentEpisode);
+      console.log("Auto-saved:", currentProgressMinutes, "min for", currentMedia.title, season>0?`S${season}E${episode}`:'');
+      renderContinueWatching(); // refresh continue watching list
     }
   }
 
-  async function deleteHistoryEntry(mediaType, tmdbId, season, episode) {
+  function startAutoSave() {
+    if (autoSaveTimer) clearInterval(autoSaveTimer);
+    autoSaveTimer = setInterval(() => {
+      if (currentUser && currentMedia && playerPanel.classList.contains('hidden') === false) {
+        if (currentProgressMinutes < 120) { // cap at 120 min
+          currentProgressMinutes += 1;
+          progressMinutesDisplay.innerText = currentProgressMinutes + ' min';
+          saveProgressToDB();
+        }
+      }
+    }, 30000); // every 30 seconds
+  }
+
+  function stopAutoSave() {
+    if (autoSaveTimer) clearInterval(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+
+  async function loadProgress() {
+    if (!currentUser || !currentMedia) return;
+    const { data, error } = await sb
+      .from('watch_history')
+      .select('progress_minutes, season_number, episode_number')
+      .eq('user_id', currentUser.id)
+      .eq('media_type', currentMedia.type)
+      .eq('tmdb_id', currentMedia.id)
+      .maybeSingle();
+    if (!error && data) {
+      currentProgressMinutes = data.progress_minutes || 0;
+      progressMinutesDisplay.innerText = currentProgressMinutes + ' min';
+      // If TV show, restore last watched season/episode
+      if (currentMedia.type === 'tv') {
+        if (data.season_number && data.episode_number) {
+          currentSeason = data.season_number;
+          currentEpisode = data.episode_number;
+        }
+      }
+    } else {
+      currentProgressMinutes = 0;
+      progressMinutesDisplay.innerText = '0 min';
+    }
+  }
+
+  async function deleteHistoryEntry(mediaType, tmdbId) {
     if (!currentUser) return;
     const { error } = await sb
       .from('watch_history')
       .delete()
       .eq('user_id', currentUser.id)
       .eq('media_type', mediaType)
-      .eq('tmdb_id', tmdbId)
-      .eq('season_number', season)
-      .eq('episode_number', episode);
+      .eq('tmdb_id', tmdbId);
     if (error) console.error("Delete error:", error);
     else await renderContinueWatching();
-  }
-
-  async function loadProgress() {
-    if (!currentUser || !currentMedia) return;
-    const season = currentMedia.type === 'tv' ? currentSeason : 0;
-    const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
-    const { data, error } = await sb
-      .from('watch_history')
-      .select('progress_minutes')
-      .eq('user_id', currentUser.id)
-      .eq('media_type', currentMedia.type)
-      .eq('tmdb_id', currentMedia.id)
-      .eq('season_number', season)
-      .eq('episode_number', episode)
-      .maybeSingle();
-    if (error) console.error(error);
-    if (data && data.progress_minutes !== undefined) {
-      currentProgressMinutes = data.progress_minutes;
-      progressMinutesInput.value = currentProgressMinutes;
-    } else {
-      currentProgressMinutes = 0;
-      progressMinutesInput.value = 0;
-    }
   }
 
   async function renderContinueWatching() {
@@ -492,7 +458,6 @@
       continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet. Start watching!</div>';
       return;
     }
-    // Group by media + season/episode to avoid duplicates (already unique)
     continueContainer.innerHTML = '';
     for (const item of data) {
       const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
@@ -502,7 +467,7 @@
       const progressPercent = Math.min((item.progress_minutes / 120) * 100, 100);
       let label = item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie';
       card.innerHTML = `
-        <div class="delete-btn" data-media-type="${item.media_type}" data-tmdb="${item.tmdb_id}" data-season="${item.season_number}" data-episode="${item.episode_number}">
+        <div class="delete-btn" data-media-type="${item.media_type}" data-tmdb="${item.tmdb_id}">
           <i class="fas fa-trash-alt text-xs"></i>
         </div>
         <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
@@ -517,10 +482,8 @@
         e.stopPropagation();
         const mediaType = deleteBtn.dataset.mediaType;
         const tmdbId = parseInt(deleteBtn.dataset.tmdb);
-        const season = parseInt(deleteBtn.dataset.season);
-        const episode = parseInt(deleteBtn.dataset.episode);
-        if (confirm(`Delete "${item.title} ${label}" from Continue Watching?`)) {
-          await deleteHistoryEntry(mediaType, tmdbId, season, episode);
+        if (confirm(`Delete "${item.title}" from Continue Watching?`)) {
+          await deleteHistoryEntry(mediaType, tmdbId);
         }
       });
       card.addEventListener('click', async (e) => {
@@ -530,7 +493,7 @@
           const movie = await res.json();
           await showDetails(movie, 'movie');
           currentProgressMinutes = item.progress_minutes;
-          progressMinutesInput.value = currentProgressMinutes;
+          progressMinutesDisplay.innerText = currentProgressMinutes + ' min';
           updateEmbedStream();
         } else {
           const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
@@ -538,12 +501,12 @@
           await showDetails(tv, 'tv');
           currentSeason = item.season_number;
           currentEpisode = item.episode_number;
-          // Reload seasons and episodes to ensure selectors match
           await loadTVSeasons(currentMedia.id, true);
           seasonSelect.value = currentSeason;
           await loadEpisodes(currentMedia.id, currentSeason);
           episodeSelect.value = currentEpisode;
-          await loadProgress();
+          currentProgressMinutes = item.progress_minutes;
+          progressMinutesDisplay.innerText = currentProgressMinutes + ' min';
           updateEmbedStream();
         }
       });
@@ -569,9 +532,10 @@
     if (currentIndex > 0) {
       currentEpisode = currentEpisodesList[currentIndex - 1].episode_number;
       episodeSelect.value = currentEpisode;
-      await loadProgress();
+      await loadProgress(); // loads progress for this show (same row)
       updateEmbedStream();
       updateEpisodeNavigation();
+      saveProgressToDB(); // save to update the episode number in DB
     }
   }
 
@@ -584,6 +548,7 @@
       await loadProgress();
       updateEmbedStream();
       updateEpisodeNavigation();
+      saveProgressToDB(); // update episode number
     }
   }
 
@@ -611,12 +576,14 @@
       await loadProgress();
       updateEmbedStream();
       updateEpisodeNavigation();
+      saveProgressToDB(); // save the new season/episode
     };
     episodeSelect.onchange = async () => {
       currentEpisode = parseInt(episodeSelect.value);
       await loadProgress();
       updateEmbedStream();
       updateEpisodeNavigation();
+      saveProgressToDB(); // save the new episode
     };
     updateEpisodeNavigation();
   }
@@ -658,6 +625,7 @@
 
   // ================= SHOW DETAILS =================
   async function showDetails(item, type) {
+    stopAutoSave();
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
     const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
@@ -674,7 +642,6 @@
     
     if (type === 'tv') {
       tvControlsDiv.classList.remove('hidden');
-      // Reset to season 1, episode 1 if first time
       if (seasonSelect.options.length === 0) {
         currentSeason = 1;
         currentEpisode = 1;
@@ -684,8 +651,10 @@
       tvControlsDiv.classList.add('hidden');
     }
     await loadProgress();
-    await ensureWatchHistoryEntry(); // ensure row exists for this episode
+    // ensure a row exists (with current season/episode)
+    await saveProgressToDB();
     updateEmbedStream();
+    startAutoSave();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -720,14 +689,12 @@
           const data = await res.json();
           showDetails(data, type);
         } catch (err) {
-          console.error(err);
           alert("Failed to load details. Please try again.");
         }
       });
     });
   }
 
-  // ================= FETCH TRENDING WITH CACHE =================
   let cachedTrending = null;
   async function fetchTrending() {
     if (cachedTrending) {
@@ -748,9 +715,8 @@
       renderCards(trendingMoviesGrid, cachedTrending.movies, 'movie');
       renderCards(trendingTvGrid, cachedTrending.tv, 'tv');
     } catch (err) {
-      console.error(err);
-      trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Failed to load trending. Check your network or TMDB API key.</div>';
-      trendingTvGrid.innerHTML = '<div class="col-span-full text-red-400">Failed to load trending. Check your network or TMDB API key.</div>';
+      trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Failed to load trending.</div>';
+      trendingTvGrid.innerHTML = '<div class="col-span-full text-red-400">Failed to load trending.</div>';
     }
   }
 
@@ -766,8 +732,7 @@
       renderCards(trendingMoviesGrid, movies, 'movie');
       renderCards(trendingTvGrid, tv, 'tv');
     } catch (err) {
-      console.error(err);
-      trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Search failed. Please try again.</div>';
+      trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Search failed.</div>';
     }
   }
 
@@ -786,11 +751,12 @@
         document.getElementById('userContainer').classList.add('hidden');
         renderContinueWatching();
         playerPanel.classList.add('hidden');
+        stopAutoSave();
       }
     }).catch(console.error);
   }
 
-  // ================= MODALS =================
+  // ================= SOURCE ORDER MODAL =================
   function openOrderModal() {
     sourceListDiv.innerHTML = '';
     EMBED_SOURCES.forEach((src, idx) => {
@@ -840,10 +806,12 @@
   orderSourcesBtn.onclick = openOrderModal;
 
   // ================= EVENT LISTENERS =================
-  closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
+  closePlayerBtn.onclick = () => {
+    playerPanel.classList.add('hidden');
+    stopAutoSave();
+  };
   reloadEmbedBtn.onclick = () => updateEmbedStream();
   sourceSelect.onchange = () => updateEmbedStream();
-  saveProgressBtn.onclick = saveProgressToDB;
   prevEpisodeBtn.onclick = goToPreviousEpisode;
   nextEpisodeBtn.onclick = goToNextEpisode;
 
@@ -853,7 +821,7 @@
     searchTimeout = setTimeout(() => search(e.target.value), 500);
   });
 
-  // ================= MODAL HANDLERS =================
+  // ================= LOGIN/SIGNUP MODALS =================
   const loginModal = document.getElementById('loginModal');
   const signupModal = document.getElementById('signupModal');
   document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
@@ -883,6 +851,7 @@
     await sb.auth.signOut();
     updateAuthUI();
     playerPanel.classList.add('hidden');
+    stopAutoSave();
   };
 
   // ================= INIT =================
