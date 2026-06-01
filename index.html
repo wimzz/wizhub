@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB • Resume & Source Order</title>
+  <title>WizhuB • Sync Source Order Across Devices</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -76,7 +76,6 @@
     .horizontal-scroll .movie-card {
       flex: 0 0 160px;
     }
-    /* source order modal */
     .modal {
       display: none;
       position: fixed;
@@ -102,6 +101,14 @@
       background: #2a2c38;
       margin-bottom: 0.5rem;
       border-radius: 0.5rem;
+    }
+    .error-banner {
+      background: #ff4444;
+      color: white;
+      padding: 0.5rem;
+      text-align: center;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
     }
   </style>
 </head>
@@ -129,6 +136,9 @@
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
   
+  <!-- Error banner (hidden by default) -->
+  <div id="errorBanner" class="error-banner hidden"></div>
+
   <!-- Continue Watching Section -->
   <section id="continueWatchingSection" class="mb-12">
     <h2 class="text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
@@ -166,7 +176,7 @@
             <span class="text-sm">Source:</span>
             <select id="sourceSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
             <button id="reloadEmbedBtn" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full"><i class="fas fa-sync-alt"></i> Reload</button>
-            <button id="orderSourcesBtn" class="text-xs bg-yellow-600 hover:bg-yellow-500 px-3 py-1 rounded-full"><i class="fas fa-arrows-alt"></i> Order Sources</button>
+            <button id="orderSourcesBtn" class="text-xs bg-yellow-600 hover:bg-yellow-500 px-2 py-1 rounded-full" title="Reorder sources"><i class="fas fa-arrows-alt"></i></button>
           </div>
           <div class="flex flex-wrap items-center gap-4 bg-black/30 p-3 rounded-xl">
             <span class="text-sm"><i class="fas fa-clock"></i> Watched (minutes):</span>
@@ -213,7 +223,7 @@
   </div>
 </div>
 
-<!-- Modals (Login/Signup) -->
+<!-- Login/Signup Modals (same as before) -->
 <div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
   <div class="bg-gray-900 rounded-2xl p-6 w-96 border border-yellow-500/30 relative">
     <h3 class="text-xl font-bold mb-4">Login</h3>
@@ -242,7 +252,7 @@
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHR6Zmt4b2xubHFsbWpld2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTMzOTUsImV4cCI6MjA5NTg2OTM5NX0.42bpsGRyKSZcQ3EUj1k3grsUVuXtZWKsce7OKv8J5YU';
   const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
   const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
-  let EMBED_SOURCES = [
+  const DEFAULT_SOURCES = [
     { name: '🎬 Vidsrc', url: (type, id, s, e, minutes) => {
         let base = type === 'movie' ? `https://vidsrc.to/embed/movie/${id}` : `https://vidsrc.to/embed/tv/${id}/${s}/${e}`;
         return minutes > 0 ? base + `?t=${minutes * 60}` : base;
@@ -264,24 +274,7 @@
       }
     }
   ];
-
-  // Load custom order from localStorage
-  function loadSourceOrder() {
-    const saved = localStorage.getItem('wizhub_source_order');
-    if (saved) {
-      try {
-        const order = JSON.parse(saved);
-        if (Array.isArray(order) && order.length === EMBED_SOURCES.length) {
-          EMBED_SOURCES = order;
-        }
-      } catch(e) {}
-    }
-  }
-  function saveSourceOrder() {
-    localStorage.setItem('wizhub_source_order', JSON.stringify(EMBED_SOURCES));
-  }
-
-  loadSourceOrder();
+  let EMBED_SOURCES = [...DEFAULT_SOURCES];
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let currentUser = null;
@@ -309,6 +302,47 @@
   const saveOrderBtn = document.getElementById('saveOrderBtn');
   const closeOrderBtn = document.getElementById('closeOrderBtn');
   const orderSourcesBtn = document.getElementById('orderSourcesBtn');
+  const errorBanner = document.getElementById('errorBanner');
+
+  function showError(msg) {
+    errorBanner.innerText = msg;
+    errorBanner.classList.remove('hidden');
+    setTimeout(() => errorBanner.classList.add('hidden'), 5000);
+  }
+
+  // Load source order from Supabase (user preferences)
+  async function loadSourceOrderFromDB() {
+    if (!currentUser) return;
+    const { data, error } = await sb
+      .from('user_preferences')
+      .select('source_order')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+    if (error) {
+      console.error("Failed to load source order:", error);
+      return;
+    }
+    if (data && data.source_order && Array.isArray(data.source_order) && data.source_order.length === DEFAULT_SOURCES.length) {
+      EMBED_SOURCES = data.source_order;
+    } else {
+      EMBED_SOURCES = [...DEFAULT_SOURCES];
+    }
+    populateSources();
+  }
+
+  // Save source order to Supabase
+  async function saveSourceOrderToDB() {
+    if (!currentUser) return;
+    const { error } = await sb
+      .from('user_preferences')
+      .upsert({ user_id: currentUser.id, source_order: EMBED_SOURCES, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (error) {
+      console.error("Failed to save source order:", error);
+      showError("Could not save source order to your account.");
+    } else {
+      console.log("Source order saved to account");
+    }
+  }
 
   function populateSources() {
     sourceSelect.innerHTML = '';
@@ -334,7 +368,7 @@
     else embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
   }
 
-  // Database functions (no episode/season columns)
+  // Database functions for watch history
   async function ensureWatchHistoryEntry() {
     if (!currentUser || !currentMedia) return;
     const record = {
@@ -458,6 +492,7 @@
         if (e.target.closest('.delete-btn')) return;
         if (item.media_type === 'movie') {
           const res = await fetch(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
+          if (!res.ok) { showError("Failed to load movie details"); return; }
           const movie = await res.json();
           await showDetails(movie, 'movie');
           currentProgressMinutes = item.progress_minutes;
@@ -465,6 +500,7 @@
           updateEmbedStream();
         } else {
           const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
+          if (!res.ok) { showError("Failed to load TV details"); return; }
           const tv = await res.json();
           await showDetails(tv, 'tv');
           currentProgressMinutes = item.progress_minutes;
@@ -476,9 +512,9 @@
     }
   }
 
-  // TV helpers (UI only, progress is per show)
   async function loadTVSeasons(tvId) {
     const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
+    if (!res.ok) throw new Error("Failed to load seasons");
     const data = await res.json();
     const seasons = (data.seasons || []).filter(s => s.season_number > 0);
     if (!seasons.length) return;
@@ -504,6 +540,7 @@
 
   async function loadEpisodes(tvId, seasonNum) {
     const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNum}?api_key=${TMDB_API_KEY}`);
+    if (!res.ok) throw new Error("Failed to load episodes");
     const data = await res.json();
     const episodes = data.episodes || [];
     episodeSelect.innerHTML = '';
@@ -573,9 +610,15 @@
         const id = card.dataset.id;
         const type = card.dataset.type;
         const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        showDetails(data, type);
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          showDetails(data, type);
+        } catch (err) {
+          showError("Failed to load movie/TV details. Check your internet connection.");
+          console.error(err);
+        }
       });
     });
   }
@@ -586,18 +629,23 @@
         fetch(`https://api.themoviedb.org/3/trending/movie/week?api_key=${TMDB_API_KEY}`),
         fetch(`https://api.themoviedb.org/3/trending/tv/week?api_key=${TMDB_API_KEY}`)
       ]);
+      if (!moviesRes.ok || !tvRes.ok) throw new Error("TMDB API error");
       const moviesData = await moviesRes.json();
       const tvData = await tvRes.json();
       renderCards(trendingMoviesGrid, moviesData.results.slice(0, 18), 'movie');
       renderCards(trendingTvGrid, tvData.results.slice(0, 18), 'tv');
     } catch (err) {
-      trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">TMDB error – check API key</div>';
+      console.error(err);
+      trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">⚠️ TMDB error. Check your internet connection or API key.</div>';
+      trendingTvGrid.innerHTML = '<div class="col-span-full text-red-400">⚠️ TMDB error. Check your internet connection or API key.</div>';
+      showError("Could not load trending content. Please refresh the page.");
     }
   }
 
   async function search(query) {
     if (!query.trim()) { fetchTrending(); return; }
     const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
+    if (!res.ok) { showError("Search failed"); return; }
     const data = await res.json();
     const movies = data.results.filter(r => r.media_type === 'movie').slice(0, 12);
     const tv = data.results.filter(r => r.media_type === 'tv').slice(0, 12);
@@ -606,18 +654,22 @@
   }
 
   function updateAuthUI() {
-    sb.auth.getUser().then(({ data: { user } }) => {
+    sb.auth.getUser().then(async ({ data: { user } }) => {
       currentUser = user;
       if (user) {
         document.getElementById('authContainer').classList.add('hidden');
         document.getElementById('userContainer').classList.remove('hidden');
         document.getElementById('userEmailDisplay').innerText = user.email;
-        renderContinueWatching();
+        await loadSourceOrderFromDB();
+        await renderContinueWatching();
       } else {
         document.getElementById('authContainer').classList.remove('hidden');
         document.getElementById('userContainer').classList.add('hidden');
         renderContinueWatching();
         playerPanel.classList.add('hidden');
+        // Reset to default sources when logged out
+        EMBED_SOURCES = [...DEFAULT_SOURCES];
+        populateSources();
       }
     }).catch(console.error);
   }
@@ -637,13 +689,12 @@
       `;
       sourceListDiv.appendChild(div);
     });
-    // attach move events dynamically
     document.querySelectorAll('.move-up').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const idx = parseInt(btn.dataset.idx);
         if (idx > 0) {
           [EMBED_SOURCES[idx-1], EMBED_SOURCES[idx]] = [EMBED_SOURCES[idx], EMBED_SOURCES[idx-1]];
-          openOrderModal(); // refresh
+          openOrderModal();
         }
       });
     });
@@ -659,11 +710,10 @@
     orderModal.style.display = 'flex';
   }
 
-  saveOrderBtn.onclick = () => {
-    saveSourceOrder();
+  saveOrderBtn.onclick = async () => {
+    await saveSourceOrderToDB();
     populateSources();
     orderModal.style.display = 'none';
-    // If a movie is currently playing, update the selected source index to stay within bounds
     if (sourceSelect.options.length) {
       const oldIdx = parseInt(sourceSelect.value);
       if (oldIdx >= EMBED_SOURCES.length) sourceSelect.value = 0;
@@ -673,7 +723,7 @@
   closeOrderBtn.onclick = () => orderModal.style.display = 'none';
   orderSourcesBtn.onclick = openOrderModal;
 
-  // Modal handlers (login/signup)
+  // Modal handlers
   const loginModal = document.getElementById('loginModal');
   const signupModal = document.getElementById('signupModal');
   document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
@@ -705,7 +755,6 @@
     playerPanel.classList.add('hidden');
   };
 
-  // Event listeners
   closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
   reloadEmbedBtn.onclick = () => updateEmbedStream();
   sourceSelect.onchange = () => updateEmbedStream();
