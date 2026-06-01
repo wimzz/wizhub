@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WizhuB • All 26 Sources + Source Order</title>
+  <title>WizhuB • Custom Source Order</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
+    /* styles unchanged – fully responsive */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     .glass-nav {
@@ -173,7 +174,7 @@
 </head>
 <body class="text-gray-200">
 
-<!-- Navigation (responsive) -->
+<!-- Navigation -->
 <nav class="glass-nav">
   <div class="flex items-center gap-2">
     <i class="fas fa-crown text-2xl md:text-3xl text-yellow-400"></i>
@@ -194,7 +195,7 @@
 </nav>
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
-  <!-- Continue Watching Section -->
+  <!-- Continue Watching -->
   <section id="continueWatchingSection" class="mb-12">
     <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
     <div id="continueWatchingContainer" class="horizontal-scroll"><div class="text-gray-400 text-sm">Log in to see your watch history.</div></div>
@@ -248,20 +249,18 @@
     </div>
   </div>
 
-  <!-- Trending Movies -->
+  <!-- Trending Movies & TV Shows -->
   <section class="mb-12">
     <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-fire text-orange-500"></i> Trending Movies</h2>
     <div id="trendingMoviesGrid" class="trending-grid"></div>
   </section>
-
-  <!-- Trending TV Shows -->
   <section class="mb-12">
     <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-tv text-purple-400"></i> Trending TV Shows</h2>
     <div id="trendingTvGrid" class="trending-grid"></div>
   </section>
 </main>
 
-<!-- Source Order Modal (scrollable for many sources) -->
+<!-- Source Order Modal -->
 <div id="orderModal" class="modal">
   <div class="modal-content">
     <h3 class="text-xl font-bold mb-4">Reorder Stream Sources</h3>
@@ -297,34 +296,31 @@
 
 <script>
 (function() {
-  // ================= ALL SOURCES (26 providers) =================
+  // ================= CUSTOM SOURCE ORDER (23 sources, removed Embed.su, 2Embed, Vidplay) =================
   const DEFAULT_SOURCES = [
-    { name: '🎬 Vidsrc', url: (type, id, s, e) => type === 'movie' ? `https://vidsrc.to/embed/movie/${id}` : `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
-    { name: '📺 2Embed', url: (type, id, s, e) => type === 'movie' ? `https://2embed.sx/embed/movie?tmdb=${id}` : `https://2embed.sx/embed/tv?tmdb=${id}&season=${s}&episode=${e}` },
-    { name: '🌀 Embed.su', url: (type, id, s, e) => type === 'movie' ? `https://embed.su/embed/movie/${id}` : `https://embed.su/embed/tv/${id}/${s}/${e}` },
-    { name: '⚡ Vidplay', url: (type, id, s, e) => type === 'movie' ? `https://vidplay.site/embed/movie/${id}` : `https://vidplay.site/embed/tv/${id}/${s}/${e}` },
-    { name: '🎥 VidCore', url: (type, id, s, e) => type === 'movie' ? `https://vidcore.net/movie/${id}` : `https://vidcore.net/tv/${id}/${s}/${e}` },
-    { name: '📀 VidUp', url: (type, id, s, e) => type === 'movie' ? `https://vidup.to/movie/${id}` : `https://vidup.to/tv/${id}/${s}/${e}` },
-    { name: '🎞️ VAPlayer', url: (type, id, s, e) => type === 'movie' ? `https://vaplayer.ru/embed/movie/${id}` : `https://vaplayer.ru/embed/tv/${id}/${s}/${e}` },
-    { name: '🔗 EmbedMaster', url: (type, id, s, e) => type === 'movie' ? `https://embedmaster.link/movie/${id}` : `https://embedmaster.link/tv/${id}/${s}/${e}` },
-    { name: '🍑 Peachify', url: (type, id, s, e) => type === 'movie' ? `https://peachify.top/embed/movie/${id}` : `https://peachify.top/embed/tv/${id}/${s}/${e}` },
-    { name: '⏩ Xpass', url: (type, id, s, e) => type === 'movie' ? `https://play.xpass.top/e/movie/${id}` : `https://play.xpass.top/e/tv/${id}/${s}/${e}` },
-    { name: '🎬 Videoasy', url: (type, id, s, e) => type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}` },
-    { name: '⚡ VidFast', url: (type, id, s, e) => type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
-    { name: '💎 VidRock', url: (type, id, s, e) => type === 'movie' ? `https://vidrock.ru/movie/${id}` : `https://vidrock.ru/tv/${id}/${s}/${e}` },
-    { name: '🎥 VixSrc', url: (type, id, s, e) => type === 'movie' ? `https://vixsrc.to/movie/${id}` : `https://vixsrc.to/tv/${id}/${s}/${e}` },
-    { name: '🎬 Cinezo', url: (type, id, s, e) => type === 'movie' ? `https://player.cinezo.live/embed/movie/${id}` : `https://player.cinezo.live/embed/tv/${id}/${s}/${e}` },
-    { name: '⚡ ZxcStream', url: (type, id, s, e) => type === 'movie' ? `https://zxcstream.xyz/player/movie/${id}` : `https://zxcstream.xyz/player/tv/${id}/${s}/${e}` },
-    { name: '🎬 FilmU', url: (type, id, s, e) => type === 'movie' ? `https://embed.filmu.in/movie/${id}` : `https://embed.filmu.in/tv/${id}/${s}/${e}` },
-    { name: '1️⃣ 1Embed', url: (type, id, s, e) => type === 'movie' ? `https://1embed.cc/embed/movie/${id}` : `https://1embed.cc/embed/tv/${id}/${s}/${e}` },
-    { name: '🎬 CinemaOS', url: (type, id, s, e) => type === 'movie' ? `https://cinemaos.tech/player/${id}` : `https://cinemaos.tech/player/${id}/${s}/${e}` },
-    { name: '🛠️ SpencerDevs', url: (type, id, s, e) => type === 'movie' ? `https://spencerdevs.xyz/movie/${id}` : `https://spencerdevs.xyz/tv/${id}/${s}/${e}` },
-    { name: '🎬 Vidzee', url: (type, id, s, e) => type === 'movie' ? `https://player.vidzee.wtf/v2/embed/movie/${id}` : `https://player.vidzee.wtf/v2/embed/tv/${id}/${s}/${e}` },
-    { name: '🌐 AnyEmbed', url: (type, id, s, e) => type === 'movie' ? `https://anyembed.xyz/embed/tmdb-movie-${id}` : `https://anyembed.xyz/embed/tmdb-tv-${id}-${s}-${e}` },
-    { name: '🔗 VidLink', url: (type, id, s, e) => type === 'movie' ? `https://vidlink.pro/movie/${id}` : `https://vidlink.pro/tv/${id}/${s}/${e}` },
-    { name: '💧 Rivestream', url: (type, id, s, e) => type === 'movie' ? `https://watch.rivestream.app/embed?type=movie&id=${id}` : `https://watch.rivestream.app/embed?type=tv&id=${id}&season=${s}&episode=${e}` },
-    { name: '1️⃣1️⃣ 111Movies', url: (type, id, s, e) => type === 'movie' ? `https://111movies.net/movie/${id}` : `https://111movies.net/tv/${id}/${s}/${e}` },
-    { name: '🔷 Nxsha', url: (type, id, s, e) => type === 'movie' ? `https://web.nxsha.app/embed/movie/${id}` : `https://web.nxsha.app/embed/tv/${id}/${s}/${e}` }
+    { name: 'Videoasy', url: (type, id, s, e) => type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}` },
+    { name: 'VidFast', url: (type, id, s, e) => type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
+    { name: 'VidUp', url: (type, id, s, e) => type === 'movie' ? `https://vidup.to/movie/${id}` : `https://vidup.to/tv/${id}/${s}/${e}` },
+    { name: 'VixSrc', url: (type, id, s, e) => type === 'movie' ? `https://vixsrc.to/movie/${id}` : `https://vixsrc.to/tv/${id}/${s}/${e}` },
+    { name: 'EmbedMaster', url: (type, id, s, e) => type === 'movie' ? `https://embedmaster.link/movie/${id}` : `https://embedmaster.link/tv/${id}/${s}/${e}` },
+    { name: 'ZxcStream', url: (type, id, s, e) => type === 'movie' ? `https://zxcstream.xyz/player/movie/${id}` : `https://zxcstream.xyz/player/tv/${id}/${s}/${e}` },
+    { name: 'AnyEmbed', url: (type, id, s, e) => type === 'movie' ? `https://anyembed.xyz/embed/tmdb-movie-${id}` : `https://anyembed.xyz/embed/tmdb-tv-${id}-${s}-${e}` },
+    { name: '111Movies', url: (type, id, s, e) => type === 'movie' ? `https://111movies.net/movie/${id}` : `https://111movies.net/tv/${id}/${s}/${e}` },
+    { name: 'Vidsrc', url: (type, id, s, e) => type === 'movie' ? `https://vidsrc.to/embed/movie/${id}` : `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
+    { name: 'VidCore', url: (type, id, s, e) => type === 'movie' ? `https://vidcore.net/movie/${id}` : `https://vidcore.net/tv/${id}/${s}/${e}` },
+    { name: 'VAPlayer', url: (type, id, s, e) => type === 'movie' ? `https://vaplayer.ru/embed/movie/${id}` : `https://vaplayer.ru/embed/tv/${id}/${s}/${e}` },
+    { name: 'Peachify', url: (type, id, s, e) => type === 'movie' ? `https://peachify.top/embed/movie/${id}` : `https://peachify.top/embed/tv/${id}/${s}/${e}` },
+    { name: 'FilmU', url: (type, id, s, e) => type === 'movie' ? `https://embed.filmu.in/movie/${id}` : `https://embed.filmu.in/tv/${id}/${s}/${e}` },
+    { name: 'Nxsha', url: (type, id, s, e) => type === 'movie' ? `https://web.nxsha.app/embed/movie/${id}` : `https://web.nxsha.app/embed/tv/${id}/${s}/${e}` },
+    { name: 'VidRock', url: (type, id, s, e) => type === 'movie' ? `https://vidrock.ru/movie/${id}` : `https://vidrock.ru/tv/${id}/${s}/${e}` },
+    { name: 'Cinezo', url: (type, id, s, e) => type === 'movie' ? `https://player.cinezo.live/embed/movie/${id}` : `https://player.cinezo.live/embed/tv/${id}/${s}/${e}` },
+    { name: 'Xpass', url: (type, id, s, e) => type === 'movie' ? `https://play.xpass.top/e/movie/${id}` : `https://play.xpass.top/e/tv/${id}/${s}/${e}` },
+    { name: '1Embed', url: (type, id, s, e) => type === 'movie' ? `https://1embed.cc/embed/movie/${id}` : `https://1embed.cc/embed/tv/${id}/${s}/${e}` },
+    { name: 'CinemaOS', url: (type, id, s, e) => type === 'movie' ? `https://cinemaos.tech/player/${id}` : `https://cinemaos.tech/player/${id}/${s}/${e}` },
+    { name: 'SpencerDevs', url: (type, id, s, e) => type === 'movie' ? `https://spencerdevs.xyz/movie/${id}` : `https://spencerdevs.xyz/tv/${id}/${s}/${e}` },
+    { name: 'Vidzee', url: (type, id, s, e) => type === 'movie' ? `https://player.vidzee.wtf/v2/embed/movie/${id}` : `https://player.vidzee.wtf/v2/embed/tv/${id}/${s}/${e}` },
+    { name: 'Rivestream', url: (type, id, s, e) => type === 'movie' ? `https://watch.rivestream.app/embed?type=movie&id=${id}` : `https://watch.rivestream.app/embed?type=tv&id=${id}&season=${s}&episode=${e}` },
+    { name: 'VidLink', url: (type, id, s, e) => type === 'movie' ? `https://vidlink.pro/movie/${id}` : `https://vidlink.pro/tv/${id}/${s}/${e}` }
   ];
 
   let EMBED_SOURCES = [...DEFAULT_SOURCES];
@@ -376,7 +372,6 @@
       const { data, error } = await sb.from('user_settings').select('source_order').eq('id', currentUser.id).maybeSingle();
       if (!error && data && data.source_order && Array.isArray(data.source_order)) {
         if (data.source_order.length !== DEFAULT_SOURCES.length) {
-          // Length mismatch – reset to full list
           EMBED_SOURCES = [...DEFAULT_SOURCES];
           await sb.from('user_settings').upsert({ id: currentUser.id, source_order: DEFAULT_SOURCES.map(s => s.name), updated_at: new Date().toISOString() });
         } else {
@@ -436,7 +431,7 @@
     else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to generate URL</div>';
   }
 
-  // ================= DATABASE FUNCTIONS =================
+  // ================= DATABASE FUNCTIONS (unchanged from working version) =================
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
