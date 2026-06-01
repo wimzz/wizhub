@@ -36,6 +36,26 @@
       width: 0%;
       transition: width 0.2s;
     }
+    .delete-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ff4444;
+      cursor: pointer;
+      z-index: 10;
+      transition: background 0.2s;
+    }
+    .delete-btn:hover {
+      background: rgba(255,68,68,0.8);
+      color: white;
+    }
     .embed-container {
       background: #000;
       border-radius: 1rem;
@@ -82,7 +102,7 @@
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
   
-  <!-- Continue Watching Section (top) -->
+  <!-- Continue Watching Section -->
   <section id="continueWatchingSection" class="mb-12">
     <h2 class="text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
     <div id="continueWatchingContainer" class="horizontal-scroll">
@@ -90,7 +110,7 @@
     </div>
   </section>
 
-  <!-- Player Panel (hidden initially) -->
+  <!-- Player Panel -->
   <div id="playerPanel" class="hidden mb-12 bg-gray-900/80 rounded-2xl p-5 border border-gray-700 shadow-2xl">
     <div class="flex flex-col lg:flex-row gap-6">
       <div class="lg:w-1/5">
@@ -108,7 +128,6 @@
         </div>
         <p id="detailOverview" class="text-gray-300 text-sm mt-2 line-clamp-3"></p>
         
-        <!-- TV Controls (season/episode) -->
         <div id="tvControls" class="hidden mt-4 flex flex-wrap gap-3">
           <select id="seasonSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
           <select id="episodeSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
@@ -207,7 +226,7 @@
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let currentUser = null;
-  let currentMedia = null;      // { type, id, title, posterPath, year, rating, overview }
+  let currentMedia = null;
   let currentSeason = 1, currentEpisode = 1;
   let currentProgressMinutes = 0;
 
@@ -247,14 +266,11 @@
     } else {
       url = src.url('tv', currentMedia.id, currentSeason, currentEpisode, currentProgressMinutes);
     }
-    if (url) {
-      embedIframe.src = url;
-    } else {
-      embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
-    }
+    if (url) embedIframe.src = url;
+    else embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
   }
 
-  // Auto-add a row with 0 minutes if not exists (ensures it appears in Continue Watching)
+  // Add or update entry (with 0 minutes if new)
   async function ensureWatchHistoryEntry() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
@@ -316,7 +332,22 @@
     }
   }
 
-  // Load saved progress for the current media (movie or TV episode)
+  // Delete a watch history entry
+  async function deleteHistoryEntry(mediaType, tmdbId, season, episode) {
+    if (!currentUser) return;
+    const { error } = await sb
+      .from('watch_history')
+      .delete()
+      .eq('user_id', currentUser.id)
+      .eq('media_type', mediaType)
+      .eq('tmdb_id', tmdbId)
+      .eq('season_number', season)
+      .eq('episode_number', episode);
+    if (error) console.error("Delete error:", error);
+    else await renderContinueWatching();
+  }
+
+  // Load saved progress for current media
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
@@ -340,7 +371,7 @@
     }
   }
 
-  // Render Continue Watching (horizontal scroll, no duplicates)
+  // Render Continue Watching with delete button
   async function renderContinueWatching() {
     if (!currentUser) {
       continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🔒 Log in to see your continue watching list.</div>';
@@ -350,16 +381,15 @@
       .from('watch_history')
       .select('*')
       .eq('user_id', currentUser.id)
-      .order('last_watched', { ascending: false })
-      .limit(20);
+      .order('last_watched', { ascending: false });
     if (error || !data) return;
-    // Deduplicate using composite key (media_type + tmdb_id + season_number + episode_number)
+    // Deduplicate using Map (same key as unique constraint)
     const uniqueMap = new Map();
     for (const item of data) {
       const key = `${item.media_type}_${item.tmdb_id}_${item.season_number}_${item.episode_number}`;
       if (!uniqueMap.has(key)) uniqueMap.set(key, item);
     }
-    const uniqueData = Array.from(uniqueMap.values()).slice(0, 10);
+    const uniqueData = Array.from(uniqueMap.values()).slice(0, 20);
     if (uniqueData.length === 0) {
       continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet. Start watching!</div>';
       return;
@@ -372,6 +402,9 @@
       card.style.flex = '0 0 160px';
       const progressPercent = Math.min((item.progress_minutes / 120) * 100, 100);
       card.innerHTML = `
+        <div class="delete-btn" data-delete='${JSON.stringify({media_type: item.media_type, tmdb_id: item.tmdb_id, season: item.season_number, episode: item.episode_number})}'>
+          <i class="fas fa-trash-alt text-xs"></i>
+        </div>
         <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
         <div class="p-2">
           <div class="font-semibold text-sm truncate">${item.title}</div>
@@ -379,12 +412,22 @@
         </div>
         <div class="progress-overlay" style="width: ${progressPercent}%;"></div>
       `;
-      card.addEventListener('click', async () => {
+      // Add delete event
+      const deleteBtn = card.querySelector('.delete-btn');
+      deleteBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const info = JSON.parse(deleteBtn.dataset.delete);
+        if (confirm(`Delete "${item.title}" from Continue Watching?`)) {
+          await deleteHistoryEntry(info.media_type, info.tmdb_id, info.season, info.episode);
+        }
+      });
+      // Add click to resume
+      card.addEventListener('click', async (e) => {
+        if (e.target.closest('.delete-btn')) return;
         if (item.media_type === 'movie') {
           const res = await fetch(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
           const movie = await res.json();
           await showDetails(movie, 'movie');
-          // set the saved progress
           currentProgressMinutes = item.progress_minutes;
           progressMinutesInput.value = currentProgressMinutes;
           updateEmbedStream();
@@ -426,7 +469,7 @@
       await loadEpisodes(tvId, currentSeason);
       await loadProgress();
       updateEmbedStream();
-      await ensureWatchHistoryEntry(); // ensure new episode appears in continue watching
+      await ensureWatchHistoryEntry();
     };
     episodeSelect.onchange = async () => {
       currentEpisode = parseInt(episodeSelect.value);
@@ -475,11 +518,9 @@
       tvControlsDiv.classList.add('hidden');
     }
     
-    // Load saved progress BEFORE embedding
     await loadProgress();
     await ensureWatchHistoryEntry();
     updateEmbedStream();
-    
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -600,7 +641,6 @@
     searchTimeout = setTimeout(() => search(e.target.value), 500);
   });
 
-  // Initialization
   populateSources();
   fetchTrending();
   updateAuthUI();
