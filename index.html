@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB • Auto‑Resume & Continue Watching</title>
+  <title>WizhuB • Auto‑Save & Continue Watching</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -15,7 +15,6 @@
       backdrop-filter: blur(12px);
       border-bottom: 1px solid rgba(250, 204, 21, 0.2);
     }
-    /* Movie card */
     .movie-card {
       transition: transform 0.25s ease, box-shadow 0.25s;
       cursor: pointer;
@@ -28,7 +27,6 @@
       transform: translateY(-6px);
       box-shadow: 0 20px 30px -12px rgba(0,0,0,0.6);
     }
-    /* Progress overlay bar for continue watching */
     .progress-overlay {
       position: absolute;
       bottom: 0;
@@ -48,7 +46,6 @@
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #1e1f2c; }
     ::-webkit-scrollbar-thumb { background: #facc15; border-radius: 10px; }
-    /* Horizontal scroll for continue watching */
     .horizontal-scroll {
       display: flex;
       overflow-x: auto;
@@ -58,20 +55,6 @@
     }
     .horizontal-scroll .movie-card {
       flex: 0 0 160px;
-    }
-    input[type=range] {
-      -webkit-appearance: none;
-      background: #2d2f3e;
-      height: 4px;
-      border-radius: 5px;
-    }
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
-      background: #facc15;
-      border-radius: 50%;
-      cursor: pointer;
     }
   </style>
 </head>
@@ -99,13 +82,13 @@
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
   
-  <!-- Continue Watching Section (horizontal scroll) -->
+  <!-- Continue Watching Section (top, horizontal scroll) -->
   <section id="continueWatchingSection" class="mb-12 hidden">
     <h2 class="text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
     <div id="continueWatchingContainer" class="horizontal-scroll"></div>
   </section>
 
-  <!-- Player Panel (initially hidden) -->
+  <!-- Player Panel (hidden initially) -->
   <div id="playerPanel" class="hidden mb-12 bg-gray-900/80 rounded-2xl p-5 border border-gray-700 shadow-2xl">
     <div class="flex flex-col lg:flex-row gap-6">
       <div class="lg:w-1/5">
@@ -136,16 +119,15 @@
           </div>
           <div class="flex flex-wrap items-center gap-4 bg-black/30 p-3 rounded-xl">
             <span class="text-sm"><i class="fas fa-chart-line"></i> Progress:</span>
-            <input type="range" id="progressSlider" min="0" max="100" value="0" class="flex-1">
-            <span id="progressPercent" class="text-sm text-yellow-400 w-12">0%</span>
-            <span id="autoSaveBadge" class="text-green-400 text-xs">✓ Auto‑save</span>
+            <span id="progressPercentDisplay" class="text-sm text-yellow-400">0%</span>
+            <span id="autoSaveBadge" class="text-green-400 text-xs">✓ Auto‑saving every 30s</span>
           </div>
         </div>
 
         <div class="embed-container mt-3">
           <iframe id="embedIframe" allowfullscreen></iframe>
         </div>
-        <p class="text-[10px] text-gray-500 text-center mt-2">External providers • Progress saves automatically when you move the slider</p>
+        <p class="text-[10px] text-gray-500 text-center mt-2">Your watch progress saves automatically while you watch.</p>
       </div>
     </div>
   </div>
@@ -207,7 +189,9 @@
   let currentUser = null;
   let currentMedia = null;
   let currentSeason = 1, currentEpisode = 1;
-  let autoSaveTimer = null;
+  let progressPercent = 0;
+  let autoSaveInterval = null;
+  let isWatching = false;
 
   // DOM elements
   const continueSection = document.getElementById('continueWatchingSection');
@@ -221,8 +205,7 @@
   const tvControlsDiv = document.getElementById('tvControls');
   const seasonSelect = document.getElementById('seasonSelect');
   const episodeSelect = document.getElementById('episodeSelect');
-  const progressSlider = document.getElementById('progressSlider');
-  const progressPercent = document.getElementById('progressPercent');
+  const progressPercentDisplay = document.getElementById('progressPercentDisplay');
   const reloadEmbedBtn = document.getElementById('reloadEmbedBtn');
   const globalSearch = document.getElementById('globalSearch');
 
@@ -249,10 +232,9 @@
     else embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
   }
 
-  // Auto-save with debounce
-  async function autoSaveProgress() {
+  // Auto-save function (saves current progressPercent to DB)
+  async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
-    const progress = parseInt(progressSlider.value);
     const record = {
       user_id: currentUser.id,
       media_type: currentMedia.type,
@@ -261,7 +243,7 @@
       poster_path: currentMedia.posterPath,
       media_year: currentMedia.year,
       rating: currentMedia.rating,
-      progress_percent: progress,
+      progress_percent: progressPercent,
       last_watched: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -272,20 +254,36 @@
     const { error } = await sb
       .from('watch_history')
       .upsert(record, { onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number' });
-    if (error) console.error("Auto-save error:", error);
+    if (error) console.error("Save error:", error);
     else {
-      console.log("Auto-saved:", progress);
-      // Refresh continue watching after save
-      renderContinueWatching();
+      console.log("Auto-saved:", progressPercent);
+      renderContinueWatching(); // refresh the continue row
     }
   }
 
-  function debounceAutoSave() {
-    if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(autoSaveProgress, 1000);
+  // Start auto-progress timer (every 30 seconds, increase by 1% until 95)
+  function startAutoProgress() {
+    if (autoSaveInterval) clearInterval(autoSaveInterval);
+    autoSaveInterval = setInterval(async () => {
+      if (!currentUser || !currentMedia || !playerPanel.classList.contains('hidden')) {
+        // only increase if player is open and we are watching
+        if (progressPercent < 95) {
+          progressPercent = Math.min(progressPercent + 1, 95);
+          progressPercentDisplay.innerText = progressPercent + '%';
+          await saveProgressToDB();
+        }
+      }
+    }, 30000); // every 30 seconds
   }
 
-  // Load saved progress for current media
+  function stopAutoProgress() {
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval);
+      autoSaveInterval = null;
+    }
+  }
+
+  // Load saved progress from DB and set progressPercent
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
     let query = sb.from('watch_history').select('progress_percent')
@@ -299,11 +297,11 @@
     }
     const { data } = await query.maybeSingle();
     if (data && data.progress_percent !== undefined) {
-      progressSlider.value = data.progress_percent;
-      progressPercent.innerText = data.progress_percent + '%';
+      progressPercent = data.progress_percent;
+      progressPercentDisplay.innerText = progressPercent + '%';
     } else {
-      progressSlider.value = 0;
-      progressPercent.innerText = '0%';
+      progressPercent = 0;
+      progressPercentDisplay.innerText = '0%';
     }
   }
 
@@ -339,13 +337,13 @@
         <div class="progress-overlay" style="width: ${item.progress_percent}%;"></div>
       `;
       card.addEventListener('click', async () => {
-        // Resume this exact media
+        // Resume this media
         if (item.media_type === 'movie') {
           const res = await fetch(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
           const movie = await res.json();
           await showDetails(movie, 'movie');
-          progressSlider.value = item.progress_percent;
-          progressPercent.innerText = item.progress_percent + '%';
+          progressPercent = item.progress_percent;
+          progressPercentDisplay.innerText = progressPercent + '%';
           updateEmbedStream();
         } else {
           const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
@@ -356,8 +354,8 @@
           await loadTVSeasons(currentMedia.id);
           seasonSelect.value = currentSeason;
           episodeSelect.value = currentEpisode;
-          progressSlider.value = item.progress_percent;
-          progressPercent.innerText = item.progress_percent + '%';
+          progressPercent = item.progress_percent;
+          progressPercentDisplay.innerText = progressPercent + '%';
           updateEmbedStream();
         }
       });
@@ -365,7 +363,7 @@
     }
   }
 
-  // TV show helpers
+  // TV helpers
   async function loadTVSeasons(tvId) {
     const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
     const data = await res.json();
@@ -385,13 +383,13 @@
       await loadEpisodes(tvId, currentSeason);
       await loadProgress();
       updateEmbedStream();
-      debounceAutoSave();
+      await saveProgressToDB(); // save on season change
     };
     episodeSelect.onchange = async () => {
       currentEpisode = parseInt(episodeSelect.value);
       await loadProgress();
       updateEmbedStream();
-      debounceAutoSave();
+      await saveProgressToDB(); // save on episode change
     };
   }
 
@@ -411,6 +409,8 @@
   }
 
   async function showDetails(item, type) {
+    // Stop previous auto progress if any
+    stopAutoProgress();
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
     const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
@@ -434,6 +434,8 @@
     }
     await loadProgress();
     updateEmbedStream();
+    // Start auto progress timer (increment every 30 sec)
+    startAutoProgress();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -494,7 +496,6 @@
     renderCards(trendingTvGrid, tv, 'tv');
   }
 
-  // Auth UI
   function updateAuthUI() {
     sb.auth.getUser().then(({ data: { user } }) => {
       currentUser = user;
@@ -508,6 +509,7 @@
         document.getElementById('userContainer').classList.add('hidden');
         continueSection.classList.add('hidden');
         playerPanel.classList.add('hidden');
+        stopAutoProgress();
       }
     }).catch(console.error);
   }
@@ -541,16 +543,16 @@
     await sb.auth.signOut();
     updateAuthUI();
     playerPanel.classList.add('hidden');
+    stopAutoProgress();
   };
 
   // Event listeners
-  closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
+  closePlayerBtn.onclick = () => {
+    playerPanel.classList.add('hidden');
+    stopAutoProgress();
+  };
   reloadEmbedBtn.onclick = () => updateEmbedStream();
   sourceSelect.onchange = () => updateEmbedStream();
-  progressSlider.oninput = () => {
-    progressPercent.innerText = progressSlider.value + '%';
-    debounceAutoSave();
-  };
   
   let searchTimeout;
   globalSearch.addEventListener('input', (e) => {
