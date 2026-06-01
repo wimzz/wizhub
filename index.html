@@ -3,16 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WIZHUB</title>
+  <title>WIZHUB • Stream & Sync</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23facc15'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E">
   <style>
+    /* ========== FULL STYLES (responsive, modern) ========== */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
-
-    /* ========== NAVBAR ========== */
     .glass-nav {
       background: rgba(10, 12, 16, 0.85);
       backdrop-filter: blur(12px);
@@ -157,25 +155,13 @@
       background: #facc15;
       color: #0a0c10;
     }
+    /* Mobile fix: larger top padding */
     @media (max-width: 768px) {
-      .glass-nav {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .search-wrapper {
-        width: 100%;
-        order: 2;
-      }
-      .nav-right {
-        order: 3;
-        justify-content: flex-end;
-      }
-      .brand {
-        order: 1;
+      main {
+        padding-top: 8rem !important;
       }
     }
-
-    /* ========== REST OF STYLES (movie cards, player, etc.) ========== */
+    /* movie cards, player, etc. (unchanged) */
     .movie-card {
       transition: transform 0.25s ease, box-shadow 0.25s;
       cursor: pointer;
@@ -425,16 +411,11 @@
     .continue-section-hidden {
       display: none !important;
     }
-    @media (max-width: 768px) {
-  main {
-    padding-top: 8rem !important;
-  }
-}
   </style>
 </head>
 <body class="text-gray-200">
 
-<!-- NAVBAR with avatar dropdown -->
+<!-- NAVBAR -->
 <nav class="glass-nav">
   <div class="brand">
     <i class="fas fa-crown text-yellow-400"></i>
@@ -575,7 +556,7 @@
 
 <script>
 (function() {
-  // ================= CONFIGURATION =================
+  // ================= SOURCES (23 existing + AnimePahe as last source) =================
   const DEFAULT_SOURCES = [
     { name: 'Videoasy', url: (type, id, s, e) => type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}` },
     { name: 'VidFast', url: (type, id, s, e) => type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
@@ -599,8 +580,32 @@
     { name: 'SpencerDevs', url: (type, id, s, e) => type === 'movie' ? `https://spencerdevs.xyz/movie/${id}` : `https://spencerdevs.xyz/tv/${id}/${s}/${e}` },
     { name: 'Vidzee', url: (type, id, s, e) => type === 'movie' ? `https://player.vidzee.wtf/v2/embed/movie/${id}` : `https://player.vidzee.wtf/v2/embed/tv/${id}/${s}/${e}` },
     { name: 'Rivestream', url: (type, id, s, e) => type === 'movie' ? `https://watch.rivestream.app/embed?type=movie&id=${id}` : `https://watch.rivestream.app/embed?type=tv&id=${id}&season=${s}&episode=${e}` },
-    { name: 'VidLink', url: (type, id, s, e) => type === 'movie' ? `https://vidlink.pro/movie/${id}` : `https://vidlink.pro/tv/${id}/${s}/${e}` }
+    { name: 'VidLink', url: (type, id, s, e) => type === 'movie' ? `https://vidlink.pro/movie/${id}` : `https://vidlink.pro/tv/${id}/${s}/${e}` },
+    // ----- NEW: AnimePahe as the LAST source -----
+    { name: '🎌 AnimePahe (Beta)', url: async (type, id, s, e) => {
+        if (type !== 'tv') return null;
+        // IMPORTANT: This source requires mapping the TMDB ID (id) to an AnimePahe slug (e.g., 'one-piece', 'naruto').
+        // For demo purposes, we use a free API that expects the AnimePahe ID.
+        // You must replace this with a proper mapping (e.g., using a local dictionary or another API).
+        // Currently, it will NOT work unless you manually set the animepaheId for each show.
+        // Example: const animepaheId = 'one-piece';
+        const animepaheId = ''; // <-- YOU MUST SET THIS FOR THE ANIME YOU ARE WATCHING
+        if (!animepaheId) {
+          console.warn('AnimePahe source requires the animepaheId (slug) for this show.');
+          return null;
+        }
+        try {
+          const apiUrl = `https://animepahe-api.pages.dev/api/stream/${animepaheId}/${s}/${e}`;
+          const res = await fetch(apiUrl);
+          const data = await res.json();
+          return data.stream_url;
+        } catch (err) {
+          console.error('AnimePahe fetch failed:', err);
+          return null;
+        }
+    }}
   ];
+
   let EMBED_SOURCES = [...DEFAULT_SOURCES];
 
   const SUPABASE_URL = 'https://evhtzfkxolnlqlmjewew.supabase.co';
@@ -679,6 +684,20 @@
     if (!event.target.closest('.avatar-wrapper')) closeDropdown();
   });
 
+  // ================= SOURCE SELECTION PERSISTENCE =================
+  function saveSelectedSourceIndex(index) {
+    localStorage.setItem('wizhub_selected_source', index);
+  }
+  function loadSelectedSourceIndex() {
+    const saved = localStorage.getItem('wizhub_selected_source');
+    if (saved !== null && !isNaN(parseInt(saved))) {
+      const idx = parseInt(saved);
+      if (idx >= 0 && idx < sourceSelect.options.length) {
+        sourceSelect.value = idx;
+      }
+    }
+  }
+
   // ================= SOURCE ORDER FUNCTIONS =================
   async function loadUserSourceOrder() {
     if (!currentUser) return;
@@ -703,6 +722,7 @@
       } else EMBED_SOURCES = [...DEFAULT_SOURCES];
     } catch (err) { EMBED_SOURCES = [...DEFAULT_SOURCES]; }
     populateSources();
+    loadSelectedSourceIndex(); // restore selected source after population
   }
   async function saveUserSourceOrder() {
     if (!currentUser) return;
@@ -717,8 +737,11 @@
       opt.textContent = src.name;
       sourceSelect.appendChild(opt);
     });
+    loadSelectedSourceIndex();
   }
-  function updateEmbedStream() {
+
+  // ================= ASYNC EMBED UPDATE (supports AnimePahe's promise) =================
+  async function updateEmbedStream() {
     if (!currentMedia) return;
     const srcIdx = parseInt(sourceSelect.value);
     const src = EMBED_SOURCES[srcIdx];
@@ -727,18 +750,34 @@
       return;
     }
     let url = '';
-    if (currentMedia.type === 'movie') url = src.url('movie', currentMedia.id, null, null);
-    else url = src.url('tv', currentMedia.id, currentSeason, currentEpisode);
+    if (currentMedia.type === 'movie') {
+      url = src.url('movie', currentMedia.id, null, null);
+    } else {
+      url = src.url('tv', currentMedia.id, currentSeason, currentEpisode);
+    }
+    if (url && typeof url.then === 'function') {
+      embedIframe.srcdoc = '<div class="text-center py-20 text-gray-400"><i class="fas fa-spinner fa-spin"></i> Loading stream...</div>';
+      try {
+        url = await url;
+      } catch (err) {
+        console.error('Async URL failed', err);
+        embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to load stream</div>';
+        return;
+      }
+    }
     if (url) embedIframe.src = url;
     else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to generate URL</div>';
   }
+
   function nextSource() {
     if (!sourceSelect.options.length) return;
     let newIdx = parseInt(sourceSelect.value) + 1;
     if (newIdx >= sourceSelect.options.length) newIdx = 0;
     sourceSelect.value = newIdx;
-    sourceSelect.dispatchEvent(new Event('change'));
+    saveSelectedSourceIndex(newIdx);
+    updateEmbedStream();
   }
+
   async function copyVideoUrl() {
     const url = embedIframe.src;
     if (!url || url === 'about:blank') { alert('No video URL to copy'); return; }
@@ -752,7 +791,7 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ================= DATABASE & WATCH HISTORY =================
+  // ================= DATABASE & WATCH HISTORY (same as before) =================
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
@@ -843,8 +882,6 @@
       continueContainer.appendChild(card);
     }
   }
-
-  // ================= TV EPISODE NAVIGATION =================
   async function updateEpisodeNavigation() {
     if (!currentMedia || currentMedia.type !== 'tv' || !currentEpisodesList.length) {
       prevEpisodeBtn.disabled = true; nextEpisodeBtn.disabled = true; return;
@@ -938,8 +975,6 @@
       } catch (err) { if (i === retries - 1) throw err; await new Promise(r => setTimeout(r, delay)); }
     }
   }
-
-  // ================= SHOW DETAILS (RESUME) =================
   async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null) {
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
@@ -965,11 +1000,9 @@
     if (savedProgress !== null) { currentProgressMinutes = savedProgress; progressMinutesInput.value = savedProgress; }
     else await loadProgress();
     await saveProgressToDB();
-    updateEmbedStream();
+    await updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-
-  // ================= RENDER CARDS (TRENDING / SEARCH) =================
   function renderCards(container, items, mediaType) {
     if (!items.length) { container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>'; return; }
     container.innerHTML = items.map(item => {
@@ -992,7 +1025,6 @@
       });
     });
   }
-
   let cachedTrending = null;
   async function fetchTrending() {
     if (cachedTrending) {
@@ -1032,7 +1064,6 @@
       trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Search failed.</div>';
     }
   }
-
   function showLoading(container) {
     container.innerHTML = '<div class="col-span-full flex justify-center py-10"><div class="loading-spinner"></div><span class="ml-2">Loading...</span></div>';
   }
@@ -1089,7 +1120,11 @@
   // ================= EVENT LISTENERS =================
   closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
   reloadEmbedBtn.onclick = () => updateEmbedStream();
-  sourceSelect.onchange = () => updateEmbedStream();
+  sourceSelect.onchange = () => {
+    const idx = parseInt(sourceSelect.value);
+    saveSelectedSourceIndex(idx);
+    updateEmbedStream();
+  };
   nextSourceBtn.onclick = nextSource;
   copyUrlBtn.onclick = copyVideoUrl;
   saveProgressBtn.onclick = async () => {
@@ -1119,7 +1154,6 @@
   }
   if (detailTitleSpan) detailTitleSpan.addEventListener('click', copyTitleToClipboard);
   if (copyTitleIcon) copyTitleIcon.addEventListener('click', copyTitleToClipboard);
-
   globalSearch.addEventListener('input', handleSearchInput);
   clearSearchBtn.addEventListener('click', clearSearch);
   globalSearch.addEventListener('focus', updateContinueVisibility);
