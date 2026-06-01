@@ -3,26 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB • Stream & Sync</title>
+  <title>WizhuB • Auto‑Resume & Sync</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0c10; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     .glass-nav {
       background: rgba(10, 12, 16, 0.85);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid rgba(250, 204, 21, 0.2);
     }
     .movie-card {
-      transition: transform 0.2s ease, box-shadow 0.2s;
+      transition: transform 0.25s ease, box-shadow 0.25s;
       cursor: pointer;
       background: #14161f;
       border-radius: 1rem;
       overflow: hidden;
     }
     .movie-card:hover {
-      transform: translateY(-5px);
+      transform: translateY(-6px);
       box-shadow: 0 20px 30px -12px rgba(0,0,0,0.6);
     }
     .embed-container {
@@ -48,6 +49,12 @@
       background: #facc15;
       border-radius: 50%;
       cursor: pointer;
+    }
+    .continue-item {
+      transition: background 0.2s;
+    }
+    .continue-item:hover {
+      background: #2a2c38;
     }
   </style>
 </head>
@@ -75,7 +82,13 @@
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
   
-  <!-- Player Panel -->
+  <!-- Continue Watching Section (above trending) -->
+  <section id="continueWatchingSection" class="mb-12 hidden">
+    <h2 class="text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
+    <div id="continueWatchingGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"></div>
+  </section>
+
+  <!-- Player Panel (initially hidden) -->
   <div id="playerPanel" class="hidden mb-12 bg-gray-900/80 rounded-2xl p-5 border border-gray-700 shadow-2xl">
     <div class="flex flex-col lg:flex-row gap-6">
       <div class="lg:w-1/5">
@@ -105,18 +118,17 @@
             <button id="reloadEmbedBtn" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full"><i class="fas fa-sync-alt"></i> Reload</button>
           </div>
           <div class="flex flex-wrap items-center gap-4 bg-black/30 p-3 rounded-xl">
-            <span class="text-sm"><i class="fas fa-chart-line"></i> Your progress:</span>
+            <span class="text-sm"><i class="fas fa-chart-line"></i> Progress:</span>
             <input type="range" id="progressSlider" min="0" max="100" value="0" class="flex-1">
             <span id="progressPercent" class="text-sm text-yellow-400 w-12">0%</span>
-            <button id="saveProgressBtn" class="text-xs bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded-full"><i class="fas fa-save"></i> Save</button>
-            <span id="saveFeedback" class="text-green-400 text-xs hidden">✓ Saved</span>
+            <span id="autoSaveBadge" class="text-green-400 text-xs">✓ Auto‑save</span>
           </div>
         </div>
 
         <div class="embed-container mt-3">
           <iframe id="embedIframe" allowfullscreen></iframe>
         </div>
-        <p class="text-[10px] text-gray-500 text-center mt-2">External providers • Save progress</p>
+        <p class="text-[10px] text-gray-500 text-center mt-2">External providers • Progress saves automatically when you move the slider</p>
       </div>
     </div>
   </div>
@@ -137,19 +149,6 @@
     </div>
   </section>
 </main>
-
-<!-- Continue Watching Sidebar -->
-<div id="continueSidebar" class="fixed top-0 right-0 h-full w-80 bg-gray-900/95 backdrop-blur-md border-l border-yellow-500/30 shadow-2xl z-50 transform translate-x-full transition-transform duration-300 p-4 overflow-y-auto">
-  <div class="flex justify-between items-center mb-5">
-    <h3 class="font-bold text-lg"><i class="fas fa-history"></i> Continue Watching</h3>
-    <button id="closeSidebarBtn" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
-  </div>
-  <div id="continueList" class="space-y-3"></div>
-</div>
-
-<button id="openContinueBtn" class="fixed right-4 bottom-20 bg-yellow-500 text-black p-3 rounded-full shadow-lg hover:bg-yellow-400 transition z-40 hidden">
-  <i class="fas fa-clock text-xl"></i>
-</button>
 
 <!-- Modals -->
 <div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
@@ -175,7 +174,7 @@
 
 <script>
 (function() {
-  // ---------- CONFIGURATION ----------
+  // ========== CONFIGURATION ==========
   const SUPABASE_URL = 'https://evhtzfkxolnlqlmjewew.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHR6Zmt4b2xubHFsbWpld2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTMzOTUsImV4cCI6MjA5NTg2OTM5NX0.42bpsGRyKSZcQ3EUj1k3grsUVuXtZWKsce7OKv8J5YU';
   const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
@@ -187,14 +186,15 @@
     { name: '⚡ Vidplay', url: (type, id, s, e) => type === 'movie' ? `https://vidplay.site/embed/movie/${id}` : `https://vidplay.site/embed/tv/${id}/${s}/${e}` }
   ];
 
-  // Create Supabase client (no variable name conflict)
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  
   let currentUser = null;
   let currentMedia = null;
   let currentSeason = 1, currentEpisode = 1;
+  let autoSaveTimer = null;
 
   // DOM elements
+  const continueWatchingSection = document.getElementById('continueWatchingSection');
+  const continueWatchingGrid = document.getElementById('continueWatchingGrid');
   const trendingMoviesGrid = document.getElementById('trendingMoviesGrid');
   const trendingTvGrid = document.getElementById('trendingTvGrid');
   const playerPanel = document.getElementById('playerPanel');
@@ -206,13 +206,7 @@
   const episodeSelect = document.getElementById('episodeSelect');
   const progressSlider = document.getElementById('progressSlider');
   const progressPercent = document.getElementById('progressPercent');
-  const saveProgressBtn = document.getElementById('saveProgressBtn');
   const reloadEmbedBtn = document.getElementById('reloadEmbedBtn');
-  const saveFeedback = document.getElementById('saveFeedback');
-  const continueSidebar = document.getElementById('continueSidebar');
-  const continueList = document.getElementById('continueList');
-  const openContinueBtn = document.getElementById('openContinueBtn');
-  const closeSidebarBtn = document.getElementById('closeSidebarBtn');
   const globalSearch = document.getElementById('globalSearch');
 
   function populateSources() {
@@ -238,9 +232,9 @@
     else embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
   }
 
-  async function saveProgress() {
-    if (!currentUser) { alert('Login required'); return; }
-    if (!currentMedia) return;
+  // Auto-save with debounce (saves 1 second after user stops moving slider)
+  async function autoSaveProgress() {
+    if (!currentUser || !currentMedia) return;
     const progress = parseInt(progressSlider.value);
     const record = {
       user_id: currentUser.id,
@@ -261,14 +255,16 @@
     const { error } = await sb
       .from('watch_history')
       .upsert(record, { onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number' });
-    if (error) alert('Save error: ' + error.message);
-    else {
-      saveFeedback.classList.remove('hidden');
-      setTimeout(() => saveFeedback.classList.add('hidden'), 2000);
-      loadContinueWatching();
-    }
+    if (error) console.error("Auto-save error:", error);
+    else console.log("Auto-saved:", progress);
   }
 
+  function debounceAutoSave() {
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(autoSaveProgress, 1000);
+  }
+
+  // Load saved progress for current media
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
     let query = sb.from('watch_history').select('progress_percent')
@@ -281,7 +277,7 @@
       query = query.is('season_number', null).is('episode_number', null);
     }
     const { data } = await query.maybeSingle();
-    if (data) {
+    if (data && data.progress_percent !== undefined) {
       progressSlider.value = data.progress_percent;
       progressPercent.innerText = data.progress_percent + '%';
     } else {
@@ -290,9 +286,12 @@
     }
   }
 
-  async function loadContinueWatching() {
-    if (!currentUser) { openContinueBtn.classList.add('hidden'); return; }
-    openContinueBtn.classList.remove('hidden');
+  // Render "Continue Watching" grid (horizontal cards)
+  async function renderContinueWatching() {
+    if (!currentUser) {
+      continueWatchingSection.classList.add('hidden');
+      return;
+    }
     const { data } = await sb
       .from('watch_history')
       .select('*')
@@ -300,44 +299,54 @@
       .order('last_watched', { ascending: false })
       .limit(10);
     if (!data || data.length === 0) {
-      continueList.innerHTML = '<div class="text-gray-400 text-sm">No history yet. Save progress while watching.</div>';
+      continueWatchingSection.classList.add('hidden');
       return;
     }
-    continueList.innerHTML = '';
-    data.forEach(item => {
-      const div = document.createElement('div');
-      div.className = 'bg-gray-800 p-3 rounded-xl cursor-pointer hover:bg-gray-700 transition';
-      div.innerHTML = `
-        <div class="font-semibold truncate">${item.title}</div>
-        <div class="text-xs text-yellow-400">${item.progress_percent}% • ${item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie'}</div>
+    continueWatchingSection.classList.remove('hidden');
+    continueWatchingGrid.innerHTML = data.map(item => {
+      const title = item.title;
+      const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
+      const progress = item.progress_percent;
+      return `
+        <div class="movie-card" data-id="${item.tmdb_id}" data-type="${item.media_type}" data-season="${item.season_number || ''}" data-episode="${item.episode_number || ''}" data-progress="${progress}">
+          <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
+          <div class="p-2">
+            <div class="font-semibold text-sm truncate">${title}</div>
+            <div class="text-xs text-yellow-400 mt-1">${progress}% watched</div>
+          </div>
+        </div>
       `;
-      div.onclick = async () => {
-        if (item.media_type === 'movie') {
-          const res = await fetch(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
-          const movie = await res.json();
-          await showDetails(movie, 'movie');
-          progressSlider.value = item.progress_percent;
-          progressPercent.innerText = item.progress_percent + '%';
-          updateEmbedStream();
-        } else {
-          const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
-          const tv = await res.json();
-          await showDetails(tv, 'tv');
-          currentSeason = item.season_number;
-          currentEpisode = item.episode_number;
+    }).join('');
+    // attach click handlers for continue cards
+    continueWatchingGrid.querySelectorAll('.movie-card').forEach(card => {
+      card.addEventListener('click', async () => {
+        const id = card.dataset.id;
+        const type = card.dataset.type;
+        const savedSeason = card.dataset.season ? parseInt(card.dataset.season) : null;
+        const savedEpisode = card.dataset.episode ? parseInt(card.dataset.episode) : null;
+        const savedProgress = parseInt(card.dataset.progress);
+        const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        await showDetails(data, type);
+        if (type === 'tv' && savedSeason && savedEpisode) {
+          currentSeason = savedSeason;
+          currentEpisode = savedEpisode;
           await loadTVSeasons(currentMedia.id);
           seasonSelect.value = currentSeason;
           episodeSelect.value = currentEpisode;
-          progressSlider.value = item.progress_percent;
-          progressPercent.innerText = item.progress_percent + '%';
-          updateEmbedStream();
+          await loadProgress(); // this will set the slider to savedProgress
+        } else {
+          progressSlider.value = savedProgress;
+          progressPercent.innerText = savedProgress + '%';
+          await loadProgress(); // double-check
         }
-        continueSidebar.classList.add('translate-x-full');
-      };
-      continueList.appendChild(div);
+        updateEmbedStream();
+      });
     });
   }
 
+  // TV show helpers
   async function loadTVSeasons(tvId) {
     const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
     const data = await res.json();
@@ -357,11 +366,13 @@
       await loadEpisodes(tvId, currentSeason);
       await loadProgress();
       updateEmbedStream();
+      debounceAutoSave(); // save on season change
     };
     episodeSelect.onchange = async () => {
       currentEpisode = parseInt(episodeSelect.value);
       await loadProgress();
       updateEmbedStream();
+      debounceAutoSave();
     };
   }
 
@@ -407,6 +418,7 @@
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // Render movie/TV cards
   function renderCards(container, items, mediaType) {
     if (!items.length) {
       container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>';
@@ -464,6 +476,7 @@
     renderCards(trendingTvGrid, tv, 'tv');
   }
 
+  // Auth UI
   function updateAuthUI() {
     sb.auth.getUser().then(({ data: { user } }) => {
       currentUser = user;
@@ -471,11 +484,11 @@
         document.getElementById('authContainer').classList.add('hidden');
         document.getElementById('userContainer').classList.remove('hidden');
         document.getElementById('userEmailDisplay').innerText = user.email;
-        loadContinueWatching();
+        renderContinueWatching();
       } else {
         document.getElementById('authContainer').classList.remove('hidden');
         document.getElementById('userContainer').classList.add('hidden');
-        openContinueBtn.classList.add('hidden');
+        continueWatchingSection.classList.add('hidden');
         playerPanel.classList.add('hidden');
       }
     }).catch(console.error);
@@ -516,10 +529,10 @@
   closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
   reloadEmbedBtn.onclick = () => updateEmbedStream();
   sourceSelect.onchange = () => updateEmbedStream();
-  saveProgressBtn.onclick = saveProgress;
-  openContinueBtn.onclick = () => continueSidebar.classList.remove('translate-x-full');
-  closeSidebarBtn.onclick = () => continueSidebar.classList.add('translate-x-full');
-  progressSlider.oninput = () => progressPercent.innerText = progressSlider.value + '%';
+  progressSlider.oninput = () => {
+    progressPercent.innerText = progressSlider.value + '%';
+    debounceAutoSave();
+  };
   
   let searchTimeout;
   globalSearch.addEventListener('input', (e) => {
@@ -527,7 +540,7 @@
     searchTimeout = setTimeout(() => search(e.target.value), 500);
   });
 
-  // Start everything
+  // Initialization
   populateSources();
   fetchTrending();
   updateAuthUI();
