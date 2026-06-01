@@ -22,11 +22,10 @@
       padding: 0.75rem 1rem;
       display: flex;
       flex-wrap: wrap;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       gap: 1rem;
     }
-    /* Brand */
     .brand {
       display: flex;
       align-items: center;
@@ -44,10 +43,9 @@
       color: transparent;
       letter-spacing: 1px;
     }
-    /* Modern search container */
     .search-wrapper {
-      flex: 1;
-      max-width: 400px;
+      flex: 1 1 auto;
+      min-width: 200px;
       position: relative;
     }
     .search-icon {
@@ -91,7 +89,6 @@
     .clear-search:hover {
       color: #facc15;
     }
-    /* Nav buttons */
     .nav-btn {
       background: transparent;
       border: 1px solid #facc15;
@@ -102,6 +99,7 @@
       font-weight: 500;
       transition: all 0.2s;
       cursor: pointer;
+      white-space: nowrap;
     }
     .nav-btn:hover {
       background: #facc15;
@@ -120,29 +118,31 @@
       text-transform: uppercase;
       cursor: pointer;
     }
-    /* Responsive adjustments */
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
     @media (max-width: 768px) {
       .glass-nav {
-        gap: 0.75rem;
-      }
-      .brand span {
-        font-size: 1.2rem;
+        flex-direction: column;
+        align-items: stretch;
       }
       .search-wrapper {
-        max-width: none;
         width: 100%;
         order: 3;
+        margin-top: 0.5rem;
       }
-      .nav-btn {
-        padding: 0.3rem 0.8rem;
-        font-size: 0.75rem;
+      .nav-right {
+        order: 2;
+        justify-content: flex-end;
+      }
+      .brand {
+        order: 1;
       }
     }
-    /* Continue Watching section toggle (hidden during search) */
-    .continue-section-hidden {
-      display: none !important;
-    }
-    /* Rest of the styles (same as before) */
+    /* Movie cards, player, etc. (unchanged from previous working version) */
     .movie-card {
       transition: transform 0.25s ease, box-shadow 0.25s;
       cursor: pointer;
@@ -389,19 +389,18 @@
       flex-wrap: wrap;
       gap: 0.5rem;
     }
+    .continue-section-hidden {
+      display: none !important;
+    }
   </style>
 </head>
 <body class="text-gray-200">
 
-<!-- NAVBAR (updated) -->
 <nav class="glass-nav">
-  <!-- Brand -->
   <div class="brand">
     <i class="fas fa-crown text-yellow-400"></i>
     <span>WIZHUB</span>
   </div>
-
-  <!-- Modern search bar with clear button -->
   <div class="search-wrapper">
     <i class="fas fa-search search-icon"></i>
     <input type="text" id="globalSearch" placeholder="Search movies or TV shows..." class="search-input" autocomplete="off">
@@ -409,29 +408,25 @@
       <i class="fas fa-times-circle"></i>
     </button>
   </div>
-
-  <!-- OGList button -->
-  <a href="oglist.html" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
-
-  <!-- Auth section -->
-  <div id="authContainer" class="flex gap-2">
-    <button id="showLoginBtn" class="nav-btn">Login</button>
-    <button id="showSignupBtn" class="nav-btn bg-yellow-500 text-black border-yellow-500 hover:bg-yellow-400">Sign up</button>
-  </div>
-  <div id="userContainer" class="hidden items-center gap-3">
-    <div class="user-avatar" id="userAvatar">U</div>
-    <button id="logoutBtn" class="text-xs bg-red-800/50 hover:bg-red-700 px-3 py-1.5 rounded-full"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  <div class="nav-right">
+    <a href="oglist.html" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
+    <div id="userContainer" class="hidden items-center gap-3">
+      <div class="user-avatar" id="userAvatar">U</div>
+      <button id="logoutBtn" class="nav-btn">Logout</button>
+    </div>
+    <div id="authContainer" class="flex gap-2">
+      <button id="showLoginBtn" class="nav-btn">Login</button>
+      <button id="showSignupBtn" class="nav-btn bg-yellow-500 text-black border-yellow-500 hover:bg-yellow-400">Sign up</button>
+    </div>
   </div>
 </nav>
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
-  <!-- Continue Watching section (can be hidden during search) -->
   <section id="continueWatchingSection" class="mb-12">
     <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
     <div id="continueWatchingContainer" class="horizontal-scroll"><div class="text-gray-400 text-sm">Log in to see your watch history.</div></div>
   </section>
 
-  <!-- Player Panel -->
   <div id="playerPanel" class="hidden mb-12 player-modern">
     <div class="embed-container">
       <iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="autoplay; encrypted-media"></iframe>
@@ -495,7 +490,6 @@
     </div>
   </div>
 
-  <!-- Trending Movies & TV Shows -->
   <section class="mb-12">
     <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-fire text-orange-500"></i> Trending Movies</h2>
     <div id="trendingMoviesGrid" class="trending-grid"></div>
@@ -506,7 +500,6 @@
   </section>
 </main>
 
-<!-- Modals (unchanged) -->
 <div id="orderModal" class="modal">
   <div class="modal-content">
     <h3 class="text-xl font-bold mb-4">Reorder Stream Sources</h3>
@@ -612,42 +605,27 @@
 
   function showLoading(container) { container.innerHTML = '<div class="col-span-full flex justify-center py-10"><div class="loading-spinner"></div><span class="ml-2">Loading...</span></div>'; }
 
-  // ================= SEARCH BEHAVIOR (hide Continue Watching when searching) =================
+  // Search behaviour
   function updateContinueVisibility() {
     const query = globalSearch.value.trim();
-    if (query !== '') {
-      continueSection.classList.add('continue-section-hidden');
-    } else {
-      continueSection.classList.remove('continue-section-hidden');
-    }
-    // Show/hide clear button
-    if (query !== '') {
-      clearSearchBtn.style.display = 'block';
-    } else {
-      clearSearchBtn.style.display = 'none';
-    }
+    if (query !== '') continueSection.classList.add('continue-section-hidden');
+    else continueSection.classList.remove('continue-section-hidden');
+    clearSearchBtn.style.display = query !== '' ? 'block' : 'none';
   }
-
-  // Clear search input
   function clearSearch() {
     globalSearch.value = '';
     updateContinueVisibility();
     search(globalSearch.value);
     globalSearch.focus();
   }
-
-  // Debounced search
   let searchTimeout;
   function handleSearchInput(e) {
-    const query = e.target.value;
     updateContinueVisibility();
     clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      search(query);
-    }, 500);
+    searchTimeout = setTimeout(() => search(e.target.value), 500);
   }
 
-  // ================= SOURCE ORDER (unchanged) =================
+  // ================= ALL CORE FUNCTIONS (identical to previous working version) =================
   async function loadUserSourceOrder() {
     if (!currentUser) return;
     try {
@@ -662,28 +640,21 @@
             const found = DEFAULT_SOURCES.find(s => s.name === savedName);
             if (found) newOrder.push({ name: found.name, url: found.url });
           }
-          if (newOrder.length === DEFAULT_SOURCES.length) {
-            EMBED_SOURCES = newOrder;
-          } else {
+          if (newOrder.length === DEFAULT_SOURCES.length) EMBED_SOURCES = newOrder;
+          else {
             EMBED_SOURCES = [...DEFAULT_SOURCES];
             await sb.from('user_settings').upsert({ id: currentUser.id, source_order: DEFAULT_SOURCES.map(s => s.name), updated_at: new Date().toISOString() });
           }
         }
-      } else {
-        EMBED_SOURCES = [...DEFAULT_SOURCES];
-      }
-    } catch (err) {
-      EMBED_SOURCES = [...DEFAULT_SOURCES];
-    }
+      } else EMBED_SOURCES = [...DEFAULT_SOURCES];
+    } catch (err) { EMBED_SOURCES = [...DEFAULT_SOURCES]; }
     populateSources();
   }
-
   async function saveUserSourceOrder() {
     if (!currentUser) return;
     const namesOnly = EMBED_SOURCES.map(s => s.name);
     await sb.from('user_settings').upsert({ id: currentUser.id, source_order: namesOnly, updated_at: new Date().toISOString() });
   }
-
   function populateSources() {
     sourceSelect.innerHTML = '';
     EMBED_SOURCES.forEach((src, i) => {
@@ -693,7 +664,6 @@
       sourceSelect.appendChild(opt);
     });
   }
-
   function updateEmbedStream() {
     if (!currentMedia) return;
     const srcIdx = parseInt(sourceSelect.value);
@@ -703,15 +673,11 @@
       return;
     }
     let url = '';
-    if (currentMedia.type === 'movie') {
-      url = src.url('movie', currentMedia.id, null, null);
-    } else {
-      url = src.url('tv', currentMedia.id, currentSeason, currentEpisode);
-    }
+    if (currentMedia.type === 'movie') url = src.url('movie', currentMedia.id, null, null);
+    else url = src.url('tv', currentMedia.id, currentSeason, currentEpisode);
     if (url) embedIframe.src = url;
     else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to generate URL</div>';
   }
-
   function nextSource() {
     if (!sourceSelect.options.length) return;
     let newIdx = parseInt(sourceSelect.value) + 1;
@@ -719,13 +685,9 @@
     sourceSelect.value = newIdx;
     sourceSelect.dispatchEvent(new Event('change'));
   }
-
   async function copyVideoUrl() {
     const url = embedIframe.src;
-    if (!url || url === 'about:blank') {
-      alert('No video URL to copy');
-      return;
-    }
+    if (!url || url === 'about:blank') { alert('No video URL to copy'); return; }
     try {
       await navigator.clipboard.writeText(url);
       const toast = document.createElement('div');
@@ -733,86 +695,50 @@
       toast.textContent = '✓ URL copied to clipboard';
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 2000);
-    } catch (err) {
-      alert('Could not copy URL');
-    }
+    } catch (err) { alert('Could not copy URL'); }
   }
-
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
     const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
     const record = {
-      user_id: currentUser.id,
-      media_type: currentMedia.type,
-      tmdb_id: currentMedia.id,
-      title: currentMedia.title,
-      poster_path: currentMedia.posterPath,
-      media_year: currentMedia.year,
-      rating: currentMedia.rating,
-      progress_minutes: currentProgressMinutes,
-      season_number: season,
-      episode_number: episode,
-      last_watched: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      user_id: currentUser.id, media_type: currentMedia.type, tmdb_id: currentMedia.id,
+      title: currentMedia.title, poster_path: currentMedia.posterPath, media_year: currentMedia.year,
+      rating: currentMedia.rating, progress_minutes: currentProgressMinutes,
+      season_number: season, episode_number: episode,
+      last_watched: new Date().toISOString(), updated_at: new Date().toISOString()
     };
-    const { error } = await sb
-      .from('watch_history')
-      .upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
+    const { error } = await sb.from('watch_history').upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
     if (error) console.error("Save error:", error);
   }
-
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
-    const { data, error } = await sb
-      .from('watch_history')
+    const { data, error } = await sb.from('watch_history')
       .select('progress_minutes, season_number, episode_number')
-      .eq('user_id', currentUser.id)
-      .eq('media_type', currentMedia.type)
-      .eq('tmdb_id', currentMedia.id)
-      .maybeSingle();
+      .eq('user_id', currentUser.id).eq('media_type', currentMedia.type).eq('tmdb_id', currentMedia.id).maybeSingle();
     if (!error && data) {
       currentProgressMinutes = data.progress_minutes || 0;
       progressMinutesInput.value = currentProgressMinutes;
-      if (currentMedia.type === 'tv') {
-        if (data.season_number && data.episode_number) {
-          currentSeason = data.season_number;
-          currentEpisode = data.episode_number;
-        }
+      if (currentMedia.type === 'tv' && data.season_number && data.episode_number) {
+        currentSeason = data.season_number;
+        currentEpisode = data.episode_number;
       }
-    } else {
-      currentProgressMinutes = 0;
-      progressMinutesInput.value = 0;
-    }
+    } else { currentProgressMinutes = 0; progressMinutesInput.value = 0; }
   }
-
   async function deleteHistoryEntry(mediaType, tmdbId) {
     if (!currentUser) return;
-    const { error } = await sb
-      .from('watch_history')
-      .delete()
-      .eq('user_id', currentUser.id)
-      .eq('media_type', mediaType)
-      .eq('tmdb_id', tmdbId);
+    const { error } = await sb.from('watch_history').delete().eq('user_id', currentUser.id).eq('media_type', mediaType).eq('tmdb_id', tmdbId);
     if (error) console.error("Delete error:", error);
     else await renderContinueWatching();
   }
-
   async function renderContinueWatching() {
     if (!currentUser) {
       continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🔒 Log in to see your continue watching list.</div>';
       return;
     }
-    const { data, error } = await sb
-      .from('watch_history')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .order('last_watched', { ascending: false });
+    const { data, error } = await sb.from('watch_history').select('*').eq('user_id', currentUser.id).order('last_watched', { ascending: false });
     if (error || !data) return;
-    if (data.length === 0) {
-      continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet. Start watching!</div>';
-      return;
-    }
+    if (data.length === 0) { continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet. Start watching!</div>'; return; }
     continueContainer.innerHTML = '';
     for (const item of data) {
       const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
@@ -837,9 +763,7 @@
         e.stopPropagation();
         const mediaType = deleteBtn.dataset.mediaType;
         const tmdbId = parseInt(deleteBtn.dataset.tmdb);
-        if (confirm(`Delete "${item.title}" from Continue Watching?`)) {
-          await deleteHistoryEntry(mediaType, tmdbId);
-        }
+        if (confirm(`Delete "${item.title}" from Continue Watching?`)) await deleteHistoryEntry(mediaType, tmdbId);
       });
       card.addEventListener('click', async (e) => {
         if (e.target.closest('.delete-btn')) return;
@@ -856,18 +780,14 @@
       continueContainer.appendChild(card);
     }
   }
-
   async function updateEpisodeNavigation() {
     if (!currentMedia || currentMedia.type !== 'tv' || !currentEpisodesList.length) {
-      prevEpisodeBtn.disabled = true;
-      nextEpisodeBtn.disabled = true;
-      return;
+      prevEpisodeBtn.disabled = true; nextEpisodeBtn.disabled = true; return;
     }
     const currentIndex = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
     prevEpisodeBtn.disabled = (currentIndex <= 0);
     nextEpisodeBtn.disabled = (currentIndex >= currentEpisodesList.length - 1);
   }
-
   async function goToPreviousEpisode() {
     if (!currentMedia || currentMedia.type !== 'tv') return;
     const currentIndex = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
@@ -880,7 +800,6 @@
       updateEpisodeNavigation();
     }
   }
-
   async function goToNextEpisode() {
     if (!currentMedia || currentMedia.type !== 'tv') return;
     const currentIndex = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
@@ -893,7 +812,6 @@
       updateEpisodeNavigation();
     }
   }
-
   async function loadTVSeasons(tvId, preserveEpisode = false, forcedSeason = null, forcedEpisode = null) {
     const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
     const data = await res.json();
@@ -929,7 +847,6 @@
     };
     updateEpisodeNavigation();
   }
-
   async function loadEpisodes(tvId, seasonNum, forcedEpisode = null) {
     const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNum}?api_key=${TMDB_API_KEY}`);
     const data = await res.json();
@@ -946,25 +863,16 @@
     episodeSelect.value = currentEpisode;
     updateEpisodeNavigation();
   }
-
   async function fetchWithRetry(url, retries = 3, delay = 1000) {
     for (let i = 0; i < retries; i++) {
       try {
         const res = await fetch(url);
         if (res.ok) return res;
-        if (res.status === 429) {
-          const wait = delay * Math.pow(2, i);
-          await new Promise(r => setTimeout(r, wait));
-          continue;
-        }
+        if (res.status === 429) { await new Promise(r => setTimeout(r, delay * Math.pow(2, i))); continue; }
         throw new Error(`HTTP ${res.status}`);
-      } catch (err) {
-        if (i === retries - 1) throw err;
-        await new Promise(r => setTimeout(r, delay));
-      }
+      } catch (err) { if (i === retries - 1) throw err; await new Promise(r => setTimeout(r, delay)); }
     }
   }
-
   async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null) {
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
@@ -979,68 +887,42 @@
     document.getElementById('detailYear').innerText = year;
     document.getElementById('detailType').innerHTML = type === 'movie' ? 'Movie' : 'TV Series';
     currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
-    
     if (type === 'tv') {
       tvControlsDiv.classList.remove('hidden');
       if (savedSeason !== null && savedEpisode !== null) {
         currentSeason = savedSeason;
         currentEpisode = savedEpisode;
-      } else {
-        currentSeason = 1;
-        currentEpisode = 1;
-      }
+      } else { currentSeason = 1; currentEpisode = 1; }
       await loadTVSeasons(item.id, true, currentSeason, currentEpisode);
-    } else {
-      tvControlsDiv.classList.add('hidden');
-    }
-    
-    if (savedProgress !== null) {
-      currentProgressMinutes = savedProgress;
-      progressMinutesInput.value = savedProgress;
-    } else {
-      await loadProgress();
-    }
+    } else tvControlsDiv.classList.add('hidden');
+    if (savedProgress !== null) { currentProgressMinutes = savedProgress; progressMinutesInput.value = savedProgress; }
+    else await loadProgress();
     await saveProgressToDB();
     updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-
   function renderCards(container, items, mediaType) {
-    if (!items.length) {
-      container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>';
-      return;
-    }
+    if (!items.length) { container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>'; return; }
     container.innerHTML = items.map(item => {
       const title = item.title || item.name;
       const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
       const year = (item.release_date || item.first_air_date || '').slice(0,4);
       const rating = item.vote_average?.toFixed(1) || '';
-      return `
-        <div class="movie-card" data-id="${item.id}" data-type="${mediaType}">
-          <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
-          <div class="p-2">
-            <div class="font-semibold text-sm truncate">${title}</div>
-            <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${year || '—'}</span><span>⭐ ${rating}</span></div>
-          </div>
-        </div>
-      `;
+      return `<div class="movie-card" data-id="${item.id}" data-type="${mediaType}">
+        <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
+        <div class="p-2"><div class="font-semibold text-sm truncate">${title}</div>
+        <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${year || '—'}</span><span>⭐ ${rating}</span></div></div>
+      </div>`;
     }).join('');
     container.querySelectorAll('.movie-card').forEach(card => {
       card.addEventListener('click', async () => {
-        const id = card.dataset.id;
-        const type = card.dataset.type;
+        const id = card.dataset.id, type = card.dataset.type;
         const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`;
-        try {
-          const res = await fetchWithRetry(url);
-          const data = await res.json();
-          showDetails(data, type);
-        } catch (err) {
-          alert("Failed to load details. Please try again.");
-        }
+        try { const res = await fetchWithRetry(url); const data = await res.json(); showDetails(data, type); }
+        catch (err) { alert("Failed to load details. Please try again."); }
       });
     });
   }
-
   let cachedTrending = null;
   async function fetchTrending() {
     if (cachedTrending) {
@@ -1065,7 +947,6 @@
       trendingTvGrid.innerHTML = '<div class="col-span-full text-red-400">Failed to load trending.</div>';
     }
   }
-
   async function search(query) {
     if (!query.trim()) { fetchTrending(); return; }
     showLoading(trendingMoviesGrid);
@@ -1081,18 +962,16 @@
       trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Search failed.</div>';
     }
   }
-
   function updateAuthUI() {
     sb.auth.getUser().then(async ({ data: { user } }) => {
       currentUser = user;
       if (user) {
         document.getElementById('authContainer').classList.add('hidden');
         document.getElementById('userContainer').classList.remove('hidden');
-        const firstLetter = user.email ? user.email.charAt(0).toUpperCase() : 'U';
-        if (userAvatar) userAvatar.innerText = firstLetter;
+        if (userAvatar) userAvatar.innerText = user.email ? user.email.charAt(0).toUpperCase() : 'U';
         await loadUserSourceOrder();
         await renderContinueWatching();
-        updateContinueVisibility(); // ensure continue section is shown if no search
+        updateContinueVisibility();
       } else {
         document.getElementById('authContainer').classList.remove('hidden');
         document.getElementById('userContainer').classList.add('hidden');
@@ -1102,56 +981,33 @@
       }
     }).catch(console.error);
   }
-
   function openOrderModal() {
     sourceListDiv.innerHTML = '';
     EMBED_SOURCES.forEach((src, idx) => {
       const div = document.createElement('div');
       div.className = 'source-item';
-      div.innerHTML = `
-        <span>${src.name}</span>
-        <div>
-          <button class="move-up text-yellow-400 mr-2" data-idx="${idx}"><i class="fas fa-arrow-up"></i></button>
-          <button class="move-down text-yellow-400" data-idx="${idx}"><i class="fas fa-arrow-down"></i></button>
-        </div>
-      `;
+      div.innerHTML = `<span>${src.name}</span><div><button class="move-up text-yellow-400 mr-2" data-idx="${idx}"><i class="fas fa-arrow-up"></i></button><button class="move-down text-yellow-400" data-idx="${idx}"><i class="fas fa-arrow-down"></i></button></div>`;
       sourceListDiv.appendChild(div);
     });
-    document.querySelectorAll('.move-up').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const idx = parseInt(btn.dataset.idx);
-        if (idx > 0) {
-          [EMBED_SOURCES[idx-1], EMBED_SOURCES[idx]] = [EMBED_SOURCES[idx], EMBED_SOURCES[idx-1]];
-          openOrderModal();
-        }
-      });
-    });
-    document.querySelectorAll('.move-down').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const idx = parseInt(btn.dataset.idx);
-        if (idx < EMBED_SOURCES.length - 1) {
-          [EMBED_SOURCES[idx], EMBED_SOURCES[idx+1]] = [EMBED_SOURCES[idx+1], EMBED_SOURCES[idx]];
-          openOrderModal();
-        }
-      });
-    });
+    document.querySelectorAll('.move-up').forEach(btn => btn.addEventListener('click', (e) => {
+      const idx = parseInt(btn.dataset.idx);
+      if (idx > 0) { [EMBED_SOURCES[idx-1], EMBED_SOURCES[idx]] = [EMBED_SOURCES[idx], EMBED_SOURCES[idx-1]]; openOrderModal(); }
+    }));
+    document.querySelectorAll('.move-down').forEach(btn => btn.addEventListener('click', (e) => {
+      const idx = parseInt(btn.dataset.idx);
+      if (idx < EMBED_SOURCES.length - 1) { [EMBED_SOURCES[idx], EMBED_SOURCES[idx+1]] = [EMBED_SOURCES[idx+1], EMBED_SOURCES[idx]]; openOrderModal(); }
+    }));
     orderModal.style.display = 'flex';
   }
-
   saveOrderBtn.onclick = async () => {
     await saveUserSourceOrder();
     populateSources();
     orderModal.style.display = 'none';
-    if (sourceSelect.options.length) {
-      const oldIdx = parseInt(sourceSelect.value);
-      if (oldIdx >= EMBED_SOURCES.length) sourceSelect.value = 0;
-      updateEmbedStream();
-    }
+    if (sourceSelect.options.length) { const oldIdx = parseInt(sourceSelect.value); if (oldIdx >= EMBED_SOURCES.length) sourceSelect.value = 0; updateEmbedStream(); }
   };
   closeOrderBtn.onclick = () => orderModal.style.display = 'none';
   orderSourcesBtn.onclick = openOrderModal;
 
-  // Event listeners
   closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
   reloadEmbedBtn.onclick = () => updateEmbedStream();
   sourceSelect.onchange = () => updateEmbedStream();
@@ -1165,10 +1021,9 @@
   prevEpisodeBtn.onclick = goToPreviousEpisode;
   nextEpisodeBtn.onclick = goToNextEpisode;
 
-  // Copy title
   function copyTitleToClipboard() {
     const title = detailTitleSpan.innerText;
-    if (!title || title === '') return;
+    if (!title) return;
     navigator.clipboard.writeText(title).then(() => {
       const toast = document.createElement('div');
       toast.className = 'toast-notification';
@@ -1180,28 +1035,16 @@
   if (detailTitleSpan) detailTitleSpan.addEventListener('click', copyTitleToClipboard);
   if (copyTitleIcon) copyTitleIcon.addEventListener('click', copyTitleToClipboard);
 
-  // Search events
   globalSearch.addEventListener('input', handleSearchInput);
   clearSearchBtn.addEventListener('click', clearSearch);
   globalSearch.addEventListener('focus', updateContinueVisibility);
-  globalSearch.addEventListener('blur', () => {
-    setTimeout(() => {
-      if (!globalSearch.value.trim()) {
-        updateContinueVisibility();
-      }
-    }, 200);
-  });
+  globalSearch.addEventListener('blur', () => { setTimeout(() => { if (!globalSearch.value.trim()) updateContinueVisibility(); }, 200); });
 
-  // Login/Signup modals (unchanged)
   const loginModal = document.getElementById('loginModal');
   const signupModal = document.getElementById('signupModal');
   document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
   document.getElementById('showSignupBtn').onclick = () => signupModal.classList.remove('hidden');
-  document.querySelectorAll('.closeModal').forEach(btn => btn.onclick = () => {
-    loginModal.classList.add('hidden');
-    signupModal.classList.add('hidden');
-    orderModal.style.display = 'none';
-  });
+  document.querySelectorAll('.closeModal').forEach(btn => btn.onclick = () => { loginModal.classList.add('hidden'); signupModal.classList.add('hidden'); orderModal.style.display = 'none'; });
   document.getElementById('switchToSignupModal').onclick = () => { loginModal.classList.add('hidden'); signupModal.classList.remove('hidden'); };
   document.getElementById('switchToLoginModal').onclick = () => { signupModal.classList.add('hidden'); loginModal.classList.remove('hidden'); };
   document.getElementById('doLoginBtn').onclick = async () => {
@@ -1224,7 +1067,6 @@
     playerPanel.classList.add('hidden');
   };
 
-  // Init
   populateSources();
   fetchTrending();
   updateAuthUI();
