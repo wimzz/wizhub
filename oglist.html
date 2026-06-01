@@ -1,1 +1,171 @@
-https://fmhy.net/videopiracyguide#streaming-sites
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>WizhuB • Resource Links</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: radial-gradient(circle at 10% 20%, #0a0c10, #030507);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .header h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #facc15, #e5b80b);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .header p {
+      color: #9ca3af;
+      margin-top: 0.5rem;
+    }
+    .button-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .resource-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #14161f;
+      border: 1px solid rgba(250, 204, 21, 0.2);
+      border-radius: 1rem;
+      padding: 0.75rem 1.25rem;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      color: #e5e7eb;
+      font-weight: 500;
+    }
+    .resource-btn:hover {
+      background: #1e212b;
+      border-color: #facc15;
+      transform: translateX(5px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+    .btn-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      overflow: hidden;
+    }
+    .btn-left .index {
+      background: #facc15;
+      color: #0a0c10;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+      font-weight: bold;
+      font-size: 0.85rem;
+    }
+    .btn-left .url-text {
+      font-size: 0.9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 400px;
+    }
+    .btn-right i {
+      font-size: 1rem;
+      color: #9ca3af;
+      transition: color 0.2s;
+    }
+    .resource-btn:hover .btn-right i {
+      color: #facc15;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: #4b5563;
+    }
+    @media (max-width: 640px) {
+      .btn-left .url-text {
+        max-width: 180px;
+      }
+      .resource-btn {
+        padding: 0.6rem 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1><i class="fas fa-link"></i> Resource Links</h1>
+      <p>Curated streaming & piracy resources – click any button to open</p>
+    </div>
+
+    <div class="button-grid" id="linksContainer"></div>
+
+    <div class="footer">
+      <i class="fas fa-shield-alt"></i> For personal reference only
+    </div>
+  </div>
+
+  <script>
+    // List of URLs exactly as provided, in order
+    const urls = [
+      "https://fmhy.net/videopiracyguide#streaming-sites",
+      "https://www.bestfreestreaming.org/",
+      "https://n3rdmade.github.io/TBCPL/",
+      "https://www.reddit.com/r/Piracy/wiki/megathread/movies_and_tv/",
+      "https://mediasavvy.pages.dev/Wiki/MoviesandTVShows#streaming-websites",
+      "https://deepwebnest.com/",
+      "https://shakil-shahadat.github.io/awesome-piracy/#streaming-sites",
+      "https://wiki-index.pages.dev/video/",
+      "https://plushub.net/",
+      "https://everythingmoe.com/",
+      "https://theindex.moe/"
+    ];
+
+    const container = document.getElementById('linksContainer');
+    urls.forEach((url, index) => {
+      const btn = document.createElement('a');
+      btn.href = url;
+      btn.target = "_blank";
+      btn.rel = "noopener noreferrer";
+      btn.className = "resource-btn";
+
+      // Extract short domain for display
+      let displayUrl = url;
+      try {
+        const domain = new URL(url).hostname;
+        displayUrl = domain;
+      } catch(e) {}
+
+      btn.innerHTML = `
+        <div class="btn-left">
+          <span class="index">${index + 1}</span>
+          <span class="url-text">${displayUrl}</span>
+        </div>
+        <div class="btn-right">
+          <i class="fas fa-external-link-alt"></i>
+        </div>
+      `;
+      container.appendChild(btn);
+    });
+  </script>
+</body>
+</html>
