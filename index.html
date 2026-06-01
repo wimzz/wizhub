@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB • Auto‑Save & Continue Watching</title>
+  <title>WizhuB • Auto‑Resume & Cross‑Device Sync</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -82,10 +82,12 @@
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
   
-  <!-- Continue Watching Section (top, horizontal scroll) -->
-  <section id="continueWatchingSection" class="mb-12 hidden">
+  <!-- Continue Watching Section (top, horizontal scroll) – shown only when logged in -->
+  <section id="continueWatchingSection" class="mb-12">
     <h2 class="text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
-    <div id="continueWatchingContainer" class="horizontal-scroll"></div>
+    <div id="continueWatchingContainer" class="horizontal-scroll">
+      <!-- placeholder: if logged out, this shows a message; if logged in but no history, shows message -->
+    </div>
   </section>
 
   <!-- Player Panel (hidden initially) -->
@@ -127,7 +129,7 @@
         <div class="embed-container mt-3">
           <iframe id="embedIframe" allowfullscreen></iframe>
         </div>
-        <p class="text-[10px] text-gray-500 text-center mt-2">Your watch progress saves automatically while you watch.</p>
+        <p class="text-[10px] text-gray-500 text-center mt-2">Your watch progress saves automatically. Resume on any device with any embed source.</p>
       </div>
     </div>
   </div>
@@ -191,7 +193,6 @@
   let currentSeason = 1, currentEpisode = 1;
   let progressPercent = 0;
   let autoSaveInterval = null;
-  let isWatching = false;
 
   // DOM elements
   const continueSection = document.getElementById('continueWatchingSection');
@@ -232,7 +233,7 @@
     else embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
   }
 
-  // Auto-save function (saves current progressPercent to DB)
+  // Save current progressPercent to Supabase
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const record = {
@@ -261,19 +262,18 @@
     }
   }
 
-  // Start auto-progress timer (every 30 seconds, increase by 1% until 95)
+  // Auto-progress timer: every 30 seconds, add 1% (capped at 95)
   function startAutoProgress() {
     if (autoSaveInterval) clearInterval(autoSaveInterval);
     autoSaveInterval = setInterval(async () => {
-      if (!currentUser || !currentMedia || !playerPanel.classList.contains('hidden')) {
-        // only increase if player is open and we are watching
+      if (currentUser && currentMedia && !playerPanel.classList.contains('hidden')) {
         if (progressPercent < 95) {
           progressPercent = Math.min(progressPercent + 1, 95);
           progressPercentDisplay.innerText = progressPercent + '%';
           await saveProgressToDB();
         }
       }
-    }, 30000); // every 30 seconds
+    }, 30000);
   }
 
   function stopAutoProgress() {
@@ -305,10 +305,10 @@
     }
   }
 
-  // Render Continue Watching (horizontal scroll with progress overlay)
+  // Render Continue Watching row – appears ONLY when logged in and has history
   async function renderContinueWatching() {
     if (!currentUser) {
-      continueSection.classList.add('hidden');
+      continueContainer.innerHTML = '<div class="text-gray-400 text-sm">Log in to see your continue watching list.</div>';
       return;
     }
     const { data } = await sb
@@ -318,10 +318,10 @@
       .order('last_watched', { ascending: false })
       .limit(10);
     if (!data || data.length === 0) {
-      continueSection.classList.add('hidden');
+      continueContainer.innerHTML = '<div class="text-gray-400 text-sm">No watch history yet. Start watching something!</div>';
       return;
     }
-    continueSection.classList.remove('hidden');
+    // Render cards
     continueContainer.innerHTML = '';
     for (const item of data) {
       const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
@@ -383,13 +383,13 @@
       await loadEpisodes(tvId, currentSeason);
       await loadProgress();
       updateEmbedStream();
-      await saveProgressToDB(); // save on season change
+      await saveProgressToDB();
     };
     episodeSelect.onchange = async () => {
       currentEpisode = parseInt(episodeSelect.value);
       await loadProgress();
       updateEmbedStream();
-      await saveProgressToDB(); // save on episode change
+      await saveProgressToDB();
     };
   }
 
@@ -409,7 +409,6 @@
   }
 
   async function showDetails(item, type) {
-    // Stop previous auto progress if any
     stopAutoProgress();
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
@@ -434,7 +433,6 @@
     }
     await loadProgress();
     updateEmbedStream();
-    // Start auto progress timer (increment every 30 sec)
     startAutoProgress();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -507,7 +505,8 @@
       } else {
         document.getElementById('authContainer').classList.remove('hidden');
         document.getElementById('userContainer').classList.add('hidden');
-        continueSection.classList.add('hidden');
+        // Show login prompt in continue section
+        continueContainer.innerHTML = '<div class="text-gray-400 text-sm">Log in to see your continue watching list.</div>';
         playerPanel.classList.add('hidden');
         stopAutoProgress();
       }
