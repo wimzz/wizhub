@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB • Modern Stream & Sync</title>
+  <title>WizhuB • Stream & Sync</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -68,6 +68,10 @@
     { name: '🌀 Embed.su', url: (type, id, season, ep) => type === 'movie' ? `https://embed.su/embed/movie/${id}` : `https://embed.su/embed/tv/${id}/${season}/${ep}` },
     { name: '⚡ Vidplay', url: (type, id, season, ep) => type === 'movie' ? `https://vidplay.site/embed/movie/${id}` : `https://vidplay.site/embed/tv/${id}/${season}/${ep}` }
   ];
+
+  // Debug flag (set to true to see console logs)
+  const DEBUG = true;
+  function log(...args) { if (DEBUG) console.log(...args); }
 </script>
 
 <!-- Navigation -->
@@ -194,357 +198,377 @@
 </div>
 
 <script>
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  let currentUser = null;
-  let currentMedia = null;
-  let currentSeason = 1, currentEpisode = 1;
+  (function() {
+    log("Initializing WizhuB...");
+    
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let currentUser = null;
+    let currentMedia = null;
+    let currentSeason = 1, currentEpisode = 1;
 
-  // DOM elements
-  const trendingMoviesGrid = document.getElementById('trendingMoviesGrid');
-  const trendingTvGrid = document.getElementById('trendingTvGrid');
-  const playerPanel = document.getElementById('playerPanel');
-  const closePlayerBtn = document.getElementById('closePlayerBtn');
-  const sourceSelect = document.getElementById('sourceSelect');
-  const embedIframe = document.getElementById('embedIframe');
-  const tvControlsDiv = document.getElementById('tvControls');
-  const seasonSelect = document.getElementById('seasonSelect');
-  const episodeSelect = document.getElementById('episodeSelect');
-  const progressSlider = document.getElementById('progressSlider');
-  const progressPercent = document.getElementById('progressPercent');
-  const saveProgressBtn = document.getElementById('saveProgressBtn');
-  const reloadEmbedBtn = document.getElementById('reloadEmbedBtn');
-  const saveFeedback = document.getElementById('saveFeedback');
-  const continueSidebar = document.getElementById('continueSidebar');
-  const continueList = document.getElementById('continueList');
-  const openContinueBtn = document.getElementById('openContinueBtn');
-  const closeSidebarBtn = document.getElementById('closeSidebarBtn');
-  const globalSearch = document.getElementById('globalSearch');
+    // DOM elements
+    const trendingMoviesGrid = document.getElementById('trendingMoviesGrid');
+    const trendingTvGrid = document.getElementById('trendingTvGrid');
+    const playerPanel = document.getElementById('playerPanel');
+    const closePlayerBtn = document.getElementById('closePlayerBtn');
+    const sourceSelect = document.getElementById('sourceSelect');
+    const embedIframe = document.getElementById('embedIframe');
+    const tvControlsDiv = document.getElementById('tvControls');
+    const seasonSelect = document.getElementById('seasonSelect');
+    const episodeSelect = document.getElementById('episodeSelect');
+    const progressSlider = document.getElementById('progressSlider');
+    const progressPercent = document.getElementById('progressPercent');
+    const saveProgressBtn = document.getElementById('saveProgressBtn');
+    const reloadEmbedBtn = document.getElementById('reloadEmbedBtn');
+    const saveFeedback = document.getElementById('saveFeedback');
+    const continueSidebar = document.getElementById('continueSidebar');
+    const continueList = document.getElementById('continueList');
+    const openContinueBtn = document.getElementById('openContinueBtn');
+    const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+    const globalSearch = document.getElementById('globalSearch');
 
-  function populateSources() {
-    sourceSelect.innerHTML = '';
-    EMBED_SOURCES.forEach((src, i) => {
-      const option = document.createElement('option');
-      option.value = i;
-      option.textContent = src.name;
-      sourceSelect.appendChild(option);
-    });
-  }
+    function populateSources() {
+      sourceSelect.innerHTML = '';
+      EMBED_SOURCES.forEach((src, i) => {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = src.name;
+        sourceSelect.appendChild(option);
+      });
+      log("Sources populated");
+    }
 
-  function updateEmbedStream() {
-    if (!currentMedia) return;
-    const srcIdx = parseInt(sourceSelect.value);
-    const source = EMBED_SOURCES[srcIdx];
-    let embedUrl = '';
-    if (currentMedia.type === 'movie') {
-      embedUrl = source.url('movie', currentMedia.id);
-    } else {
-      embedUrl = source.url('tv', currentMedia.id, currentSeason, currentEpisode);
+    function updateEmbedStream() {
+      if (!currentMedia) return;
+      const srcIdx = parseInt(sourceSelect.value);
+      const source = EMBED_SOURCES[srcIdx];
+      let embedUrl = '';
+      if (currentMedia.type === 'movie') {
+        embedUrl = source.url('movie', currentMedia.id);
+      } else {
+        embedUrl = source.url('tv', currentMedia.id, currentSeason, currentEpisode);
+      }
+      log("Updating embed URL:", embedUrl);
+      if (embedUrl) embedIframe.src = embedUrl;
+      else embedIframe.srcdoc = '<div style="padding:2rem;text-align:center;color:red">Embed source not available</div>';
     }
-    if (embedUrl) embedIframe.src = embedUrl;
-    else embedIframe.srcdoc = '<div style="padding:2rem;text-align:center;color:red">Embed source not available</div>';
-  }
 
-  async function saveProgress() {
-    if (!currentUser) { alert('Please login to save progress'); return; }
-    if (!currentMedia) return;
-    const progress = parseInt(progressSlider.value);
-    const record = {
-      user_id: currentUser.id,
-      media_type: currentMedia.type,
-      tmdb_id: currentMedia.id,
-      title: currentMedia.title,
-      poster_path: currentMedia.posterPath,
-      media_year: currentMedia.year,
-      rating: currentMedia.rating,
-      progress_percent: progress,
-      last_watched: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    if (currentMedia.type === 'tv') {
-      record.season_number = currentSeason;
-      record.episode_number = currentEpisode;
-    }
-    const { error } = await supabase
-      .from('watch_history')
-      .upsert(record, { onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number' });
-    if (error) {
-      console.error(error);
-      alert('Save failed: ' + error.message);
-    } else {
-      saveFeedback.classList.remove('hidden');
-      setTimeout(() => saveFeedback.classList.add('hidden'), 2000);
-      loadContinueWatching();
-    }
-  }
-
-  async function loadProgress() {
-    if (!currentUser || !currentMedia) return;
-    let query = supabase.from('watch_history').select('progress_percent')
-      .eq('user_id', currentUser.id)
-      .eq('media_type', currentMedia.type)
-      .eq('tmdb_id', currentMedia.id);
-    if (currentMedia.type === 'tv') {
-      query = query.eq('season_number', currentSeason).eq('episode_number', currentEpisode);
-    } else {
-      query = query.is('season_number', null).is('episode_number', null);
-    }
-    const { data } = await query.maybeSingle();
-    if (data && data.progress_percent !== undefined) {
-      progressSlider.value = data.progress_percent;
-      progressPercent.innerText = data.progress_percent + '%';
-    } else {
-      progressSlider.value = 0;
-      progressPercent.innerText = '0%';
-    }
-  }
-
-  async function loadContinueWatching() {
-    if (!currentUser) {
-      openContinueBtn.classList.add('hidden');
-      return;
-    }
-    openContinueBtn.classList.remove('hidden');
-    const { data, error } = await supabase
-      .from('watch_history')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .order('last_watched', { ascending: false })
-      .limit(10);
-    if (error || !data || data.length === 0) {
-      continueList.innerHTML = '<div class="text-gray-400 text-sm">No history yet. Watch something and save progress.</div>';
-      return;
-    }
-    continueList.innerHTML = '';
-    data.forEach(item => {
-      const div = document.createElement('div');
-      div.className = 'bg-gray-800 p-3 rounded-xl cursor-pointer hover:bg-gray-700 transition';
-      div.innerHTML = `
-        <div class="font-semibold truncate">${item.title}</div>
-        <div class="text-xs text-yellow-400 mt-1">${item.progress_percent}% • ${item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie'}</div>
-      `;
-      div.onclick = async () => {
-        if (item.media_type === 'movie') {
-          const res = await fetch(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
-          const movie = await res.json();
-          await showDetails(movie, 'movie');
-          progressSlider.value = item.progress_percent;
-          progressPercent.innerText = item.progress_percent + '%';
-          updateEmbedStream();
-        } else {
-          const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
-          const tv = await res.json();
-          await showDetails(tv, 'tv');
-          currentSeason = item.season_number;
-          currentEpisode = item.episode_number;
-          await loadTVSeasons(currentMedia.id);
-          seasonSelect.value = currentSeason;
-          episodeSelect.value = currentEpisode;
-          progressSlider.value = item.progress_percent;
-          progressPercent.innerText = item.progress_percent + '%';
-          updateEmbedStream();
-        }
-        continueSidebar.classList.add('translate-x-full');
+    async function saveProgress() {
+      if (!currentUser) { alert('Please login to save progress'); return; }
+      if (!currentMedia) return;
+      const progress = parseInt(progressSlider.value);
+      const record = {
+        user_id: currentUser.id,
+        media_type: currentMedia.type,
+        tmdb_id: currentMedia.id,
+        title: currentMedia.title,
+        poster_path: currentMedia.posterPath,
+        media_year: currentMedia.year,
+        rating: currentMedia.rating,
+        progress_percent: progress,
+        last_watched: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
-      continueList.appendChild(div);
-    });
-  }
+      if (currentMedia.type === 'tv') {
+        record.season_number = currentSeason;
+        record.episode_number = currentEpisode;
+      }
+      log("Saving progress:", record);
+      const { error } = await supabase
+        .from('watch_history')
+        .upsert(record, { onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number' });
+      if (error) {
+        console.error("Save error:", error);
+        alert('Save failed: ' + error.message);
+      } else {
+        saveFeedback.classList.remove('hidden');
+        setTimeout(() => saveFeedback.classList.add('hidden'), 2000);
+        loadContinueWatching();
+      }
+    }
 
-  async function loadTVSeasons(tvId) {
-    const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
-    const data = await res.json();
-    const seasons = (data.seasons || []).filter(s => s.season_number > 0);
-    if (!seasons.length) return;
-    seasonSelect.innerHTML = '';
-    seasons.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.season_number;
-      opt.textContent = `Season ${s.season_number}`;
-      seasonSelect.appendChild(opt);
-    });
-    seasonSelect.value = currentSeason;
-    await loadEpisodes(tvId, currentSeason);
-    seasonSelect.onchange = async () => {
-      currentSeason = parseInt(seasonSelect.value);
+    async function loadProgress() {
+      if (!currentUser || !currentMedia) return;
+      let query = supabase.from('watch_history').select('progress_percent')
+        .eq('user_id', currentUser.id)
+        .eq('media_type', currentMedia.type)
+        .eq('tmdb_id', currentMedia.id);
+      if (currentMedia.type === 'tv') {
+        query = query.eq('season_number', currentSeason).eq('episode_number', currentEpisode);
+      } else {
+        query = query.is('season_number', null).is('episode_number', null);
+      }
+      const { data, error } = await query.maybeSingle();
+      if (error) console.error("Load progress error:", error);
+      if (data && data.progress_percent !== undefined) {
+        progressSlider.value = data.progress_percent;
+        progressPercent.innerText = data.progress_percent + '%';
+        log("Loaded progress:", data.progress_percent);
+      } else {
+        progressSlider.value = 0;
+        progressPercent.innerText = '0%';
+      }
+    }
+
+    async function loadContinueWatching() {
+      if (!currentUser) {
+        openContinueBtn.classList.add('hidden');
+        return;
+      }
+      openContinueBtn.classList.remove('hidden');
+      const { data, error } = await supabase
+        .from('watch_history')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('last_watched', { ascending: false })
+        .limit(10);
+      if (error) {
+        console.error("Continue watching error:", error);
+        return;
+      }
+      if (!data || data.length === 0) {
+        continueList.innerHTML = '<div class="text-gray-400 text-sm">No history yet. Watch something and save progress.</div>';
+        return;
+      }
+      continueList.innerHTML = '';
+      data.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'bg-gray-800 p-3 rounded-xl cursor-pointer hover:bg-gray-700 transition';
+        div.innerHTML = `
+          <div class="font-semibold truncate">${item.title}</div>
+          <div class="text-xs text-yellow-400 mt-1">${item.progress_percent}% • ${item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie'}</div>
+        `;
+        div.onclick = async () => {
+          if (item.media_type === 'movie') {
+            const res = await fetch(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
+            const movie = await res.json();
+            await showDetails(movie, 'movie');
+            progressSlider.value = item.progress_percent;
+            progressPercent.innerText = item.progress_percent + '%';
+            updateEmbedStream();
+          } else {
+            const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
+            const tv = await res.json();
+            await showDetails(tv, 'tv');
+            currentSeason = item.season_number;
+            currentEpisode = item.episode_number;
+            await loadTVSeasons(currentMedia.id);
+            seasonSelect.value = currentSeason;
+            episodeSelect.value = currentEpisode;
+            progressSlider.value = item.progress_percent;
+            progressPercent.innerText = item.progress_percent + '%';
+            updateEmbedStream();
+          }
+          continueSidebar.classList.add('translate-x-full');
+        };
+        continueList.appendChild(div);
+      });
+    }
+
+    async function loadTVSeasons(tvId) {
+      const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
+      const data = await res.json();
+      const seasons = (data.seasons || []).filter(s => s.season_number > 0);
+      if (!seasons.length) return;
+      seasonSelect.innerHTML = '';
+      seasons.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.season_number;
+        opt.textContent = `Season ${s.season_number}`;
+        seasonSelect.appendChild(opt);
+      });
+      seasonSelect.value = currentSeason;
       await loadEpisodes(tvId, currentSeason);
-      await loadProgress();
-      updateEmbedStream();
-    };
-    episodeSelect.onchange = async () => {
-      currentEpisode = parseInt(episodeSelect.value);
-      await loadProgress();
-      updateEmbedStream();
-    };
-  }
-
-  async function loadEpisodes(tvId, seasonNum) {
-    const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNum}?api_key=${TMDB_API_KEY}`);
-    const data = await res.json();
-    const episodes = data.episodes || [];
-    episodeSelect.innerHTML = '';
-    episodes.forEach(ep => {
-      const opt = document.createElement('option');
-      opt.value = ep.episode_number;
-      opt.textContent = `Episode ${ep.episode_number}`;
-      episodeSelect.appendChild(opt);
-    });
-    if (episodes.length === 0) episodeSelect.innerHTML = '<option value="1">Episode 1</option>';
-    episodeSelect.value = currentEpisode;
-  }
-
-  async function showDetails(item, type) {
-    playerPanel.classList.remove('hidden');
-    const title = item.title || item.name;
-    const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://via.placeholder.com/300x450?text=No+Image';
-    const overview = item.overview || 'No overview available.';
-    const rating = item.vote_average ? item.vote_average.toFixed(1) : '—';
-    const year = type === 'movie' ? (item.release_date?.split('-')[0] || 'N/A') : (item.first_air_date?.split('-')[0] || 'N/A');
-    document.getElementById('detailPoster').src = poster;
-    document.getElementById('detailTitle').innerText = title;
-    document.getElementById('detailOverview').innerText = overview;
-    document.getElementById('detailRating').innerText = rating;
-    document.getElementById('detailYear').innerText = year;
-    document.getElementById('detailType').innerHTML = type === 'movie' ? 'Movie' : 'TV Series';
-    currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
-    if (type === 'tv') {
-      tvControlsDiv.classList.remove('hidden');
-      currentSeason = 1;
-      currentEpisode = 1;
-      await loadTVSeasons(item.id);
-    } else {
-      tvControlsDiv.classList.add('hidden');
+      seasonSelect.onchange = async () => {
+        currentSeason = parseInt(seasonSelect.value);
+        await loadEpisodes(tvId, currentSeason);
+        await loadProgress();
+        updateEmbedStream();
+      };
+      episodeSelect.onchange = async () => {
+        currentEpisode = parseInt(episodeSelect.value);
+        await loadProgress();
+        updateEmbedStream();
+      };
     }
-    await loadProgress();
-    updateEmbedStream();
-    // Scroll player into view
-    playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
 
-  function renderCards(container, items, mediaType) {
-    if (!items.length) {
-      container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>';
-      return;
+    async function loadEpisodes(tvId, seasonNum) {
+      const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNum}?api_key=${TMDB_API_KEY}`);
+      const data = await res.json();
+      const episodes = data.episodes || [];
+      episodeSelect.innerHTML = '';
+      episodes.forEach(ep => {
+        const opt = document.createElement('option');
+        opt.value = ep.episode_number;
+        opt.textContent = `Episode ${ep.episode_number}`;
+        episodeSelect.appendChild(opt);
+      });
+      if (episodes.length === 0) episodeSelect.innerHTML = '<option value="1">Episode 1</option>';
+      episodeSelect.value = currentEpisode;
     }
-    container.innerHTML = items.map(item => {
+
+    async function showDetails(item, type) {
+      playerPanel.classList.remove('hidden');
       const title = item.title || item.name;
       const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://via.placeholder.com/300x450?text=No+Image';
-      const year = (item.release_date || item.first_air_date || '').slice(0,4);
-      const rating = item.vote_average?.toFixed(1) || '';
-      return `
-        <div class="movie-card" data-id="${item.id}" data-type="${mediaType}">
-          <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
-          <div class="p-2">
-            <div class="font-semibold text-sm truncate">${title}</div>
-            <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${year || '—'}</span><span>⭐ ${rating}</span></div>
-          </div>
-        </div>
-      `;
-    }).join('');
-    container.querySelectorAll('.movie-card').forEach(card => {
-      card.addEventListener('click', async () => {
-        const id = card.dataset.id;
-        const type = card.dataset.type;
-        const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        showDetails(data, type);
-      });
-    });
-  }
-
-  async function fetchTrending() {
-    try {
-      const [moviesRes, tvRes] = await Promise.all([
-        fetch(`https://api.themoviedb.org/3/trending/movie/week?api_key=${TMDB_API_KEY}`),
-        fetch(`https://api.themoviedb.org/3/trending/tv/week?api_key=${TMDB_API_KEY}`)
-      ]);
-      const moviesData = await moviesRes.json();
-      const tvData = await tvRes.json();
-      renderCards(trendingMoviesGrid, moviesData.results.slice(0, 18), 'movie');
-      renderCards(trendingTvGrid, tvData.results.slice(0, 18), 'tv');
-    } catch (err) {
-      console.error(err);
-      trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">API error – check TMDB key</div>';
-    }
-  }
-
-  async function search(query) {
-    if (!query.trim()) { fetchTrending(); return; }
-    const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
-    const data = await res.json();
-    const movies = data.results.filter(r => r.media_type === 'movie').slice(0, 12);
-    const tv = data.results.filter(r => r.media_type === 'tv').slice(0, 12);
-    renderCards(trendingMoviesGrid, movies, 'movie');
-    renderCards(trendingTvGrid, tv, 'tv');
-  }
-
-  function updateAuthUI() {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      currentUser = user;
-      if (user) {
-        document.getElementById('authContainer').classList.add('hidden');
-        document.getElementById('userContainer').classList.remove('hidden');
-        document.getElementById('userEmailDisplay').innerText = user.email;
-        loadContinueWatching();
+      const overview = item.overview || 'No overview available.';
+      const rating = item.vote_average ? item.vote_average.toFixed(1) : '—';
+      const year = type === 'movie' ? (item.release_date?.split('-')[0] || 'N/A') : (item.first_air_date?.split('-')[0] || 'N/A');
+      document.getElementById('detailPoster').src = poster;
+      document.getElementById('detailTitle').innerText = title;
+      document.getElementById('detailOverview').innerText = overview;
+      document.getElementById('detailRating').innerText = rating;
+      document.getElementById('detailYear').innerText = year;
+      document.getElementById('detailType').innerHTML = type === 'movie' ? 'Movie' : 'TV Series';
+      currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
+      if (type === 'tv') {
+        tvControlsDiv.classList.remove('hidden');
+        currentSeason = 1;
+        currentEpisode = 1;
+        await loadTVSeasons(item.id);
       } else {
-        document.getElementById('authContainer').classList.remove('hidden');
-        document.getElementById('userContainer').classList.add('hidden');
-        openContinueBtn.classList.add('hidden');
-        playerPanel.classList.add('hidden'); // hide player if logged out
+        tvControlsDiv.classList.add('hidden');
       }
-    }).catch(console.error);
-  }
+      await loadProgress();
+      updateEmbedStream();
+      playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 
-  // Modal logic
-  const loginModal = document.getElementById('loginModal');
-  const signupModal = document.getElementById('signupModal');
-  document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
-  document.getElementById('showSignupBtn').onclick = () => signupModal.classList.remove('hidden');
-  document.querySelectorAll('.closeModal').forEach(btn => btn.onclick = () => {
-    loginModal.classList.add('hidden');
-    signupModal.classList.add('hidden');
-  });
-  document.getElementById('switchToSignupModal').onclick = () => { loginModal.classList.add('hidden'); signupModal.classList.remove('hidden'); };
-  document.getElementById('switchToLoginModal').onclick = () => { signupModal.classList.add('hidden'); loginModal.classList.remove('hidden'); };
-  document.getElementById('doLoginBtn').onclick = async () => {
-    const email = document.getElementById('loginEmail').value;
-    const pass = document.getElementById('loginPassword').value;
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
-    if (error) alert(error.message);
-    else { loginModal.classList.add('hidden'); updateAuthUI(); }
-  };
-  document.getElementById('doSignupBtn').onclick = async () => {
-    const email = document.getElementById('signupEmail').value;
-    const pass = document.getElementById('signupPassword').value;
-    const { error } = await supabase.auth.signUp({ email, password: pass });
-    if (error) alert(error.message);
-    else { alert('Account created! Please log in.'); signupModal.classList.add('hidden'); }
-  };
-  document.getElementById('logoutBtn').onclick = async () => {
-    await supabase.auth.signOut();
+    function renderCards(container, items, mediaType) {
+      if (!items.length) {
+        container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>';
+        return;
+      }
+      container.innerHTML = items.map(item => {
+        const title = item.title || item.name;
+        const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://via.placeholder.com/300x450?text=No+Image';
+        const year = (item.release_date || item.first_air_date || '').slice(0,4);
+        const rating = item.vote_average?.toFixed(1) || '';
+        return `
+          <div class="movie-card" data-id="${item.id}" data-type="${mediaType}">
+            <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
+            <div class="p-2">
+              <div class="font-semibold text-sm truncate">${title}</div>
+              <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${year || '—'}</span><span>⭐ ${rating}</span></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      container.querySelectorAll('.movie-card').forEach(card => {
+        card.addEventListener('click', async () => {
+          const id = card.dataset.id;
+          const type = card.dataset.type;
+          const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          showDetails(data, type);
+        });
+      });
+    }
+
+    async function fetchTrending() {
+      try {
+        const [moviesRes, tvRes] = await Promise.all([
+          fetch(`https://api.themoviedb.org/3/trending/movie/week?api_key=${TMDB_API_KEY}`),
+          fetch(`https://api.themoviedb.org/3/trending/tv/week?api_key=${TMDB_API_KEY}`)
+        ]);
+        const moviesData = await moviesRes.json();
+        const tvData = await tvRes.json();
+        renderCards(trendingMoviesGrid, moviesData.results.slice(0, 18), 'movie');
+        renderCards(trendingTvGrid, tvData.results.slice(0, 18), 'tv');
+        log("Trending loaded");
+      } catch (err) {
+        console.error("Trending fetch error:", err);
+        trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">API error – check TMDB key</div>';
+      }
+    }
+
+    async function search(query) {
+      if (!query.trim()) { fetchTrending(); return; }
+      const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      const movies = data.results.filter(r => r.media_type === 'movie').slice(0, 12);
+      const tv = data.results.filter(r => r.media_type === 'tv').slice(0, 12);
+      renderCards(trendingMoviesGrid, movies, 'movie');
+      renderCards(trendingTvGrid, tv, 'tv');
+    }
+
+    function updateAuthUI() {
+      supabase.auth.getUser().then(({ data: { user }, error }) => {
+        if (error) {
+          console.error("Auth error:", error);
+          return;
+        }
+        currentUser = user;
+        if (user) {
+          document.getElementById('authContainer').classList.add('hidden');
+          document.getElementById('userContainer').classList.remove('hidden');
+          document.getElementById('userEmailDisplay').innerText = user.email;
+          loadContinueWatching();
+          log("User logged in:", user.email);
+        } else {
+          document.getElementById('authContainer').classList.remove('hidden');
+          document.getElementById('userContainer').classList.add('hidden');
+          openContinueBtn.classList.add('hidden');
+          playerPanel.classList.add('hidden');
+          log("User logged out");
+        }
+      }).catch(console.error);
+    }
+
+    // Modal logic
+    const loginModal = document.getElementById('loginModal');
+    const signupModal = document.getElementById('signupModal');
+    document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
+    document.getElementById('showSignupBtn').onclick = () => signupModal.classList.remove('hidden');
+    document.querySelectorAll('.closeModal').forEach(btn => btn.onclick = () => {
+      loginModal.classList.add('hidden');
+      signupModal.classList.add('hidden');
+    });
+    document.getElementById('switchToSignupModal').onclick = () => { loginModal.classList.add('hidden'); signupModal.classList.remove('hidden'); };
+    document.getElementById('switchToLoginModal').onclick = () => { signupModal.classList.add('hidden'); loginModal.classList.remove('hidden'); };
+    document.getElementById('doLoginBtn').onclick = async () => {
+      const email = document.getElementById('loginEmail').value;
+      const pass = document.getElementById('loginPassword').value;
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+      if (error) alert(error.message);
+      else { loginModal.classList.add('hidden'); updateAuthUI(); }
+    };
+    document.getElementById('doSignupBtn').onclick = async () => {
+      const email = document.getElementById('signupEmail').value;
+      const pass = document.getElementById('signupPassword').value;
+      const { error } = await supabase.auth.signUp({ email, password: pass });
+      if (error) alert(error.message);
+      else { alert('Account created! Please log in.'); signupModal.classList.add('hidden'); }
+    };
+    document.getElementById('logoutBtn').onclick = async () => {
+      await supabase.auth.signOut();
+      updateAuthUI();
+      playerPanel.classList.add('hidden');
+    };
+
+    // Event listeners
+    closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
+    reloadEmbedBtn.onclick = () => updateEmbedStream();
+    sourceSelect.onchange = () => updateEmbedStream();
+    saveProgressBtn.onclick = saveProgress;
+    openContinueBtn.onclick = () => continueSidebar.classList.remove('translate-x-full');
+    closeSidebarBtn.onclick = () => continueSidebar.classList.add('translate-x-full');
+    progressSlider.oninput = () => progressPercent.innerText = progressSlider.value + '%';
+    
+    let searchTimeout;
+    globalSearch.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => search(e.target.value), 500);
+    });
+
+    // Initialize
+    populateSources();
+    fetchTrending();
     updateAuthUI();
-    playerPanel.classList.add('hidden');
-  };
-
-  // Event listeners
-  closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
-  reloadEmbedBtn.onclick = () => updateEmbedStream();
-  sourceSelect.onchange = () => updateEmbedStream();
-  saveProgressBtn.onclick = saveProgress;
-  openContinueBtn.onclick = () => continueSidebar.classList.remove('translate-x-full');
-  closeSidebarBtn.onclick = () => continueSidebar.classList.add('translate-x-full');
-  progressSlider.oninput = () => progressPercent.innerText = progressSlider.value + '%';
-  
-  let searchTimeout;
-  globalSearch.addEventListener('input', (e) => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => search(e.target.value), 500);
-  });
-
-  // Initialize
-  populateSources();
-  fetchTrending();
-  updateAuthUI();
-  supabase.auth.onAuthStateChange(() => updateAuthUI());
+    supabase.auth.onAuthStateChange(() => updateAuthUI());
+    log("Initialization complete");
+  })();
 </script>
 </body>
 </html>
