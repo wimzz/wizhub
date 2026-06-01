@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB • Resume Anywhere</title>
+  <title>WizhuB • Auto-Resume & Continue Watching</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -82,7 +82,7 @@
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
   
-  <!-- Continue Watching Section (always visible, updates when logged in) -->
+  <!-- Continue Watching Section (Top, always visible, updates when logged in) -->
   <section id="continueWatchingSection" class="mb-12">
     <h2 class="text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
     <div id="continueWatchingContainer" class="horizontal-scroll">
@@ -108,11 +108,13 @@
         </div>
         <p id="detailOverview" class="text-gray-300 text-sm mt-2 line-clamp-3"></p>
         
+        <!-- TV Controls -->
         <div id="tvControls" class="hidden mt-4 flex flex-wrap gap-3">
           <select id="seasonSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
           <select id="episodeSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
         </div>
 
+        <!-- Manual Progress Input (Minutes) -->
         <div class="mt-4 space-y-3">
           <div class="flex flex-wrap gap-3 items-center">
             <span class="text-sm">Source:</span>
@@ -177,7 +179,7 @@
 
 <script>
 (function() {
-  // Supabase credentials (already yours)
+  // Supabase credentials
   const SUPABASE_URL = 'https://evhtzfkxolnlqlmjewew.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHR6Zmt4b2xubHFsbWpld2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTMzOTUsImV4cCI6MjA5NTg2OTM5NX0.42bpsGRyKSZcQ3EUj1k3grsUVuXtZWKsce7OKv8J5YU';
   const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
@@ -224,7 +226,6 @@
   const episodeSelect = document.getElementById('episodeSelect');
   const progressMinutesInput = document.getElementById('progressMinutes');
   const saveProgressBtn = document.getElementById('saveProgressBtn');
-  const saveFeedback = document.getElementById('saveFeedback');
   const reloadEmbedBtn = document.getElementById('reloadEmbedBtn');
   const globalSearch = document.getElementById('globalSearch');
 
@@ -277,8 +278,6 @@
       .upsert(record, { onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number' });
     if (error) alert('Save error: ' + error.message);
     else {
-      saveFeedback.classList.remove('hidden');
-      setTimeout(() => saveFeedback.classList.add('hidden'), 2000);
       renderContinueWatching();
     }
   }
@@ -499,7 +498,7 @@
       } else {
         document.getElementById('authContainer').classList.remove('hidden');
         document.getElementById('userContainer').classList.add('hidden');
-        renderContinueWatching(); // shows login message
+        renderContinueWatching();
         playerPanel.classList.add('hidden');
       }
     }).catch(console.error);
