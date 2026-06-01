@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WIZHUB • Stream & Sync</title>
+  <title>WIZHUB</title>
+  <!-- Favicon - crown icon matching site brand -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23facc15'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -554,7 +556,8 @@
 
 <script>
 (function() {
-  // ================= SOURCES (23 original + CinemaOS + AnimePahe at the end) =================
+  // ================= SOURCES (23 original + CinemaOS + AnimePahe) =================
+  // For AnimePahe, we'll mark it to open in a new tab
   const DEFAULT_SOURCES = [
     { name: 'Videoasy', url: (type, id, s, e) => type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}` },
     { name: 'VidFast', url: (type, id, s, e) => type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
@@ -579,10 +582,10 @@
     { name: 'Vidzee', url: (type, id, s, e) => type === 'movie' ? `https://player.vidzee.wtf/v2/embed/movie/${id}` : `https://player.vidzee.wtf/v2/embed/tv/${id}/${s}/${e}` },
     { name: 'Rivestream', url: (type, id, s, e) => type === 'movie' ? `https://watch.rivestream.app/embed?type=movie&id=${id}` : `https://watch.rivestream.app/embed?type=tv&id=${id}&season=${s}&episode=${e}` },
     { name: 'VidLink', url: (type, id, s, e) => type === 'movie' ? `https://vidlink.pro/movie/${id}` : `https://vidlink.pro/tv/${id}/${s}/${e}` },
-    // ----- NEW: CinemaOS (embeds the website) just before AnimePahe -----
-    { name: '🎬 CinemaOS (Site)', url: (type, id, s, e) => `https://cinemaos.live` },
-    // ----- NEW: AnimePahe (embeds the website) as last source -----
-    { name: '🎌 AnimePahe (Site)', url: (type, id, s, e) => `https://animepahe.org` }
+    // CinemaOS website embed (works in iframe)
+    { name: '🎬 CinemaOS (Site)', url: () => `https://cinemaos.live` },
+    // AnimePahe - will open in new tab (not in iframe)
+    { name: '🎌 AnimePahe (Site)', url: () => `https://animepahe.org`, openInNewTab: true }
   ];
 
   let EMBED_SOURCES = [...DEFAULT_SOURCES];
@@ -599,7 +602,7 @@
   let currentTVDetails = null;
   let currentEpisodesList = [];
 
-  // DOM elements (same as before)
+  // DOM elements
   const continueSection = document.getElementById('continueWatchingSection');
   const continueContainer = document.getElementById('continueWatchingContainer');
   const trendingMoviesGrid = document.getElementById('trendingMoviesGrid');
@@ -677,7 +680,7 @@
     }
   }
 
-  // ================= SOURCE ORDER FUNCTIONS (unchanged) =================
+  // ================= SOURCE ORDER FUNCTIONS =================
   async function loadUserSourceOrder() {
     if (!currentUser) return;
     try {
@@ -690,7 +693,7 @@
           const newOrder = [];
           for (const savedName of data.source_order) {
             const found = DEFAULT_SOURCES.find(s => s.name === savedName);
-            if (found) newOrder.push({ name: found.name, url: found.url });
+            if (found) newOrder.push({ name: found.name, url: found.url, openInNewTab: found.openInNewTab });
           }
           if (newOrder.length === DEFAULT_SOURCES.length) EMBED_SOURCES = newOrder;
           else {
@@ -719,7 +722,7 @@
     loadSelectedSourceIndex();
   }
 
-  // ================= ASYNC EMBED UPDATE (supports both normal and site URLs) =================
+  // ================= ASYNC EMBED UPDATE (with special handling for new‑tab sources) =================
   async function updateEmbedStream() {
     if (!currentMedia) return;
     const srcIdx = parseInt(sourceSelect.value);
@@ -739,6 +742,12 @@
         embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to load</div>';
         return;
       }
+    }
+    // Check if this source should open in a new tab
+    if (src.openInNewTab === true && url) {
+      window.open(url, '_blank');
+      // Keep the iframe content unchanged (do not update src)
+      return;
     }
     if (url) embedIframe.src = url;
     else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
@@ -766,7 +775,7 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ================= ALL DATABASE FUNCTIONS (unchanged, same as previous working version) =================
+  // ================= ALL DATABASE FUNCTIONS (unchanged) =================
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
