@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WizhuB • Copy URL & Next Source</title>
+  <title>WizhuB • Redesigned Player</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* all styles unchanged from previous version – fully responsive */
+    /* ===== GLOBAL STYLES ===== */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     .glass-nav {
@@ -73,6 +73,7 @@
       border-radius: 1rem;
       overflow: hidden;
       aspect-ratio: 16/9;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
     }
     iframe { width: 100%; height: 100%; border: none; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -120,41 +121,6 @@
       margin-bottom: 0.5rem;
       border-radius: 0.5rem;
     }
-    .episode-nav {
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-      justify-content: center;
-      margin-top: 1rem;
-    }
-    .episode-nav button {
-      background: #2a2c38;
-      border: none;
-      padding: 0.3rem 1rem;
-      border-radius: 2rem;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .episode-nav button:hover:not(:disabled) {
-      background: #facc15;
-      color: black;
-    }
-    .episode-nav button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .loading-spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-radius: 50%;
-      border-top-color: #facc15;
-      animation: spin 0.6s linear infinite;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
     .trending-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -164,12 +130,146 @@
     @media (min-width: 768px) { .trending-grid { grid-template-columns: repeat(4, 1fr); } }
     @media (min-width: 1024px) { .trending-grid { grid-template-columns: repeat(5, 1fr); } }
     @media (min-width: 1280px) { .trending-grid { grid-template-columns: repeat(6, 1fr); } }
-    @media (max-width: 768px) {
-      .player-panel .detail-poster { width: 120px; margin: 0 auto; }
-      .player-panel .flex-col { flex-direction: column; }
-      .glass-nav .flex-1 { order: 3; width: 100%; margin-top: 0.5rem; }
-    }
     input, select, button { font-size: 16px; }
+
+    /* ===== REDESIGNED PLAYER PANEL STYLES ===== */
+    .player-modern {
+      background: linear-gradient(145deg, #101218, #0b0d12);
+      border-radius: 1.5rem;
+      border: 1px solid rgba(250, 204, 21, 0.15);
+      box-shadow: 0 20px 35px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.02);
+      overflow: hidden;
+    }
+    .player-modern .poster-wrapper {
+      position: relative;
+      border-radius: 1rem;
+      overflow: hidden;
+      background: #07090e;
+    }
+    .player-modern .poster-wrapper img {
+      width: 100%;
+      height: auto;
+      transition: transform 0.3s ease;
+    }
+    .player-modern .poster-wrapper:hover img {
+      transform: scale(1.02);
+    }
+    .player-modern .rating-badge {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .player-modern .type-badge {
+      background: #facc1522;
+      border: 1px solid #facc1544;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .player-modern .overview-text {
+      color: #b0b8cc;
+      line-height: 1.5;
+      font-size: 0.9rem;
+    }
+    .control-group {
+      background: rgba(0,0,0,0.3);
+      border-radius: 1rem;
+      padding: 0.5rem;
+    }
+    .select-modern {
+      background: #1a1d24;
+      border: 1px solid #2d2f3e;
+      border-radius: 2rem;
+      padding: 0.4rem 1rem;
+      font-size: 0.85rem;
+      color: white;
+      transition: all 0.2s;
+    }
+    .select-modern:hover, .select-modern:focus {
+      border-color: #facc15;
+      outline: none;
+    }
+    .btn-icon {
+      background: #1e212b;
+      border: none;
+      border-radius: 2rem;
+      padding: 0.4rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: all 0.2s;
+      color: #e0e0e0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-icon:hover {
+      background: #2a2e3a;
+      color: #facc15;
+      transform: translateY(-1px);
+    }
+    .btn-primary {
+      background: #facc15;
+      color: #0a0c10;
+      border: none;
+      border-radius: 2rem;
+      padding: 0.4rem 1.2rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn-primary:hover {
+      background: #e5b80b;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(250,204,21,0.2);
+    }
+    .progress-input {
+      background: #1a1d24;
+      border: 1px solid #2d2f3e;
+      border-radius: 2rem;
+      padding: 0.4rem 1rem;
+      width: 90px;
+      text-align: center;
+    }
+    .episode-nav-modern {
+      display: flex;
+      gap: 0.8rem;
+    }
+    .episode-nav-modern button {
+      background: #1e212b;
+      border: none;
+      border-radius: 2rem;
+      padding: 0.3rem 1rem;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+    .episode-nav-modern button:hover:not(:disabled) {
+      background: #facc15;
+      color: #0a0c10;
+    }
+    .episode-nav-modern button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    @media (max-width: 768px) {
+      .player-modern .flex-col {
+        flex-direction: column;
+      }
+      .player-modern .poster-wrapper {
+        max-width: 180px;
+        margin: 0 auto;
+      }
+      .control-group .flex-wrap {
+        justify-content: center;
+      }
+    }
     .toast-notification {
       position: fixed;
       bottom: 20px;
@@ -213,61 +313,84 @@
 </nav>
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
+  <!-- Continue Watching -->
   <section id="continueWatchingSection" class="mb-12">
     <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
     <div id="continueWatchingContainer" class="horizontal-scroll"><div class="text-gray-400 text-sm">Log in to see your watch history.</div></div>
   </section>
 
-  <!-- Player Panel (new buttons added) -->
-  <div id="playerPanel" class="hidden mb-12 bg-gray-900/80 rounded-2xl p-4 md:p-5 border border-gray-700 shadow-2xl">
-    <div class="flex flex-col md:flex-row gap-4 md:gap-6">
-      <div class="md:w-1/5 flex flex-col items-center md:items-start">
-        <img id="detailPoster" class="w-32 md:w-full rounded-xl shadow-lg" src="https://placehold.co/300x450" alt="poster">
-        <div class="mt-3 text-sm space-y-1 text-center md:text-left">
-          <p><i class="fas fa-star text-yellow-400"></i> <span id="detailRating">—</span> / 10</p>
-          <p><i class="fas fa-calendar"></i> <span id="detailYear">—</span></p>
-          <p><span id="detailType" class="capitalize bg-gray-800/60 px-2 py-0.5 rounded-full text-xs">—</span></p>
+  <!-- ================= REDESIGNED PLAYER PANEL ================= -->
+  <div id="playerPanel" class="hidden mb-12 player-modern">
+    <div class="flex flex-col md:flex-row gap-6 p-4 md:p-6">
+      <!-- Left Column: Poster + meta -->
+      <div class="md:w-1/4 xl:w-1/5">
+        <div class="poster-wrapper rounded-xl shadow-2xl">
+          <img id="detailPoster" class="w-full rounded-xl" src="https://placehold.co/300x450" alt="poster">
+        </div>
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <div class="rating-badge">
+            <i class="fas fa-star text-yellow-400 text-xs"></i>
+            <span id="detailRating" class="font-semibold">—</span>
+            <span class="text-gray-400 text-xs">/10</span>
+          </div>
+          <div class="flex gap-3 text-sm">
+            <span><i class="fas fa-calendar-alt text-gray-400 mr-1"></i><span id="detailYear">—</span></span>
+            <span class="type-badge" id="detailType">—</span>
+          </div>
         </div>
       </div>
+
+      <!-- Right Column: Title, Overview, Controls, Embed -->
       <div class="flex-1">
-        <div class="flex justify-between items-start flex-wrap gap-2">
-          <h2 id="detailTitle" class="text-xl md:text-3xl font-bold break-words"></h2>
-          <button id="closePlayerBtn" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+        <div class="flex justify-between items-start flex-wrap gap-3">
+          <h2 id="detailTitle" class="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent"></h2>
+          <button id="closePlayerBtn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
         </div>
-        <p id="detailOverview" class="text-gray-300 text-sm mt-2 line-clamp-3 leading-relaxed"></p>
-        <div id="tvControls" class="hidden mt-4">
-          <div class="flex flex-wrap gap-3 items-center">
-            <select id="seasonSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
-            <select id="episodeSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
-            <div class="episode-nav">
+        <p id="detailOverview" class="overview-text mt-3 text-sm md:text-base leading-relaxed"></p>
+        
+        <!-- TV Controls (Episode selector + navigation) -->
+        <div id="tvControls" class="hidden mt-5">
+          <div class="control-group flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap gap-3 items-center">
+              <select id="seasonSelect" class="select-modern"></select>
+              <select id="episodeSelect" class="select-modern"></select>
+            </div>
+            <div class="episode-nav-modern">
               <button id="prevEpisodeBtn" class="text-sm" disabled><i class="fas fa-step-backward"></i> Previous</button>
               <button id="nextEpisodeBtn" class="text-sm" disabled>Next <i class="fas fa-step-forward"></i></button>
             </div>
           </div>
         </div>
-        <div class="mt-4 space-y-3">
-          <div class="flex flex-wrap gap-3 items-center">
-            <span class="text-sm font-medium">Source:</span>
-            <select id="sourceSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm flex-1 min-w-[120px]"></select>
-            <button id="reloadEmbedBtn" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full"><i class="fas fa-sync-alt"></i> Reload</button>
-            <button id="nextSourceBtn" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full" title="Next source"><i class="fas fa-forward"></i> Next</button>
-            <button id="copyUrlBtn" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full" title="Copy video URL"><i class="fas fa-copy"></i> Copy URL</button>
-            <button id="orderSourcesBtn" class="text-xs bg-yellow-600 hover:bg-yellow-500 px-2 py-1 rounded-full" title="Reorder sources"><i class="fas fa-arrows-alt"></i></button>
+
+        <!-- Source & Playback Controls -->
+        <div class="mt-5 space-y-4">
+          <div class="control-group flex flex-wrap items-center gap-2">
+            <span class="text-sm font-medium text-gray-300">Source:</span>
+            <select id="sourceSelect" class="select-modern flex-1 min-w-[130px]"></select>
+            <div class="flex flex-wrap gap-2">
+              <button id="reloadEmbedBtn" class="btn-icon"><i class="fas fa-sync-alt"></i> Reload</button>
+              <button id="nextSourceBtn" class="btn-icon"><i class="fas fa-forward"></i> Next</button>
+              <button id="copyUrlBtn" class="btn-icon"><i class="fas fa-copy"></i> Copy URL</button>
+              <button id="orderSourcesBtn" class="btn-icon" title="Reorder sources"><i class="fas fa-arrows-alt"></i> Order</button>
+            </div>
           </div>
-          <div class="flex flex-wrap items-center gap-4 bg-black/30 p-3 rounded-xl">
-            <span class="text-sm"><i class="fas fa-clock"></i> Watched (minutes):</span>
-            <input type="number" id="progressMinutes" value="0" step="1" min="0" class="w-24 bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm">
-            <button id="saveProgressBtn" class="text-xs bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded-full"><i class="fas fa-save"></i> Save Time</button>
+          
+          <div class="control-group flex flex-wrap items-center gap-4">
+            <span class="text-sm"><i class="fas fa-clock text-yellow-400"></i> Watched (minutes):</span>
+            <input type="number" id="progressMinutes" value="0" step="1" min="0" class="progress-input">
+            <button id="saveProgressBtn" class="btn-primary"><i class="fas fa-save"></i> Save Time</button>
           </div>
         </div>
-        <div class="embed-container mt-3">
+
+        <div class="embed-container mt-4">
           <iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="autoplay; encrypted-media"></iframe>
         </div>
-        <p class="text-[10px] text-gray-500 text-center mt-2">If video doesn't load, try another source.</p>
+        <p class="text-[10px] text-gray-500 text-center mt-3">If video doesn't load, try another source.</p>
       </div>
     </div>
   </div>
 
+  <!-- Trending Movies & TV Shows -->
   <section class="mb-12">
     <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-fire text-orange-500"></i> Trending Movies</h2>
     <div id="trendingMoviesGrid" class="trending-grid"></div>
@@ -290,7 +413,7 @@
   </div>
 </div>
 
-<!-- Login/Signup Modals (unchanged) -->
+<!-- Login/Signup Modals -->
 <div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
   <div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-yellow-500/30 relative">
     <h3 class="text-xl font-bold mb-4">Login</h3>
@@ -314,7 +437,7 @@
 
 <script>
 (function() {
-  // ================= SOURCES (custom order, 23 sources) =================
+  // ================= ALL SOURCES (custom order, 23 sources) =================
   const DEFAULT_SOURCES = [
     { name: 'Videoasy', url: (type, id, s, e) => type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}` },
     { name: 'VidFast', url: (type, id, s, e) => type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
@@ -356,7 +479,7 @@
   let currentTVDetails = null;
   let currentEpisodesList = [];
 
-  // DOM elements (additional buttons)
+  // DOM elements
   const continueContainer = document.getElementById('continueWatchingContainer');
   const trendingMoviesGrid = document.getElementById('trendingMoviesGrid');
   const trendingTvGrid = document.getElementById('trendingTvGrid');
@@ -451,17 +574,14 @@
     else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to generate URL</div>';
   }
 
-  // Next source function
   function nextSource() {
     if (!sourceSelect.options.length) return;
     let newIdx = parseInt(sourceSelect.value) + 1;
     if (newIdx >= sourceSelect.options.length) newIdx = 0;
     sourceSelect.value = newIdx;
-    // Trigger the same action as if user changed the dropdown
     sourceSelect.dispatchEvent(new Event('change'));
   }
 
-  // Copy URL function
   async function copyVideoUrl() {
     const url = embedIframe.src;
     if (!url || url === 'about:blank') {
@@ -470,7 +590,6 @@
     }
     try {
       await navigator.clipboard.writeText(url);
-      // Show a small notification
       const toast = document.createElement('div');
       toast.className = 'toast-notification';
       toast.textContent = '✓ URL copied to clipboard';
@@ -482,7 +601,7 @@
     }
   }
 
-  // ================= DATABASE FUNCTIONS (unchanged) =================
+  // ================= DATABASE FUNCTIONS =================
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
