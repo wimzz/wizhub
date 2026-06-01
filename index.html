@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB • Auto‑Resume & Cross‑Device Sync</title>
+  <title>WizhuB • Resume Anywhere</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0a0c10; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
       background: rgba(10, 12, 16, 0.85);
       backdrop-filter: blur(12px);
@@ -82,15 +82,15 @@
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
   
-  <!-- Continue Watching Section (top, horizontal scroll) – shown only when logged in -->
+  <!-- Continue Watching Section (always visible, updates when logged in) -->
   <section id="continueWatchingSection" class="mb-12">
     <h2 class="text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
     <div id="continueWatchingContainer" class="horizontal-scroll">
-      <!-- placeholder: if logged out, this shows a message; if logged in but no history, shows message -->
+      <div class="text-gray-400 text-sm">Log in to see your watch history.</div>
     </div>
   </section>
 
-  <!-- Player Panel (hidden initially) -->
+  <!-- Player Panel -->
   <div id="playerPanel" class="hidden mb-12 bg-gray-900/80 rounded-2xl p-5 border border-gray-700 shadow-2xl">
     <div class="flex flex-col lg:flex-row gap-6">
       <div class="lg:w-1/5">
@@ -120,16 +120,18 @@
             <button id="reloadEmbedBtn" class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded-full"><i class="fas fa-sync-alt"></i> Reload</button>
           </div>
           <div class="flex flex-wrap items-center gap-4 bg-black/30 p-3 rounded-xl">
-            <span class="text-sm"><i class="fas fa-chart-line"></i> Progress:</span>
-            <span id="progressPercentDisplay" class="text-sm text-yellow-400">0%</span>
-            <span id="autoSaveBadge" class="text-green-400 text-xs">✓ Auto‑saving every 30s</span>
+            <span class="text-sm"><i class="fas fa-clock"></i> Watched (minutes):</span>
+            <input type="number" id="progressMinutes" value="0" step="1" min="0" class="w-24 bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm">
+            <button id="saveProgressBtn" class="text-xs bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded-full"><i class="fas fa-save"></i> Save Time</button>
+            <span id="saveFeedback" class="text-green-400 text-xs hidden">✓ Saved</span>
           </div>
+          <p class="text-xs text-gray-400">⚠️ Enter the minutes you have watched (e.g., 30). When you resume on another server, the video will start at that time.</p>
         </div>
 
         <div class="embed-container mt-3">
           <iframe id="embedIframe" allowfullscreen></iframe>
         </div>
-        <p class="text-[10px] text-gray-500 text-center mt-2">Your watch progress saves automatically. Resume on any device with any embed source.</p>
+        <p class="text-[10px] text-gray-500 text-center mt-2">Change server above, then reload. Your saved time works across all sources.</p>
       </div>
     </div>
   </div>
@@ -175,27 +177,41 @@
 
 <script>
 (function() {
-  // ========== CONFIGURATION ==========
+  // Supabase credentials (already yours)
   const SUPABASE_URL = 'https://evhtzfkxolnlqlmjewew.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHR6Zmt4b2xubHFsbWpld2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTMzOTUsImV4cCI6MjA5NTg2OTM5NX0.42bpsGRyKSZcQ3EUj1k3grsUVuXtZWKsce7OKv8J5YU';
   const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
   const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
   const EMBED_SOURCES = [
-    { name: '🎬 Vidsrc', url: (type, id, s, e) => type === 'movie' ? `https://vidsrc.to/embed/movie/${id}` : `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
-    { name: '📺 2Embed', url: (type, id, s, e) => type === 'movie' ? `https://2embed.sx/embed/movie?tmdb=${id}` : `https://2embed.sx/embed/tv?tmdb=${id}&season=${s}&episode=${e}` },
-    { name: '🌀 Embed.su', url: (type, id, s, e) => type === 'movie' ? `https://embed.su/embed/movie/${id}` : `https://embed.su/embed/tv/${id}/${s}/${e}` },
-    { name: '⚡ Vidplay', url: (type, id, s, e) => type === 'movie' ? `https://vidplay.site/embed/movie/${id}` : `https://vidplay.site/embed/tv/${id}/${s}/${e}` }
+    { name: '🎬 Vidsrc', url: (type, id, s, e, minutes) => {
+        let base = type === 'movie' ? `https://vidsrc.to/embed/movie/${id}` : `https://vidsrc.to/embed/tv/${id}/${s}/${e}`;
+        return minutes > 0 ? base + `?t=${minutes * 60}` : base;
+      }
+    },
+    { name: '📺 2Embed', url: (type, id, s, e, minutes) => {
+        let base = type === 'movie' ? `https://2embed.sx/embed/movie?tmdb=${id}` : `https://2embed.sx/embed/tv?tmdb=${id}&season=${s}&episode=${e}`;
+        return minutes > 0 ? base + `&t=${minutes * 60}` : base;
+      }
+    },
+    { name: '🌀 Embed.su', url: (type, id, s, e, minutes) => {
+        let base = type === 'movie' ? `https://embed.su/embed/movie/${id}` : `https://embed.su/embed/tv/${id}/${s}/${e}`;
+        return minutes > 0 ? base + `?t=${minutes * 60}` : base;
+      }
+    },
+    { name: '⚡ Vidplay', url: (type, id, s, e, minutes) => {
+        let base = type === 'movie' ? `https://vidplay.site/embed/movie/${id}` : `https://vidplay.site/embed/tv/${id}/${s}/${e}`;
+        return minutes > 0 ? base + `?t=${minutes * 60}` : base;
+      }
+    }
   ];
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let currentUser = null;
   let currentMedia = null;
   let currentSeason = 1, currentEpisode = 1;
-  let progressPercent = 0;
-  let autoSaveInterval = null;
+  let currentProgressMinutes = 0;
 
   // DOM elements
-  const continueSection = document.getElementById('continueWatchingSection');
   const continueContainer = document.getElementById('continueWatchingContainer');
   const trendingMoviesGrid = document.getElementById('trendingMoviesGrid');
   const trendingTvGrid = document.getElementById('trendingTvGrid');
@@ -206,7 +222,9 @@
   const tvControlsDiv = document.getElementById('tvControls');
   const seasonSelect = document.getElementById('seasonSelect');
   const episodeSelect = document.getElementById('episodeSelect');
-  const progressPercentDisplay = document.getElementById('progressPercentDisplay');
+  const progressMinutesInput = document.getElementById('progressMinutes');
+  const saveProgressBtn = document.getElementById('saveProgressBtn');
+  const saveFeedback = document.getElementById('saveFeedback');
   const reloadEmbedBtn = document.getElementById('reloadEmbedBtn');
   const globalSearch = document.getElementById('globalSearch');
 
@@ -222,20 +240,22 @@
 
   function updateEmbedStream() {
     if (!currentMedia) return;
-    const src = EMBED_SOURCES[parseInt(sourceSelect.value)];
+    const srcIdx = parseInt(sourceSelect.value);
+    const src = EMBED_SOURCES[srcIdx];
     let url = '';
     if (currentMedia.type === 'movie') {
-      url = src.url('movie', currentMedia.id);
+      url = src.url('movie', currentMedia.id, null, null, currentProgressMinutes);
     } else {
-      url = src.url('tv', currentMedia.id, currentSeason, currentEpisode);
+      url = src.url('tv', currentMedia.id, currentSeason, currentEpisode, currentProgressMinutes);
     }
     if (url) embedIframe.src = url;
     else embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
   }
 
-  // Save current progressPercent to Supabase
   async function saveProgressToDB() {
-    if (!currentUser || !currentMedia) return;
+    if (!currentUser) { alert('Please login first'); return; }
+    if (!currentMedia) return;
+    const minutes = parseInt(progressMinutesInput.value) || 0;
     const record = {
       user_id: currentUser.id,
       media_type: currentMedia.type,
@@ -244,7 +264,7 @@
       poster_path: currentMedia.posterPath,
       media_year: currentMedia.year,
       rating: currentMedia.rating,
-      progress_percent: progressPercent,
+      progress_minutes: minutes,
       last_watched: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -255,38 +275,17 @@
     const { error } = await sb
       .from('watch_history')
       .upsert(record, { onConflict: 'user_id, media_type, tmdb_id, season_number, episode_number' });
-    if (error) console.error("Save error:", error);
+    if (error) alert('Save error: ' + error.message);
     else {
-      console.log("Auto-saved:", progressPercent);
-      renderContinueWatching(); // refresh the continue row
+      saveFeedback.classList.remove('hidden');
+      setTimeout(() => saveFeedback.classList.add('hidden'), 2000);
+      renderContinueWatching();
     }
   }
 
-  // Auto-progress timer: every 30 seconds, add 1% (capped at 95)
-  function startAutoProgress() {
-    if (autoSaveInterval) clearInterval(autoSaveInterval);
-    autoSaveInterval = setInterval(async () => {
-      if (currentUser && currentMedia && !playerPanel.classList.contains('hidden')) {
-        if (progressPercent < 95) {
-          progressPercent = Math.min(progressPercent + 1, 95);
-          progressPercentDisplay.innerText = progressPercent + '%';
-          await saveProgressToDB();
-        }
-      }
-    }, 30000);
-  }
-
-  function stopAutoProgress() {
-    if (autoSaveInterval) {
-      clearInterval(autoSaveInterval);
-      autoSaveInterval = null;
-    }
-  }
-
-  // Load saved progress from DB and set progressPercent
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
-    let query = sb.from('watch_history').select('progress_percent')
+    let query = sb.from('watch_history').select('progress_minutes')
       .eq('user_id', currentUser.id)
       .eq('media_type', currentMedia.type)
       .eq('tmdb_id', currentMedia.id);
@@ -296,19 +295,18 @@
       query = query.is('season_number', null).is('episode_number', null);
     }
     const { data } = await query.maybeSingle();
-    if (data && data.progress_percent !== undefined) {
-      progressPercent = data.progress_percent;
-      progressPercentDisplay.innerText = progressPercent + '%';
+    if (data && data.progress_minutes !== undefined) {
+      currentProgressMinutes = data.progress_minutes;
+      progressMinutesInput.value = currentProgressMinutes;
     } else {
-      progressPercent = 0;
-      progressPercentDisplay.innerText = '0%';
+      currentProgressMinutes = 0;
+      progressMinutesInput.value = 0;
     }
   }
 
-  // Render Continue Watching row – appears ONLY when logged in and has history
   async function renderContinueWatching() {
     if (!currentUser) {
-      continueContainer.innerHTML = '<div class="text-gray-400 text-sm">Log in to see your continue watching list.</div>';
+      continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🔒 Log in to see your continue watching list.</div>';
       return;
     }
     const { data } = await sb
@@ -318,32 +316,32 @@
       .order('last_watched', { ascending: false })
       .limit(10);
     if (!data || data.length === 0) {
-      continueContainer.innerHTML = '<div class="text-gray-400 text-sm">No watch history yet. Start watching something!</div>';
+      continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet. Start watching a movie or TV show!</div>';
       return;
     }
-    // Render cards
     continueContainer.innerHTML = '';
     for (const item of data) {
       const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
       const card = document.createElement('div');
       card.className = 'movie-card relative';
       card.style.flex = '0 0 160px';
+      // rough progress % for visual bar (assuming 120 min movie)
+      const progressPercent = Math.min((item.progress_minutes / 120) * 100, 100);
       card.innerHTML = `
         <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
         <div class="p-2">
           <div class="font-semibold text-sm truncate">${item.title}</div>
-          <div class="text-xs text-gray-400">${item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie'}</div>
+          <div class="text-xs text-gray-400">${item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie'} • ${item.progress_minutes} min</div>
         </div>
-        <div class="progress-overlay" style="width: ${item.progress_percent}%;"></div>
+        <div class="progress-overlay" style="width: ${progressPercent}%;"></div>
       `;
       card.addEventListener('click', async () => {
-        // Resume this media
         if (item.media_type === 'movie') {
           const res = await fetch(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
           const movie = await res.json();
           await showDetails(movie, 'movie');
-          progressPercent = item.progress_percent;
-          progressPercentDisplay.innerText = progressPercent + '%';
+          currentProgressMinutes = item.progress_minutes;
+          progressMinutesInput.value = currentProgressMinutes;
           updateEmbedStream();
         } else {
           const res = await fetch(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
@@ -354,8 +352,8 @@
           await loadTVSeasons(currentMedia.id);
           seasonSelect.value = currentSeason;
           episodeSelect.value = currentEpisode;
-          progressPercent = item.progress_percent;
-          progressPercentDisplay.innerText = progressPercent + '%';
+          currentProgressMinutes = item.progress_minutes;
+          progressMinutesInput.value = currentProgressMinutes;
           updateEmbedStream();
         }
       });
@@ -383,13 +381,11 @@
       await loadEpisodes(tvId, currentSeason);
       await loadProgress();
       updateEmbedStream();
-      await saveProgressToDB();
     };
     episodeSelect.onchange = async () => {
       currentEpisode = parseInt(episodeSelect.value);
       await loadProgress();
       updateEmbedStream();
-      await saveProgressToDB();
     };
   }
 
@@ -409,7 +405,6 @@
   }
 
   async function showDetails(item, type) {
-    stopAutoProgress();
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
     const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
@@ -433,7 +428,6 @@
     }
     await loadProgress();
     updateEmbedStream();
-    startAutoProgress();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -505,10 +499,8 @@
       } else {
         document.getElementById('authContainer').classList.remove('hidden');
         document.getElementById('userContainer').classList.add('hidden');
-        // Show login prompt in continue section
-        continueContainer.innerHTML = '<div class="text-gray-400 text-sm">Log in to see your continue watching list.</div>';
+        renderContinueWatching(); // shows login message
         playerPanel.classList.add('hidden');
-        stopAutoProgress();
       }
     }).catch(console.error);
   }
@@ -542,16 +534,13 @@
     await sb.auth.signOut();
     updateAuthUI();
     playerPanel.classList.add('hidden');
-    stopAutoProgress();
   };
 
   // Event listeners
-  closePlayerBtn.onclick = () => {
-    playerPanel.classList.add('hidden');
-    stopAutoProgress();
-  };
+  closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
   reloadEmbedBtn.onclick = () => updateEmbedStream();
   sourceSelect.onchange = () => updateEmbedStream();
+  saveProgressBtn.onclick = saveProgressToDB;
   
   let searchTimeout;
   globalSearch.addEventListener('input', (e) => {
