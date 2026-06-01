@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>WizhuB • Auto Continue Watching</title>
+  <title>WizhuB • Resume & Continue Watching</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -82,7 +82,7 @@
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
   
-  <!-- Continue Watching Section (always visible) -->
+  <!-- Continue Watching Section (top) -->
   <section id="continueWatchingSection" class="mb-12">
     <h2 class="text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
     <div id="continueWatchingContainer" class="horizontal-scroll">
@@ -108,6 +108,7 @@
         </div>
         <p id="detailOverview" class="text-gray-300 text-sm mt-2 line-clamp-3"></p>
         
+        <!-- TV Controls (season/episode) -->
         <div id="tvControls" class="hidden mt-4 flex flex-wrap gap-3">
           <select id="seasonSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
           <select id="episodeSelect" class="bg-gray-800 border border-gray-600 rounded-full px-3 py-1 text-sm"></select>
@@ -176,6 +177,7 @@
 
 <script>
 (function() {
+  // ================= CONFIGURATION =================
   const SUPABASE_URL = 'https://evhtzfkxolnlqlmjewew.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHR6Zmt4b2xubHFsbWpld2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTMzOTUsImV4cCI6MjA5NTg2OTM5NX0.42bpsGRyKSZcQ3EUj1k3grsUVuXtZWKsce7OKv8J5YU';
   const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
@@ -205,7 +207,7 @@
 
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let currentUser = null;
-  let currentMedia = null;
+  let currentMedia = null;      // { type, id, title, posterPath, year, rating, overview }
   let currentSeason = 1, currentEpisode = 1;
   let currentProgressMinutes = 0;
 
@@ -245,10 +247,14 @@
     } else {
       url = src.url('tv', currentMedia.id, currentSeason, currentEpisode, currentProgressMinutes);
     }
-    if (url) embedIframe.src = url;
-    else embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
+    if (url) {
+      embedIframe.src = url;
+    } else {
+      embedIframe.srcdoc = '<div style="padding:2rem;color:red">Source unavailable</div>';
+    }
   }
 
+  // Auto-add a row with 0 minutes if not exists (ensures it appears in Continue Watching)
   async function ensureWatchHistoryEntry() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
@@ -274,9 +280,9 @@
         ignoreDuplicates: false
       });
     if (error) console.error("Auto-add error:", error);
-    else await renderContinueWatching();
   }
 
+  // Save entered minutes
   async function saveProgressToDB() {
     if (!currentUser) { alert('Please login first'); return; }
     if (!currentMedia) return;
@@ -310,11 +316,12 @@
     }
   }
 
+  // Load saved progress for the current media (movie or TV episode)
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
     const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
-    const { data } = await sb
+    const { data, error } = await sb
       .from('watch_history')
       .select('progress_minutes')
       .eq('user_id', currentUser.id)
@@ -323,6 +330,7 @@
       .eq('season_number', season)
       .eq('episode_number', episode)
       .maybeSingle();
+    if (error) console.error(error);
     if (data && data.progress_minutes !== undefined) {
       currentProgressMinutes = data.progress_minutes;
       progressMinutesInput.value = currentProgressMinutes;
@@ -332,6 +340,7 @@
     }
   }
 
+  // Render Continue Watching (horizontal scroll, no duplicates)
   async function renderContinueWatching() {
     if (!currentUser) {
       continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🔒 Log in to see your continue watching list.</div>';
@@ -344,7 +353,7 @@
       .order('last_watched', { ascending: false })
       .limit(20);
     if (error || !data) return;
-    // Deduplicate using Map (key includes season/episode as numbers)
+    // Deduplicate using composite key (media_type + tmdb_id + season_number + episode_number)
     const uniqueMap = new Map();
     for (const item of data) {
       const key = `${item.media_type}_${item.tmdb_id}_${item.season_number}_${item.episode_number}`;
@@ -375,6 +384,7 @@
           const res = await fetch(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
           const movie = await res.json();
           await showDetails(movie, 'movie');
+          // set the saved progress
           currentProgressMinutes = item.progress_minutes;
           progressMinutesInput.value = currentProgressMinutes;
           updateEmbedStream();
@@ -396,7 +406,7 @@
     }
   }
 
-  // TV helpers (unchanged except using 0 for movies)
+  // TV helpers
   async function loadTVSeasons(tvId) {
     const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
     const data = await res.json();
@@ -416,7 +426,7 @@
       await loadEpisodes(tvId, currentSeason);
       await loadProgress();
       updateEmbedStream();
-      await ensureWatchHistoryEntry();
+      await ensureWatchHistoryEntry(); // ensure new episode appears in continue watching
     };
     episodeSelect.onchange = async () => {
       currentEpisode = parseInt(episodeSelect.value);
@@ -455,6 +465,7 @@
     document.getElementById('detailYear').innerText = year;
     document.getElementById('detailType').innerHTML = type === 'movie' ? 'Movie' : 'TV Series';
     currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
+    
     if (type === 'tv') {
       tvControlsDiv.classList.remove('hidden');
       currentSeason = 1;
@@ -463,9 +474,12 @@
     } else {
       tvControlsDiv.classList.add('hidden');
     }
+    
+    // Load saved progress BEFORE embedding
     await loadProgress();
     await ensureWatchHistoryEntry();
     updateEmbedStream();
+    
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -543,7 +557,7 @@
     }).catch(console.error);
   }
 
-  // Modal handlers (unchanged)
+  // Modal handlers
   const loginModal = document.getElementById('loginModal');
   const signupModal = document.getElementById('signupModal');
   document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
@@ -574,6 +588,7 @@
     playerPanel.classList.add('hidden');
   };
 
+  // Event listeners
   closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
   reloadEmbedBtn.onclick = () => updateEmbedStream();
   sourceSelect.onchange = () => updateEmbedStream();
@@ -585,6 +600,7 @@
     searchTimeout = setTimeout(() => search(e.target.value), 500);
   });
 
+  // Initialization
   populateSources();
   fetchTrending();
   updateAuthUI();
