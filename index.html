@@ -10,6 +10,7 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
+
     /* ========== NAVBAR ========== */
     .glass-nav {
       background: rgba(10, 12, 16, 0.85);
@@ -42,7 +43,6 @@
       color: transparent;
       letter-spacing: 1px;
     }
-    /* Search bar */
     .search-wrapper {
       flex: 1 1 auto;
       min-width: 200px;
@@ -83,7 +83,6 @@
       display: none;
     }
     .clear-search:hover { color: #facc15; }
-    /* Right side: OGList + Avatar container */
     .nav-right {
       display: flex;
       align-items: center;
@@ -106,7 +105,6 @@
       background: #facc15;
       color: #0a0c10;
     }
-    /* User avatar + dropdown */
     .avatar-wrapper {
       position: relative;
     }
@@ -126,7 +124,6 @@
       transition: transform 0.1s;
     }
     .user-avatar:hover { transform: scale(1.02); }
-    /* Dropdown menu */
     .avatar-dropdown {
       position: absolute;
       top: 48px;
@@ -159,7 +156,6 @@
       background: #facc15;
       color: #0a0c10;
     }
-    /* Responsive: on mobile, stack elements */
     @media (max-width: 768px) {
       .glass-nav {
         flex-direction: column;
@@ -177,7 +173,8 @@
         order: 1;
       }
     }
-    /* Rest of the styles (movie cards, player, etc.) – identical to previous working version */
+
+    /* ========== REST OF STYLES (movie cards, player, etc.) ========== */
     .movie-card {
       transition: transform 0.25s ease, box-shadow 0.25s;
       cursor: pointer;
@@ -431,7 +428,7 @@
 </head>
 <body class="text-gray-200">
 
-<!-- NEW NAVBAR with avatar dropdown -->
+<!-- NAVBAR with avatar dropdown -->
 <nav class="glass-nav">
   <div class="brand">
     <i class="fas fa-crown text-yellow-400"></i>
@@ -446,7 +443,6 @@
   </div>
   <div class="nav-right">
     <a href="oglist.html" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
-    <!-- Avatar with dropdown -->
     <div id="userContainer" class="hidden avatar-wrapper">
       <div class="user-avatar" id="userAvatar">U</div>
       <div id="avatarDropdown" class="avatar-dropdown">
@@ -573,7 +569,7 @@
 
 <script>
 (function() {
-  // ================= SOURCES (unchanged) =================
+  // ================= CONFIGURATION =================
   const DEFAULT_SOURCES = [
     { name: 'Videoasy', url: (type, id, s, e) => type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}` },
     { name: 'VidFast', url: (type, id, s, e) => type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
@@ -600,6 +596,7 @@
     { name: 'VidLink', url: (type, id, s, e) => type === 'movie' ? `https://vidlink.pro/movie/${id}` : `https://vidlink.pro/tv/${id}/${s}/${e}` }
   ];
   let EMBED_SOURCES = [...DEFAULT_SOURCES];
+
   const SUPABASE_URL = 'https://evhtzfkxolnlqlmjewew.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHR6Zmt4b2xubHFsbWpld2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTMzOTUsImV4cCI6MjA5NTg2OTM5NX0.42bpsGRyKSZcQ3EUj1k3grsUVuXtZWKsce7OKv8J5YU';
   const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
@@ -612,7 +609,7 @@
   let currentTVDetails = null;
   let currentEpisodesList = [];
 
-  // DOM elements (including new dropdown)
+  // DOM elements
   const continueSection = document.getElementById('continueWatchingSection');
   const continueContainer = document.getElementById('continueWatchingContainer');
   const trendingMoviesGrid = document.getElementById('trendingMoviesGrid');
@@ -644,9 +641,7 @@
   const avatarDropdown = document.getElementById('avatarDropdown');
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
 
-  function showLoading(container) { container.innerHTML = '<div class="col-span-full flex justify-center py-10"><div class="loading-spinner"></div><span class="ml-2">Loading...</span></div>'; }
-
-  // Search behaviour
+  // ================= SEARCH BEHAVIOR =================
   function updateContinueVisibility() {
     const query = globalSearch.value.trim();
     if (query !== '') continueSection.classList.add('continue-section-hidden');
@@ -666,7 +661,7 @@
     searchTimeout = setTimeout(() => search(e.target.value), 500);
   }
 
-  // Avatar dropdown toggle
+  // ================= AVATAR DROPDOWN =================
   function toggleDropdown(e) {
     e.stopPropagation();
     avatarDropdown.classList.toggle('show');
@@ -675,12 +670,10 @@
     avatarDropdown.classList.remove('show');
   }
   document.addEventListener('click', function(event) {
-    if (!event.target.closest('.avatar-wrapper')) {
-      closeDropdown();
-    }
+    if (!event.target.closest('.avatar-wrapper')) closeDropdown();
   });
 
-  // ================= ALL CORE FUNCTIONS (identical to previous working version) =================
+  // ================= SOURCE ORDER FUNCTIONS =================
   async function loadUserSourceOrder() {
     if (!currentUser) return;
     try {
@@ -752,16 +745,25 @@
       setTimeout(() => toast.remove(), 2000);
     } catch (err) { alert('Could not copy URL'); }
   }
+
+  // ================= DATABASE & WATCH HISTORY =================
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
     const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
     const record = {
-      user_id: currentUser.id, media_type: currentMedia.type, tmdb_id: currentMedia.id,
-      title: currentMedia.title, poster_path: currentMedia.posterPath, media_year: currentMedia.year,
-      rating: currentMedia.rating, progress_minutes: currentProgressMinutes,
-      season_number: season, episode_number: episode,
-      last_watched: new Date().toISOString(), updated_at: new Date().toISOString()
+      user_id: currentUser.id,
+      media_type: currentMedia.type,
+      tmdb_id: currentMedia.id,
+      title: currentMedia.title,
+      poster_path: currentMedia.posterPath,
+      media_year: currentMedia.year,
+      rating: currentMedia.rating,
+      progress_minutes: currentProgressMinutes,
+      season_number: season,
+      episode_number: episode,
+      last_watched: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
     const { error } = await sb.from('watch_history').upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
     if (error) console.error("Save error:", error);
@@ -835,6 +837,8 @@
       continueContainer.appendChild(card);
     }
   }
+
+  // ================= TV EPISODE NAVIGATION =================
   async function updateEpisodeNavigation() {
     if (!currentMedia || currentMedia.type !== 'tv' || !currentEpisodesList.length) {
       prevEpisodeBtn.disabled = true; nextEpisodeBtn.disabled = true; return;
@@ -928,6 +932,8 @@
       } catch (err) { if (i === retries - 1) throw err; await new Promise(r => setTimeout(r, delay)); }
     }
   }
+
+  // ================= SHOW DETAILS (RESUME) =================
   async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null) {
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
@@ -956,6 +962,8 @@
     updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  // ================= RENDER CARDS (TRENDING / SEARCH) =================
   function renderCards(container, items, mediaType) {
     if (!items.length) { container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>'; return; }
     container.innerHTML = items.map(item => {
@@ -978,6 +986,7 @@
       });
     });
   }
+
   let cachedTrending = null;
   async function fetchTrending() {
     if (cachedTrending) {
@@ -1017,13 +1026,19 @@
       trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Search failed.</div>';
     }
   }
+
+  function showLoading(container) {
+    container.innerHTML = '<div class="col-span-full flex justify-center py-10"><div class="loading-spinner"></div><span class="ml-2">Loading...</span></div>';
+  }
+
+  // ================= AUTH UI =================
   function updateAuthUI() {
     sb.auth.getUser().then(async ({ data: { user } }) => {
       currentUser = user;
       if (user) {
         document.getElementById('authContainer').classList.add('hidden');
         document.getElementById('userContainer').classList.remove('hidden');
-        if (userAvatar) userAvatar.innerText = user.email ? user.email.charAt(0).toUpperCase() : 'U';
+        if (userAvatarDiv) userAvatarDiv.innerText = user.email ? user.email.charAt(0).toUpperCase() : 'U';
         await loadUserSourceOrder();
         await renderContinueWatching();
         updateContinueVisibility();
@@ -1036,6 +1051,8 @@
       }
     }).catch(console.error);
   }
+
+  // ================= SOURCE ORDER MODAL =================
   function openOrderModal() {
     sourceListDiv.innerHTML = '';
     EMBED_SOURCES.forEach((src, idx) => {
@@ -1063,6 +1080,7 @@
   closeOrderBtn.onclick = () => orderModal.style.display = 'none';
   orderSourcesBtn.onclick = openOrderModal;
 
+  // ================= EVENT LISTENERS =================
   closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
   reloadEmbedBtn.onclick = () => updateEmbedStream();
   sourceSelect.onchange = () => updateEmbedStream();
@@ -1075,7 +1093,13 @@
   };
   prevEpisodeBtn.onclick = goToPreviousEpisode;
   nextEpisodeBtn.onclick = goToNextEpisode;
-
+  if (userAvatarDiv) userAvatarDiv.addEventListener('click', toggleDropdown);
+  if (dropdownLogoutBtn) dropdownLogoutBtn.onclick = async () => {
+    await sb.auth.signOut();
+    updateAuthUI();
+    playerPanel.classList.add('hidden');
+    closeDropdown();
+  };
   function copyTitleToClipboard() {
     const title = detailTitleSpan.innerText;
     if (!title) return;
@@ -1095,6 +1119,7 @@
   globalSearch.addEventListener('focus', updateContinueVisibility);
   globalSearch.addEventListener('blur', () => { setTimeout(() => { if (!globalSearch.value.trim()) updateContinueVisibility(); }, 200); });
 
+  // ================= LOGIN/SIGNUP MODALS =================
   const loginModal = document.getElementById('loginModal');
   const signupModal = document.getElementById('signupModal');
   document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
@@ -1116,12 +1141,8 @@
     if (error) alert(error.message);
     else { alert('Account created! Please log in.'); signupModal.classList.add('hidden'); }
   };
-  document.getElementById('logoutBtn').onclick = async () => {
-    await sb.auth.signOut();
-    updateAuthUI();
-    playerPanel.classList.add('hidden');
-  };
 
+  // ================= INIT =================
   populateSources();
   fetchTrending();
   updateAuthUI();
