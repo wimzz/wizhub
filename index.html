@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WIZHUB - Resume & Progress</title>
+  <title>WIZHUB - Resume & Progress (Fixed)</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23facc15'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
+    /* (same styles as before - keep for brevity) */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -491,7 +492,7 @@
 
 <script>
 (function() {
-  // ================= SOURCES (with resume parameters) =================
+  // ================= SOURCES (FIXED VixSrc) =================
   const DEFAULT_SOURCES = [
     { name: 'Videasy', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}`;
@@ -506,7 +507,8 @@
     { name: 'VidUp', url: (type, id, s, e) => type === 'movie' ? `https://vidup.to/movie/${id}` : `https://vidup.to/tv/${id}/${s}/${e}` },
     { name: 'VixSrc', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://vixsrc.to/movie/${id}` : `https://vixsrc.to/tv/${id}/${s}/${e}`;
-        return progressSec > 0 ? base + `?t=${progressSec}` : base;
+        // FIXED: correct parameter is startAt, not t
+        return progressSec > 0 ? base + `?startAt=${progressSec}` : base;
       }
     },
     { name: 'EmbedMaster', url: (type, id, s, e) => type === 'movie' ? `https://embedmaster.link/movie/${id}` : `https://embedmaster.link/tv/${id}/${s}/${e}` },
@@ -673,7 +675,21 @@
     }
   }
 
-  // ========== IMPROVED SAVE/LOAD ==========
+  // ========== AUTO SAVE PROGRESS (looser threshold) ==========
+  let autoSaveTimer = null;
+  function autoSaveProgress(seconds, sourceName) {
+    if (!currentUser || !currentMedia) return;
+    // Only save if difference is more than 10 seconds (prevents excessive saves)
+    if (Math.abs(seconds - currentProgressSeconds) < 10) return;
+    currentProgressSeconds = seconds;
+    currentProgressMinutes = Math.floor(seconds / 60);
+    progressMinutesInput.value = currentProgressMinutes;
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => { saveProgressToDB(); }, 1000);
+    console.log(`Auto-save from ${sourceName}: ${seconds} seconds`);
+  }
+
+  // ========== SAVE/LOAD PROGRESS ==========
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
@@ -884,6 +900,7 @@
       return;
     }
     let url = '';
+    // For sources that accept progressSec
     if (src.name === 'Videasy' || src.name === 'VidFast' || src.name === 'VixSrc') {
       url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
     } else {
@@ -921,6 +938,54 @@
       setTimeout(() => toast.remove(), 2000);
     } catch (err) { alert('Could not copy URL'); }
   }
+
+  // ========== POSTMESSAGE HANDLERS (FIXED VixSrc) ==========
+  window.addEventListener('message', (event) => {
+    const { origin, data } = event;
+    if (!data) return;
+
+    // ---- Videasy (string message like {"progress": seconds}) ----
+    if (origin.includes('videasy') && typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        if (typeof parsed.progress === 'number') {
+          autoSaveProgress(parsed.progress, 'Videasy');
+        }
+      } catch(e) {}
+    }
+
+    // ---- VidFast (PLAYER_EVENT or MEDIA_DATA) ----
+    if (origin.includes('vidfast')) {
+      if (data.type === 'PLAYER_EVENT' && data.data?.currentTime) {
+        autoSaveProgress(Math.floor(data.data.currentTime), 'VidFast');
+      }
+      if (data.type === 'MEDIA_DATA') {
+        const media = data.data?.[currentMedia?.id];
+        if (media?.progress?.watched) {
+          autoSaveProgress(media.progress.watched, 'VidFast');
+        }
+      }
+    }
+
+    // ---- VixSrc (FIXED: now checks event === "timeupdate") ----
+    if (origin.includes('vixsrc')) {
+      // Debug log to see what VixSrc sends
+      console.log('VIXSRC RAW EVENT', data);
+      if (data?.type === 'PLAYER_EVENT') {
+        const eventName = data.data?.event;
+        const currentTime = data.data?.currentTime;
+        if (eventName === 'timeupdate' && typeof currentTime === 'number') {
+          autoSaveProgress(Math.floor(currentTime), 'VixSrc');
+        }
+        // Also handle seek, pause, ended to capture final position
+        if (eventName === 'seeked' || eventName === 'pause' || eventName === 'ended') {
+          if (typeof currentTime === 'number') {
+            autoSaveProgress(Math.floor(currentTime), `VixSrc (${eventName})`);
+          }
+        }
+      }
+    }
+  });
 
   // ========== SHOW DETAILS (with resume seconds) ==========
   async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null, savedSeconds = null) {
