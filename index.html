@@ -366,24 +366,6 @@
       .info-section { padding: 1rem; }
       .control-group .flex-wrap { justify-content: center; }
     }
-    .toast-notification {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #2a2c38;
-      color: #facc15;
-      padding: 8px 16px;
-      border-radius: 9999px;
-      font-size: 14px;
-      z-index: 300;
-      animation: fadeOut 2s forwards;
-    }
-    @keyframes fadeOut {
-      0% { opacity: 1; }
-      70% { opacity: 1; }
-      100% { opacity: 0; visibility: hidden; }
-    }
     .copy-title-icon {
       cursor: pointer;
       margin-left: 0.5rem;
@@ -405,6 +387,7 @@
 </head>
 <body class="text-gray-200">
 
+<!-- NAVBAR (unchanged) -->
 <nav class="glass-nav">
   <div class="brand">
     <i class="fas fa-crown text-yellow-400"></i>
@@ -433,11 +416,13 @@
 </nav>
 
 <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
+  <!-- Continue Watching -->
   <section id="continueWatchingSection" class="mb-12">
     <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4"><i class="fas fa-history text-yellow-400"></i> Continue Watching</h2>
     <div id="continueWatchingContainer" class="horizontal-scroll"><div class="text-gray-400 text-sm">Log in to see your watch history.</div></div>
   </section>
 
+  <!-- Player Panel -->
   <div id="playerPanel" class="hidden mb-12 player-modern">
     <div class="embed-container">
       <iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="autoplay; encrypted-media"></iframe>
@@ -466,6 +451,7 @@
             <button id="orderSourcesBtn" class="btn-icon" title="Reorder sources"><i class="fas fa-arrows-alt"></i> Order</button>
           </div>
         </div>
+        <!-- Manual progress (keep for fallback) -->
         <div class="control-group flex flex-wrap items-center gap-4">
           <span class="text-sm"><i class="fas fa-clock text-yellow-400"></i> Watched (minutes):</span>
           <input type="number" id="progressMinutes" value="0" step="1" min="0" class="progress-input">
@@ -487,11 +473,7 @@
             <button id="closePlayerBtn" class="text-gray-400 hover:text-white text-xl">&times;</button>
           </div>
           <div class="flex flex-wrap items-center gap-3 mt-2">
-            <div class="rating-badge">
-              <i class="fas fa-star text-yellow-400 text-xs"></i>
-              <span id="detailRating" class="font-semibold">—</span>
-              <span class="text-gray-400 text-xs">/10</span>
-            </div>
+            <div class="rating-badge"><i class="fas fa-star text-yellow-400 text-xs"></i><span id="detailRating">—</span><span class="text-gray-400 text-xs">/10</span></div>
             <span class="text-sm"><i class="fas fa-calendar-alt text-gray-400 mr-1"></i><span id="detailYear">—</span></span>
             <span class="type-badge" id="detailType">—</span>
           </div>
@@ -501,51 +483,19 @@
     </div>
   </div>
 
-  <section class="mb-12">
-    <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-fire text-orange-500"></i> Trending Movies</h2>
-    <div id="trendingMoviesGrid" class="trending-grid"></div>
-  </section>
-  <section class="mb-12">
-    <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-tv text-purple-400"></i> Trending TV Shows</h2>
-    <div id="trendingTvGrid" class="trending-grid"></div>
-  </section>
+  <!-- Trending sections -->
+  <section class="mb-12"><h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-fire text-orange-500"></i> Trending Movies</h2><div id="trendingMoviesGrid" class="trending-grid"></div></section>
+  <section class="mb-12"><h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-tv text-purple-400"></i> Trending TV Shows</h2><div id="trendingTvGrid" class="trending-grid"></div></section>
 </main>
 
-<div id="orderModal" class="modal">
-  <div class="modal-content">
-    <h3 class="text-xl font-bold mb-4">Reorder Stream Sources</h3>
-    <div id="sourceList" class="mb-4" style="max-height: 50vh; overflow-y: auto;"></div>
-    <div class="flex gap-2">
-      <button id="saveOrderBtn" class="bg-green-600 px-4 py-2 rounded-full">Save Order</button>
-      <button id="closeOrderBtn" class="bg-gray-600 px-4 py-2 rounded-full">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
-  <div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-yellow-500/30 relative">
-    <h3 class="text-xl font-bold mb-4">Login</h3>
-    <input type="email" id="loginEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3">
-    <input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4">
-    <button id="doLoginBtn" class="w-full bg-yellow-500 text-black py-2 rounded-lg font-semibold">Login</button>
-    <p class="text-sm text-center mt-3">No account? <a id="switchToSignupModal" class="text-yellow-400 cursor-pointer">Sign up</a></p>
-    <button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button>
-  </div>
-</div>
-<div id="signupModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
-  <div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-yellow-500/30 relative">
-    <h3 class="text-xl font-bold mb-4">Create Account</h3>
-    <input type="email" id="signupEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3">
-    <input type="password" id="signupPassword" placeholder="Password (min 6)" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4">
-    <button id="doSignupBtn" class="w-full bg-yellow-500 text-black py-2 rounded-lg font-semibold">Sign Up</button>
-    <p class="text-sm text-center mt-3">Already have an account? <a id="switchToLoginModal" class="text-yellow-400 cursor-pointer">Login</a></p>
-    <button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button>
-  </div>
-</div>
+<!-- Modals -->
+<div id="orderModal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Reorder Stream Sources</h3><div id="sourceList" class="mb-4" style="max-height: 50vh; overflow-y: auto;"></div><div class="flex gap-2"><button id="saveOrderBtn" class="bg-green-600 px-4 py-2 rounded-full">Save Order</button><button id="closeOrderBtn" class="bg-gray-600 px-4 py-2 rounded-full">Cancel</button></div></div></div>
+<div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden"><div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-yellow-500/30 relative"><h3 class="text-xl font-bold mb-4">Login</h3><input type="email" id="loginEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3"><input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4"><button id="doLoginBtn" class="w-full bg-yellow-500 text-black py-2 rounded-lg font-semibold">Login</button><p class="text-sm text-center mt-3">No account? <a id="switchToSignupModal" class="text-yellow-400 cursor-pointer">Sign up</a></p><button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button></div></div>
+<div id="signupModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden"><div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-yellow-500/30 relative"><h3 class="text-xl font-bold mb-4">Create Account</h3><input type="email" id="signupEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3"><input type="password" id="signupPassword" placeholder="Password (min 6)" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4"><button id="doSignupBtn" class="w-full bg-yellow-500 text-black py-2 rounded-lg font-semibold">Sign Up</button><p class="text-sm text-center mt-3">Already have an account? <a id="switchToLoginModal" class="text-yellow-400 cursor-pointer">Login</a></p><button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button></div></div>
 
 <script>
 (function() {
-  // ================= SOURCES (25 sources) =================
+  // ================= SOURCES (25, same as before) =================
   const DEFAULT_SOURCES = [
     { name: 'Videasy', url: (type, id, s, e) => type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}` },
     { name: 'VidFast', url: (type, id, s, e) => type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
@@ -620,7 +570,7 @@
   const avatarDropdown = document.getElementById('avatarDropdown');
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
 
-  // Helper functions (search, avatar, source order) unchanged
+  // Helper functions (search, avatar, source order – same as before)
   function updateContinueVisibility() {
     const query = globalSearch.value.trim();
     if (query !== '') continueSection.classList.add('continue-section-hidden');
@@ -640,20 +590,11 @@
     searchTimeout = setTimeout(() => search(e.target.value), 500);
   }
 
-  function toggleDropdown(e) {
-    e.stopPropagation();
-    avatarDropdown.classList.toggle('show');
-  }
-  function closeDropdown() {
-    avatarDropdown.classList.remove('show');
-  }
-  document.addEventListener('click', (event) => {
-    if (!event.target.closest('.avatar-wrapper')) closeDropdown();
-  });
+  function toggleDropdown(e) { e.stopPropagation(); avatarDropdown.classList.toggle('show'); }
+  function closeDropdown() { avatarDropdown.classList.remove('show'); }
+  document.addEventListener('click', (event) => { if (!event.target.closest('.avatar-wrapper')) closeDropdown(); });
 
-  function saveSelectedSourceIndex(index) {
-    localStorage.setItem('wizhub_selected_source', index);
-  }
+  function saveSelectedSourceIndex(index) { localStorage.setItem('wizhub_selected_source', index); }
   function loadSelectedSourceIndex() {
     const saved = localStorage.getItem('wizhub_selected_source');
     if (saved !== null && !isNaN(parseInt(saved))) {
@@ -703,7 +644,7 @@
     loadSelectedSourceIndex();
   }
 
-  // ================= CORE: UPDATE EMBED WITH TIME PARAMETER =================
+  // ========== CORE: EMBED UPDATE WITH TIME PARAMETER ==========
   async function updateEmbedStream() {
     if (!currentMedia) return;
     const srcIdx = parseInt(sourceSelect.value);
@@ -715,28 +656,16 @@
     let url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
     if (url && typeof url.then === 'function') {
       embedIframe.srcdoc = '<div class="text-center py-20 text-gray-400"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
-      try {
-        url = await url;
-      } catch (err) {
-        console.error('Async URL failed', err);
-        embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to load</div>';
-        return;
-      }
+      try { url = await url; } catch (err) { embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to load</div>'; return; }
     }
-    if (src.openInNewTab === true && url) {
-      window.open(url, '_blank');
-      return;
-    }
+    if (src.openInNewTab === true && url) { window.open(url, '_blank'); return; }
     if (url) {
-      // Add time parameter if progress > 0 and source doesn't have openInNewTab
       if (currentProgressMinutes > 0 && !src.openInNewTab) {
         const separator = url.includes('?') ? '&' : '?';
         url += `${separator}t=${currentProgressMinutes * 60}`;
       }
       embedIframe.src = url;
-    } else {
-      embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
-    }
+    } else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
   }
 
   function nextSource() {
@@ -761,7 +690,7 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ================= AUTO-PROGRESS SAVING (improved for Videasy, VixSrc) =================
+  // ========== AUTO-PROGRESS (silent) ==========
   let autoSaveTimer = null;
   function autoSaveProgress(seconds) {
     if (!currentUser || !currentMedia) return;
@@ -770,14 +699,7 @@
     currentProgressMinutes = minutes;
     progressMinutesInput.value = minutes;
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(() => {
-      saveProgressToDB();
-      const toast = document.createElement('div');
-      toast.className = 'toast-notification';
-      toast.textContent = `✓ Progress saved: ${minutes} min`;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 1500);
-    }, 1000);
+    autoSaveTimer = setTimeout(() => { saveProgressToDB(); }, 1000); // no toast
   }
 
   const vidFastOrigins = [
@@ -788,38 +710,23 @@
   window.addEventListener('message', (event) => {
     const { origin, data } = event;
     if (!data) return;
-
-    // ---- Videasy (string message like {"progress": 45} ) ----
+    // Videasy
     if (origin.includes('videasy') && typeof data === 'string') {
-      try {
-        const parsed = JSON.parse(data);
-        if (typeof parsed.progress === 'number') {
-          // progress is in minutes
-          autoSaveProgress(parsed.progress * 60);
-        }
-      } catch(e) {}
+      try { const parsed = JSON.parse(data); if (typeof parsed.progress === 'number') autoSaveProgress(parsed.progress * 60); } catch(e) {}
     }
-
-    // ---- VidFast (PLAYER_EVENT or MEDIA_DATA) ----
+    // VidFast
     if (vidFastOrigins.includes(origin)) {
-      if (data.type === 'PLAYER_EVENT' && data.data?.currentTime) {
-        autoSaveProgress(data.data.currentTime);
-      }
+      if (data.type === 'PLAYER_EVENT' && data.data?.currentTime) autoSaveProgress(data.data.currentTime);
       if (data.type === 'MEDIA_DATA') {
         const media = data.data?.[currentMedia?.id];
-        if (media?.progress?.watched) {
-          autoSaveProgress(media.progress.watched);
-        }
+        if (media?.progress?.watched) autoSaveProgress(media.progress.watched);
       }
     }
-
-    // ---- VixSrc (PLAYER_EVENT) ----
-    if (origin.includes('vixsrc') && data.type === 'PLAYER_EVENT' && data.data?.currentTime) {
-      autoSaveProgress(data.data.currentTime);
-    }
+    // VixSrc
+    if (origin.includes('vixsrc') && data.type === 'PLAYER_EVENT' && data.data?.currentTime) autoSaveProgress(data.data.currentTime);
   });
 
-  // ================= DATABASE & WATCH HISTORY (identical to previous, but ensure saveProgressToDB defined) =================
+  // ========== DATABASE & WATCH HISTORY ==========
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
@@ -838,8 +745,7 @@
       last_watched: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
-    const { error } = await sb.from('watch_history').upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
-    if (error) console.error("Save error:", error);
+    await sb.from('watch_history').upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
   }
 
   async function loadProgress() {
@@ -859,9 +765,8 @@
 
   async function deleteHistoryEntry(mediaType, tmdbId) {
     if (!currentUser) return;
-    const { error } = await sb.from('watch_history').delete().eq('user_id', currentUser.id).eq('media_type', mediaType).eq('tmdb_id', tmdbId);
-    if (error) console.error("Delete error:", error);
-    else await renderContinueWatching();
+    await sb.from('watch_history').delete().eq('user_id', currentUser.id).eq('media_type', mediaType).eq('tmdb_id', tmdbId);
+    await renderContinueWatching();
   }
 
   async function renderContinueWatching() {
@@ -894,8 +799,7 @@
       const deleteBtn = card.querySelector('.delete-btn');
       deleteBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const mediaType = deleteBtn.dataset.mediaType;
-        const tmdbId = parseInt(deleteBtn.dataset.tmdb);
+        const mediaType = deleteBtn.dataset.mediaType, tmdbId = parseInt(deleteBtn.dataset.tmdb);
         if (confirm(`Delete "${item.title}" from Continue Watching?`)) await deleteHistoryEntry(mediaType, tmdbId);
       });
       card.addEventListener('click', async (e) => {
@@ -914,14 +818,101 @@
     }
   }
 
-  // TV episode navigation (unchanged)
-  async function updateEpisodeNavigation() { /* same as before */ }
-  async function goToPreviousEpisode() { /* same */ }
-  async function goToNextEpisode() { /* same */ }
-  async function loadTVSeasons(tvId, preserveEpisode, forcedSeason, forcedEpisode) { /* same */ }
-  async function loadEpisodes(tvId, seasonNum, forcedEpisode) { /* same */ }
-  async function fetchWithRetry(url, retries, delay) { /* same */ }
-  async function showDetails(item, type, savedProgress, savedSeason, savedEpisode) {
+  // Episode navigation (identical to previous, simplified)
+  async function updateEpisodeNavigation() {
+    if (!currentMedia || currentMedia.type !== 'tv' || !currentEpisodesList.length) {
+      prevEpisodeBtn.disabled = true; nextEpisodeBtn.disabled = true; return;
+    }
+    const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
+    prevEpisodeBtn.disabled = (idx <= 0);
+    nextEpisodeBtn.disabled = (idx >= currentEpisodesList.length - 1);
+  }
+  async function goToPreviousEpisode() {
+    if (!currentMedia || currentMedia.type !== 'tv') return;
+    const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
+    if (idx > 0) {
+      currentEpisode = currentEpisodesList[idx - 1].episode_number;
+      episodeSelect.value = currentEpisode;
+      await saveProgressToDB();
+      await renderContinueWatching();
+      updateEmbedStream();
+      updateEpisodeNavigation();
+    }
+  }
+  async function goToNextEpisode() {
+    if (!currentMedia || currentMedia.type !== 'tv') return;
+    const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
+    if (idx < currentEpisodesList.length - 1) {
+      currentEpisode = currentEpisodesList[idx + 1].episode_number;
+      episodeSelect.value = currentEpisode;
+      await saveProgressToDB();
+      await renderContinueWatching();
+      updateEmbedStream();
+      updateEpisodeNavigation();
+    }
+  }
+  async function loadTVSeasons(tvId, preserveEpisode = false, forcedSeason = null, forcedEpisode = null) {
+    const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
+    const data = await res.json();
+    currentTVDetails = data;
+    const seasons = (data.seasons || []).filter(s => s.season_number > 0);
+    if (!seasons.length) return;
+    seasonSelect.innerHTML = '';
+    seasons.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.season_number;
+      opt.textContent = `Season ${s.season_number}`;
+      seasonSelect.appendChild(opt);
+    });
+    if (forcedSeason !== null) currentSeason = forcedSeason;
+    else if (!preserveEpisode) currentSeason = seasons[0]?.season_number || 1;
+    seasonSelect.value = currentSeason;
+    await loadEpisodes(tvId, currentSeason, forcedEpisode);
+    seasonSelect.onchange = async () => {
+      currentSeason = parseInt(seasonSelect.value);
+      currentEpisode = 1;
+      await loadEpisodes(tvId, currentSeason);
+      await saveProgressToDB();
+      await renderContinueWatching();
+      updateEmbedStream();
+      updateEpisodeNavigation();
+    };
+    episodeSelect.onchange = async () => {
+      currentEpisode = parseInt(episodeSelect.value);
+      await saveProgressToDB();
+      await renderContinueWatching();
+      updateEmbedStream();
+      updateEpisodeNavigation();
+    };
+    updateEpisodeNavigation();
+  }
+  async function loadEpisodes(tvId, seasonNum, forcedEpisode = null) {
+    const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNum}?api_key=${TMDB_API_KEY}`);
+    const data = await res.json();
+    currentEpisodesList = data.episodes || [];
+    episodeSelect.innerHTML = '';
+    currentEpisodesList.forEach(ep => {
+      const opt = document.createElement('option');
+      opt.value = ep.episode_number;
+      opt.textContent = `Episode ${ep.episode_number}: ${ep.name}`;
+      episodeSelect.appendChild(opt);
+    });
+    if (currentEpisodesList.length === 0) episodeSelect.innerHTML = '<option value="1">Episode 1</option>';
+    if (forcedEpisode !== null) currentEpisode = forcedEpisode;
+    episodeSelect.value = currentEpisode;
+    updateEpisodeNavigation();
+  }
+  async function fetchWithRetry(url, retries = 3, delay = 1000) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) return res;
+        if (res.status === 429) await new Promise(r => setTimeout(r, delay * Math.pow(2, i)));
+        else throw new Error(`HTTP ${res.status}`);
+      } catch (err) { if (i === retries - 1) throw err; await new Promise(r => setTimeout(r, delay)); }
+    }
+  }
+  async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null) {
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
     const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
@@ -946,11 +937,11 @@
     if (savedProgress !== null) { currentProgressMinutes = savedProgress; progressMinutesInput.value = savedProgress; }
     else await loadProgress();
     await saveProgressToDB();
-    await updateEmbedStream(); // will include time parameter if progress > 0
+    await updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // renderCards, fetchTrending, search, showLoading etc. (unchanged, but we need them)
+  // Card rendering
   function renderCards(container, items, mediaType) {
     if (!items.length) { container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>'; return; }
     container.innerHTML = items.map(item => {
@@ -973,6 +964,7 @@
       });
     });
   }
+
   let cachedTrending = null;
   async function fetchTrending() {
     if (cachedTrending) {
@@ -1008,15 +1000,11 @@
       const tv = data.results.filter(r => r.media_type === 'tv').slice(0, 12);
       renderCards(trendingMoviesGrid, movies, 'movie');
       renderCards(trendingTvGrid, tv, 'tv');
-    } catch (err) {
-      trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Search failed.</div>';
-    }
+    } catch (err) { trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Search failed.</div>'; }
   }
-  function showLoading(container) {
-    container.innerHTML = '<div class="col-span-full flex justify-center py-10"><div class="loading-spinner"></div><span class="ml-2">Loading...</span></div>';
-  }
+  function showLoading(container) { container.innerHTML = '<div class="col-span-full flex justify-center py-10"><div class="loading-spinner"></div><span class="ml-2">Loading...</span></div>'; }
 
-  // AUTH UI
+  // Auth UI
   function updateAuthUI() {
     sb.auth.getUser().then(async ({ data: { user } }) => {
       currentUser = user;
@@ -1037,7 +1025,7 @@
     }).catch(console.error);
   }
 
-  // SOURCE ORDER MODAL
+  // Source order modal
   function openOrderModal() {
     sourceListDiv.innerHTML = '';
     EMBED_SOURCES.forEach((src, idx) => {
@@ -1065,14 +1053,10 @@
   closeOrderBtn.onclick = () => orderModal.style.display = 'none';
   orderSourcesBtn.onclick = openOrderModal;
 
-  // EVENT LISTENERS
+  // Event listeners
   closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
   reloadEmbedBtn.onclick = () => updateEmbedStream();
-  sourceSelect.onchange = () => {
-    const idx = parseInt(sourceSelect.value);
-    saveSelectedSourceIndex(idx);
-    updateEmbedStream();
-  };
+  sourceSelect.onchange = () => { saveSelectedSourceIndex(parseInt(sourceSelect.value)); updateEmbedStream(); };
   nextSourceBtn.onclick = nextSource;
   copyUrlBtn.onclick = copyVideoUrl;
   saveProgressBtn.onclick = async () => {
@@ -1107,7 +1091,7 @@
   globalSearch.addEventListener('focus', updateContinueVisibility);
   globalSearch.addEventListener('blur', () => { setTimeout(() => { if (!globalSearch.value.trim()) updateContinueVisibility(); }, 200); });
 
-  // LOGIN/SIGNUP MODALS (unchanged)
+  // Modal handlers (login/signup)
   const loginModal = document.getElementById('loginModal');
   const signupModal = document.getElementById('signupModal');
   document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
@@ -1130,7 +1114,7 @@
     else { alert('Account created! Please log in.'); signupModal.classList.add('hidden'); }
   };
 
-  // INIT
+  // Initialize
   populateSources();
   fetchTrending();
   updateAuthUI();
