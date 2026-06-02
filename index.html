@@ -491,11 +491,11 @@
 
 <script>
 (function() {
-  // ================= SOURCES (with proper resume parameters) =================
+  // ================= SOURCES (updated with progress parameters) =================
   const DEFAULT_SOURCES = [
     { name: 'Videasy', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}`;
-        return progressSec > 0 ? base + `?progress=${progressSec}` : base;
+        return progressSec > 0 ? base + `?start=${progressSec}` : base;
       }
     },
     { name: 'VidFast', url: (type, id, s, e, progressSec) => {
@@ -506,7 +506,7 @@
     { name: 'VidUp', url: (type, id, s, e) => type === 'movie' ? `https://vidup.to/movie/${id}` : `https://vidup.to/tv/${id}/${s}/${e}` },
     { name: 'VixSrc', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://vixsrc.to/movie/${id}` : `https://vixsrc.to/tv/${id}/${s}/${e}`;
-        return progressSec > 0 ? base + `?startAt=${progressSec}` : base;
+        return progressSec > 0 ? base + `?t=${progressSec}` : base;
       }
     },
     { name: 'EmbedMaster', url: (type, id, s, e) => type === 'movie' ? `https://embedmaster.link/movie/${id}` : `https://embedmaster.link/tv/${id}/${s}/${e}` },
@@ -546,6 +546,7 @@
   let currentProgressSeconds = 0;
   let currentTVDetails = null;
   let currentEpisodesList = [];
+  let watchHeartbeat = null;
 
   // DOM elements
   const continueSection = document.getElementById('continueWatchingSection');
@@ -579,7 +580,7 @@
   const avatarDropdown = document.getElementById('avatarDropdown');
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
 
-  // Helper functions (search, avatar, source order)
+  // Helper functions
   function updateContinueVisibility() {
     const query = globalSearch.value.trim();
     if (query !== '') continueSection.classList.add('continue-section-hidden');
@@ -653,6 +654,22 @@
     loadSelectedSourceIndex();
   }
 
+  // Heartbeat functions
+  function startHeartbeat() {
+    clearInterval(watchHeartbeat);
+    watchHeartbeat = setInterval(async () => {
+      if (!currentUser || !currentMedia) return;
+      currentProgressSeconds += 15;
+      currentProgressMinutes = Math.floor(currentProgressSeconds / 60);
+      progressMinutesInput.value = currentProgressMinutes;
+      await saveProgressToDB();
+    }, 15000);
+  }
+  function stopHeartbeat() {
+    clearInterval(watchHeartbeat);
+    watchHeartbeat = null;
+  }
+
   // ========== CORE: UPDATE EMBED WITH SOURCE‑SPECIFIC TIME PARAMETER ==========
   async function updateEmbedStream() {
     if (!currentMedia) return;
@@ -663,7 +680,6 @@
       return;
     }
     let url = '';
-    // For sources that accept progressSec, pass it; others ignore.
     if (src.name === 'Videasy' || src.name === 'VidFast' || src.name === 'VixSrc') {
       url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
     } else {
@@ -700,58 +716,7 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ========== AUTO-PROGRESS SAVING (using documented events) ==========
-  let autoSaveTimer = null;
-  function autoSaveProgress(seconds, sourceName) {
-    if (!currentUser || !currentMedia) return;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes === currentProgressMinutes) return;
-    currentProgressMinutes = minutes;
-    currentProgressSeconds = seconds;
-    progressMinutesInput.value = minutes;
-    if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(() => { saveProgressToDB(); }, 1000);
-  }
-
-  const vidFastOrigins = [
-    'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
-    'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
-  ];
-
-  window.addEventListener('message', (event) => {
-    const { origin, data } = event;
-    if (!data) return;
-
-    // ---- Videasy (string message like {"progress": seconds}) ----
-    if (origin.includes('videasy') && typeof data === 'string') {
-      try {
-        const parsed = JSON.parse(data);
-        if (typeof parsed.progress === 'number') {
-          autoSaveProgress(parsed.progress, 'Videasy');
-        }
-      } catch(e) {}
-    }
-
-    // ---- VidFast (PLAYER_EVENT or MEDIA_DATA) ----
-    if (vidFastOrigins.includes(origin)) {
-      if (data.type === 'PLAYER_EVENT' && data.data?.currentTime) {
-        autoSaveProgress(data.data.currentTime, 'VidFast');
-      }
-      if (data.type === 'MEDIA_DATA') {
-        const media = data.data?.[currentMedia?.id];
-        if (media?.progress?.watched) {
-          autoSaveProgress(media.progress.watched, 'VidFast');
-        }
-      }
-    }
-
-    // ---- VixSrc (PLAYER_EVENT) ----
-    if (origin.includes('vixsrc') && data.type === 'PLAYER_EVENT' && data.data?.currentTime) {
-      autoSaveProgress(data.data.currentTime, 'VixSrc');
-    }
-  });
-
-  // ========== DATABASE & WATCH HISTORY ==========
+  // ========== IMPROVED PROGRESS SAVING ==========
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
@@ -764,29 +729,35 @@
       poster_path: currentMedia.posterPath,
       media_year: currentMedia.year,
       rating: currentMedia.rating,
-      progress_minutes: currentProgressMinutes,
+      progress_minutes: Math.floor(currentProgressSeconds / 60),
+      progress_seconds: currentProgressSeconds,
       season_number: season,
       episode_number: episode,
       last_watched: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
-    await sb.from('watch_history').upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
+    const { error } = await sb.from('watch_history').upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
+    if (error) console.error(error);
   }
 
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
     const { data, error } = await sb.from('watch_history')
-      .select('progress_minutes, season_number, episode_number')
+      .select('progress_minutes, progress_seconds, season_number, episode_number')
       .eq('user_id', currentUser.id).eq('media_type', currentMedia.type).eq('tmdb_id', currentMedia.id).maybeSingle();
     if (!error && data) {
-      currentProgressMinutes = data.progress_minutes || 0;
-      currentProgressSeconds = currentProgressMinutes * 60;
+      currentProgressSeconds = data.progress_seconds || 0;
+      currentProgressMinutes = Math.floor(currentProgressSeconds / 60);
       progressMinutesInput.value = currentProgressMinutes;
-      if (currentMedia.type === 'tv' && data.season_number && data.episode_number) {
-        currentSeason = data.season_number;
-        currentEpisode = data.episode_number;
+      if (currentMedia.type === 'tv') {
+        if (data.season_number) currentSeason = data.season_number;
+        if (data.episode_number) currentEpisode = data.episode_number;
       }
-    } else { currentProgressMinutes = 0; currentProgressSeconds = 0; progressMinutesInput.value = 0; }
+    } else {
+      currentProgressSeconds = 0;
+      currentProgressMinutes = 0;
+      progressMinutesInput.value = 0;
+    }
   }
 
   async function deleteHistoryEntry(mediaType, tmdbId) {
@@ -833,18 +804,18 @@
         if (item.media_type === 'movie') {
           const res = await fetchWithRetry(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
           const movie = await res.json();
-          await showDetails(movie, 'movie', item.progress_minutes);
+          await showDetails(movie, 'movie', item.progress_minutes, null, null, item.progress_seconds);
         } else {
           const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
           const tv = await res.json();
-          await showDetails(tv, 'tv', item.progress_minutes, item.season_number, item.episode_number);
+          await showDetails(tv, 'tv', item.progress_minutes, item.season_number, item.episode_number, item.progress_seconds);
         }
       });
       continueContainer.appendChild(card);
     }
   }
 
-  // TV episode navigation (same as before)
+  // TV episode navigation
   async function updateEpisodeNavigation() {
     if (!currentMedia || currentMedia.type !== 'tv' || !currentEpisodesList.length) {
       prevEpisodeBtn.disabled = true; nextEpisodeBtn.disabled = true; return;
@@ -938,7 +909,9 @@
       } catch (err) { if (i === retries - 1) throw err; await new Promise(r => setTimeout(r, delay)); }
     }
   }
-  async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null) {
+
+  // Updated showDetails with seconds parameter
+  async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null, savedSeconds = null) {
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
     const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
@@ -960,17 +933,24 @@
       } else { currentSeason = 1; currentEpisode = 1; }
       await loadTVSeasons(item.id, true, currentSeason, currentEpisode);
     } else tvControlsDiv.classList.add('hidden');
-    if (savedProgress !== null) {
-      currentProgressMinutes = savedProgress;
+    if (savedSeconds !== null) {
+      currentProgressSeconds = savedSeconds;
+      currentProgressMinutes = Math.floor(currentProgressSeconds / 60);
+      progressMinutesInput.value = currentProgressMinutes;
+    } else if (savedProgress !== null) {
       currentProgressSeconds = savedProgress * 60;
+      currentProgressMinutes = savedProgress;
       progressMinutesInput.value = savedProgress;
-    } else await loadProgress();
+    } else {
+      await loadProgress();
+    }
     await saveProgressToDB();
-    await updateEmbedStream(); // will add ?progress= or &t= or ?startAt=
+    await updateEmbedStream();
+    startHeartbeat();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Card rendering (same)
+  // Card rendering
   function renderCards(container, items, mediaType) {
     if (!items.length) { container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>'; return; }
     container.innerHTML = items.map(item => {
@@ -1083,7 +1063,11 @@
   orderSourcesBtn.onclick = openOrderModal;
 
   // Event listeners
-  closePlayerBtn.onclick = () => playerPanel.classList.add('hidden');
+  closePlayerBtn.onclick = async () => {
+    await saveProgressToDB();
+    stopHeartbeat();
+    playerPanel.classList.add('hidden');
+  };
   reloadEmbedBtn.onclick = () => updateEmbedStream();
   sourceSelect.onchange = () => { saveSelectedSourceIndex(parseInt(sourceSelect.value)); updateEmbedStream(); };
   nextSourceBtn.onclick = nextSource;
@@ -1101,6 +1085,7 @@
     await sb.auth.signOut();
     updateAuthUI();
     playerPanel.classList.add('hidden');
+    stopHeartbeat();
     closeDropdown();
   };
   function copyTitleToClipboard() {
@@ -1120,6 +1105,10 @@
   clearSearchBtn.addEventListener('click', clearSearch);
   globalSearch.addEventListener('focus', updateContinueVisibility);
   globalSearch.addEventListener('blur', () => { setTimeout(() => { if (!globalSearch.value.trim()) updateContinueVisibility(); }, 200); });
+
+  window.addEventListener('beforeunload', async () => {
+    await saveProgressToDB();
+  });
 
   // Login/signup modal handlers
   const loginModal = document.getElementById('loginModal');
