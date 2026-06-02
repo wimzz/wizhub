@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WIZHUB – Resume & Progress (Fully Working)</title>
+  <title>WIZHUB – Resume & Progress (Auto Continue Update)</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23facc15'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* ========== ALL STYLES (unchanged, fully functional) ========== */
+    /* All styles remain exactly as before – unchanged for reliability */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -581,7 +582,7 @@
   const avatarDropdown = document.getElementById('avatarDropdown');
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
 
-  // Helper functions (unchanged from original working version)
+  // Helper functions (unchanged)
   function updateContinueVisibility() {
     const query = globalSearch.value.trim();
     const continueSection = document.getElementById('continueWatchingSection');
@@ -681,7 +682,7 @@
     if (error) console.error("Save error:", error);
     else {
       console.log("Saved OK");
-      await renderContinueWatching();
+      await renderContinueWatching(); // <-- immediate UI update
     }
   }
 
@@ -922,7 +923,7 @@
     console.log(`Auto-save from ${sourceName}: ${seconds} seconds`);
   }
 
-  // ========== VIDEASY MESSAGE HANDLER (exactly as needed) ==========
+  // ========== VIDEASY MESSAGE HANDLER (extracts watched seconds) ==========
   function handleVideasyMessage(rawData) {
     let msg = rawData;
     if (typeof rawData === 'string') {
@@ -932,13 +933,13 @@
 
     console.log("Videasy message:", msg);
 
-    // 1) Direct timestamp field
+    // 1) Direct timestamp field (older version)
     if (typeof msg.timestamp === 'number') {
       autoSaveProgress(msg.timestamp, 'Videasy(timestamp)');
       return;
     }
 
-    // 2) MEDIA_DATA with nested progress.watched
+    // 2) MEDIA_DATA with nested progress.watched (current implementation)
     if (msg.type === 'MEDIA_DATA' && typeof msg.data === 'string') {
       try {
         const inner = JSON.parse(msg.data);
@@ -956,7 +957,7 @@
       } catch(e) {}
     }
 
-    // 3) timeupdate event (rare but possible)
+    // 3) timeupdate event (rare)
     if (msg.event === 'timeupdate' && typeof msg.currentTime === 'number') {
       autoSaveProgress(msg.currentTime, 'Videasy(timeupdate)');
     }
@@ -987,7 +988,7 @@
       return;
     }
 
-    // VixSrc (documented structure)
+    // VixSrc
     if (origin.includes('vixsrc') || origin.includes('vixcloud')) {
       if (data?.type !== "PLAYER_EVENT") return;
       let eventName = data.data?.event;
