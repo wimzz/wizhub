@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WIZHUB – Resume & Auto‑Save (All Sources Fixed)</title>
+  <title>WIZHUB – Resume from Continue Watching (Protected)</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23facc15'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
+    /* All styles unchanged – kept for brevity */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -550,6 +552,10 @@
   let lastVidFastSave = 0;
   let lastVixSrcSaved = 0;
 
+  // ========== PROTECTION AGAINST PLAYER OVERWRITING SAVED PROGRESS ==========
+  let ignoreAutoSaveUntil = 0;        // timestamp (ms) until which auto-save is ignored
+  let ignoreEventCount = 0;           // number of events to ignore after load (as fallback)
+
   // DOM elements
   const continueContainer = document.getElementById('continueWatchingContainer');
   const trendingMoviesGrid = document.getElementById('trendingMoviesGrid');
@@ -581,7 +587,7 @@
   const avatarDropdown = document.getElementById('avatarDropdown');
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
 
-  // Helper functions
+  // Helper functions (unchanged)
   function updateContinueVisibility() {
     const query = globalSearch.value.trim();
     const continueSection = document.getElementById('continueWatchingSection');
@@ -656,7 +662,7 @@
     loadSelectedSourceIndex();
   }
 
-  // ========== SAVE/LOAD PROGRESS (with immediate UI update) ==========
+  // ========== SAVE/LOAD PROGRESS ==========
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
@@ -765,7 +771,7 @@
     }
   }
 
-  // TV episode helpers
+  // TV episode helpers (unchanged)
   async function updateEpisodeNavigation() {
     if (!currentMedia || currentMedia.type !== 'tv' || !currentEpisodesList.length) {
       prevEpisodeBtn.disabled = true; nextEpisodeBtn.disabled = true; return;
@@ -909,10 +915,17 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ========== AUTO-SAVE HELPER ==========
+  // ========== AUTO-SAVE WITH PROTECTION AGAINST INITIAL OVERWRITE ==========
   let autoSaveTimer = null;
   function autoSaveProgress(seconds, sourceName) {
     if (!currentUser || !currentMedia) return;
+    // Ignore auto-save during the first 5 seconds or first 5 events (whichever comes first)
+    const now = Date.now();
+    if (now < ignoreAutoSaveUntil || ignoreEventCount > 0) {
+      if (ignoreEventCount > 0) ignoreEventCount--;
+      console.log(`Auto-save IGNORED (protection active): ${sourceName} ${seconds}s`);
+      return;
+    }
     if (Math.abs(seconds - currentProgressSeconds) < 1) return;
     currentProgressSeconds = seconds;
     currentProgressMinutes = Math.floor(seconds / 60);
@@ -1052,7 +1065,7 @@
     }
   }, 2000);
 
-  // ========== SHOW DETAILS (resume logic) ==========
+  // ========== SHOW DETAILS (resume logic with protection) ==========
   async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null, savedSeconds = null) {
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
@@ -1088,10 +1101,13 @@
     } else {
       await loadProgress();
     }
+    // Activate protection for 5 seconds or 5 events
+    ignoreAutoSaveUntil = Date.now() + 5000;
+    ignoreEventCount = 5;
     lastPositionForJump = currentProgressSeconds;
     lastVidFastSave = currentProgressSeconds;
     lastVixSrcSaved = currentProgressSeconds;
-    await saveProgressToDB();
+    await saveProgressToDB();  // ensure DB has the saved time
     await updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
