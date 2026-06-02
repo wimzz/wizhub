@@ -556,10 +556,9 @@
 
 <script>
 (function() {
-  // ================= SOURCES (23 original + CinemaOS + AnimePahe) =================
-  // For AnimePahe, we'll mark it to open in a new tab
+  // ================= SOURCES (25 sources, name fixed: Videasy) =================
   const DEFAULT_SOURCES = [
-    { name: 'Videoasy', url: (type, id, s, e) => type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}` },
+    { name: 'Videasy', url: (type, id, s, e) => type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}` },
     { name: 'VidFast', url: (type, id, s, e) => type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
     { name: 'VidUp', url: (type, id, s, e) => type === 'movie' ? `https://vidup.to/movie/${id}` : `https://vidup.to/tv/${id}/${s}/${e}` },
     { name: 'VixSrc', url: (type, id, s, e) => type === 'movie' ? `https://vixsrc.to/movie/${id}` : `https://vixsrc.to/tv/${id}/${s}/${e}` },
@@ -582,9 +581,8 @@
     { name: 'Vidzee', url: (type, id, s, e) => type === 'movie' ? `https://player.vidzee.wtf/v2/embed/movie/${id}` : `https://player.vidzee.wtf/v2/embed/tv/${id}/${s}/${e}` },
     { name: 'Rivestream', url: (type, id, s, e) => type === 'movie' ? `https://watch.rivestream.app/embed?type=movie&id=${id}` : `https://watch.rivestream.app/embed?type=tv&id=${id}&season=${s}&episode=${e}` },
     { name: 'VidLink', url: (type, id, s, e) => type === 'movie' ? `https://vidlink.pro/movie/${id}` : `https://vidlink.pro/tv/${id}/${s}/${e}` },
-    // CinemaOS website embed (works in iframe)
+    // Website sources (load main page in iframe)
     { name: '🎬 CinemaOS (Site)', url: () => `https://cinemaos.live` },
-    // AnimePahe - will open in new tab (not in iframe)
     { name: '🎌 AnimePahe (Site)', url: () => `https://animepahe.org`, openInNewTab: true }
   ];
 
@@ -634,7 +632,7 @@
   const avatarDropdown = document.getElementById('avatarDropdown');
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
 
-  // ================= SEARCH BEHAVIOR (unchanged) =================
+  // ================= SEARCH BEHAVIOR =================
   function updateContinueVisibility() {
     const query = globalSearch.value.trim();
     if (query !== '') continueSection.classList.add('continue-section-hidden');
@@ -722,7 +720,7 @@
     loadSelectedSourceIndex();
   }
 
-  // ================= ASYNC EMBED UPDATE (with special handling for new‑tab sources) =================
+  // ================= ASYNC EMBED UPDATE (supports async and new-tab) =================
   async function updateEmbedStream() {
     if (!currentMedia) return;
     const srcIdx = parseInt(sourceSelect.value);
@@ -732,7 +730,6 @@
       return;
     }
     let url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
-    // If the URL is a promise (async) handle it
     if (url && typeof url.then === 'function') {
       embedIframe.srcdoc = '<div class="text-center py-20 text-gray-400"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
       try {
@@ -743,10 +740,8 @@
         return;
       }
     }
-    // Check if this source should open in a new tab
     if (src.openInNewTab === true && url) {
       window.open(url, '_blank');
-      // Keep the iframe content unchanged (do not update src)
       return;
     }
     if (url) embedIframe.src = url;
@@ -775,7 +770,66 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ================= ALL DATABASE FUNCTIONS (unchanged) =================
+  // ================= AUTO-PROGRESS SAVING FOR VIDEASY, VIDFAST, VIXSRC =================
+  let autoSaveTimer = null;
+  function autoSaveProgress(seconds) {
+    if (!currentUser || !currentMedia) return;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes === currentProgressMinutes) return;
+    currentProgressMinutes = minutes;
+    progressMinutesInput.value = minutes;
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => {
+      saveProgressToDB();
+      const toast = document.createElement('div');
+      toast.className = 'toast-notification';
+      toast.textContent = '✓ Progress auto-saved';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 1500);
+    }, 1000);
+  }
+
+  // Origins for VidFast
+  const vidFastOrigins = [
+    'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
+    'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
+  ];
+
+  window.addEventListener('message', (event) => {
+    const { origin, data } = event;
+    if (!data) return;
+
+    // ---- Videasy (adjust based on actual message format) ----
+    // Example: {"progress": 45} (minutes)
+    if (origin.includes('videasy') && typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        if (typeof parsed.progress === 'number') {
+          autoSaveProgress(parsed.progress * 60); // if progress is minutes -> seconds
+        }
+      } catch(e) {}
+    }
+
+    // ---- VidFast (PLAYER_EVENT or MEDIA_DATA) ----
+    if (vidFastOrigins.includes(origin)) {
+      if (data.type === 'PLAYER_EVENT' && data.data?.currentTime) {
+        autoSaveProgress(data.data.currentTime);
+      }
+      if (data.type === 'MEDIA_DATA') {
+        const media = data.data?.[currentMedia?.id];
+        if (media?.progress?.watched) {
+          autoSaveProgress(media.progress.watched);
+        }
+      }
+    }
+
+    // ---- VixSrc (PLAYER_EVENT) ----
+    if (origin.includes('vixsrc') && data.type === 'PLAYER_EVENT' && data.data?.currentTime) {
+      autoSaveProgress(data.data.currentTime);
+    }
+  });
+
+  // ================= DATABASE & WATCH HISTORY =================
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
