@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WIZHUB – Resume & Progress (Auto Continue Update)</title>
+  <title>WIZHUB – Resume & Progress (All Sources Working)</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23facc15'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* All styles remain exactly as before – unchanged for reliability */
+    /* All styles unchanged – kept for brevity (same as before) */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -682,7 +682,7 @@
     if (error) console.error("Save error:", error);
     else {
       console.log("Saved OK");
-      await renderContinueWatching(); // <-- immediate UI update
+      await renderContinueWatching(); // immediate UI update
     }
   }
 
@@ -910,20 +910,20 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ========== AUTO-SAVE HELPER ==========
+  // ========== AUTO-SAVE HELPER (threshold 1 second for immediate response) ==========
   let autoSaveTimer = null;
   function autoSaveProgress(seconds, sourceName) {
     if (!currentUser || !currentMedia) return;
-    if (Math.abs(seconds - currentProgressSeconds) < 5) return;
+    if (Math.abs(seconds - currentProgressSeconds) < 1) return; // threshold 1 second
     currentProgressSeconds = seconds;
     currentProgressMinutes = Math.floor(seconds / 60);
     progressMinutesInput.value = currentProgressMinutes;
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(() => { saveProgressToDB(); }, 1000);
+    autoSaveTimer = setTimeout(() => { saveProgressToDB(); }, 500); // save after 500ms debounce
     console.log(`Auto-save from ${sourceName}: ${seconds} seconds`);
   }
 
-  // ========== VIDEASY MESSAGE HANDLER (extracts watched seconds) ==========
+  // ========== VIDEASY MESSAGE HANDLER ==========
   function handleVideasyMessage(rawData) {
     let msg = rawData;
     if (typeof rawData === 'string') {
@@ -933,17 +933,16 @@
 
     console.log("Videasy message:", msg);
 
-    // 1) Direct timestamp field (older version)
+    // 1) Direct timestamp field
     if (typeof msg.timestamp === 'number') {
       autoSaveProgress(msg.timestamp, 'Videasy(timestamp)');
       return;
     }
 
-    // 2) MEDIA_DATA with nested progress.watched (current implementation)
+    // 2) MEDIA_DATA with progress.watched (current implementation)
     if (msg.type === 'MEDIA_DATA' && typeof msg.data === 'string') {
       try {
         const inner = JSON.parse(msg.data);
-        // inner is like { "tv-1668": { "progress": { "watched": 123 } } }
         for (let key in inner) {
           const item = inner[key];
           if (item?.progress?.watched !== undefined) {
@@ -957,9 +956,92 @@
       } catch(e) {}
     }
 
-    // 3) timeupdate event (rare)
+    // 3) timeupdate event
     if (msg.event === 'timeupdate' && typeof msg.currentTime === 'number') {
       autoSaveProgress(msg.currentTime, 'Videasy(timeupdate)');
+    }
+  }
+
+  // ========== VIDFAST HANDLER (using official origins and event structure) ==========
+  const vidfastOrigins = [
+    'https://vidfast.pro',
+    'https://vidfast.in',
+    'https://vidfast.io',
+    'https://vidfast.me',
+    'https://vidfast.net',
+    'https://vidfast.pm',
+    'https://vidfast.xyz'
+  ];
+
+  let lastVidFastSave = 0;
+  function handleVidFastMessage(data, origin) {
+    if (!vidfastOrigins.includes(origin)) return;
+    if (!data) return;
+
+    // PLAYER_EVENT handling
+    if (data.type === 'PLAYER_EVENT' && data.data) {
+      const { event, currentTime, duration } = data.data;
+      if (typeof currentTime === 'number' && currentTime > 0) {
+        // Update display immediately
+        currentProgressSeconds = Math.floor(currentTime);
+        currentProgressMinutes = Math.floor(currentTime / 60);
+        progressMinutesInput.value = currentProgressMinutes;
+        console.log(`VidFast ${event}: ${currentTime}s / ${duration}s`);
+
+        // Save on seeked, pause, ended
+        if (event === 'seeked' || event === 'pause' || event === 'ended') {
+          autoSaveProgress(Math.floor(currentTime), `VidFast(${event})`);
+        }
+        // Throttled timeupdate (every 15 seconds)
+        if (event === 'timeupdate' && (Math.floor(currentTime) - lastVidFastSave) >= 15) {
+          lastVidFastSave = Math.floor(currentTime);
+          autoSaveProgress(Math.floor(currentTime), 'VidFast(timeupdate)');
+        }
+      }
+      return;
+    }
+
+    // MEDIA_DATA handling (fallback for watched progress)
+    if (data.type === 'MEDIA_DATA' && data.data && currentMedia) {
+      const mediaKey = currentMedia.type === 'movie' ? `m${currentMedia.id}` : `t${currentMedia.id}`;
+      const mediaData = data.data[mediaKey];
+      if (mediaData?.progress?.watched !== undefined) {
+        const watchedSec = Math.floor(mediaData.progress.watched);
+        autoSaveProgress(watchedSec, 'VidFast(MEDIA_DATA)');
+      }
+    }
+  }
+
+  // ========== VIXSRC HANDLER (unchanged, already working) ==========
+  let lastVixSrcSaved = 0;
+  function handleVixSrcMessage(data, origin) {
+    if (!origin.includes('vixsrc') && !origin.includes('vixcloud')) return;
+    if (data?.type !== "PLAYER_EVENT") return;
+    let eventName = data.data?.event;
+    let currentTime = Math.floor(data.data?.currentTime || 0);
+    if (!eventName && data.event?.event) {
+      eventName = data.event.event;
+      currentTime = Math.floor(data.event.currentTime || 0);
+    }
+    if (currentTime > 0) {
+      currentProgressSeconds = currentTime;
+      currentProgressMinutes = Math.floor(currentTime / 60);
+      progressMinutesInput.value = currentProgressMinutes;
+      if (eventName === "timeupdate" && (currentTime - lastVixSrcSaved) >= 15) {
+        lastVixSrcSaved = currentTime;
+        saveProgressToDB();
+        console.log("Auto-saved from VixSrc timeupdate at", currentTime);
+      }
+      if (eventName === "seeked" && currentTime > 0) {
+        lastVixSrcSaved = currentTime;
+        saveProgressToDB();
+        console.log("Saved after VixSrc seek at", currentTime);
+      }
+      if (eventName === "pause" || eventName === "ended") {
+        lastVixSrcSaved = currentTime;
+        saveProgressToDB();
+        console.log(`Saved on VixSrc ${eventName} at`, currentTime);
+      }
     }
   }
 
@@ -975,48 +1057,14 @@
     }
 
     // VidFast
-    if (origin.includes('vidfast')) {
-      if (data.type === 'PLAYER_EVENT' && data.data?.currentTime) {
-        autoSaveProgress(Math.floor(data.data.currentTime), 'VidFast');
-      }
-      if (data.type === 'MEDIA_DATA') {
-        const media = data.data?.[currentMedia?.id];
-        if (media?.progress?.watched) {
-          autoSaveProgress(media.progress.watched, 'VidFast');
-        }
-      }
+    if (vidfastOrigins.some(o => origin === o)) {
+      handleVidFastMessage(data, origin);
       return;
     }
 
     // VixSrc
     if (origin.includes('vixsrc') || origin.includes('vixcloud')) {
-      if (data?.type !== "PLAYER_EVENT") return;
-      let eventName = data.data?.event;
-      let currentTime = Math.floor(data.data?.currentTime || 0);
-      if (!eventName && data.event?.event) {
-        eventName = data.event.event;
-        currentTime = Math.floor(data.event.currentTime || 0);
-      }
-      if (currentTime > 0) {
-        currentProgressSeconds = currentTime;
-        currentProgressMinutes = Math.floor(currentTime / 60);
-        progressMinutesInput.value = currentProgressMinutes;
-        if (eventName === "timeupdate" && (currentTime - lastSavedSecond) >= 15) {
-          lastSavedSecond = currentTime;
-          saveProgressToDB();
-          console.log("Auto-saved from VixSrc timeupdate at", currentTime);
-        }
-        if (eventName === "seeked" && currentTime > 0) {
-          lastSavedSecond = currentTime;
-          saveProgressToDB();
-          console.log("Saved after VixSrc seek at", currentTime);
-        }
-        if (eventName === "pause" || eventName === "ended") {
-          lastSavedSecond = currentTime;
-          saveProgressToDB();
-          console.log(`Saved on VixSrc ${eventName} at`, currentTime);
-        }
-      }
+      handleVixSrcMessage(data, origin);
       return;
     }
   });
@@ -1070,12 +1118,14 @@
     }
     lastSavedSecond = currentProgressSeconds;
     lastPositionForJump = currentProgressSeconds;
+    lastVidFastSave = currentProgressSeconds;
+    lastVixSrcSaved = currentProgressSeconds;
     await saveProgressToDB();
     await updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Card rendering (unchanged)
+  // Card rendering, fetch trending, etc. (unchanged)
   function renderCards(container, items, mediaType) {
     if (!items.length) { container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>'; return; }
     container.innerHTML = items.map(item => {
@@ -1201,6 +1251,8 @@
     currentProgressSeconds = currentProgressMinutes * 60;
     lastSavedSecond = currentProgressSeconds;
     lastPositionForJump = currentProgressSeconds;
+    lastVidFastSave = currentProgressSeconds;
+    lastVixSrcSaved = currentProgressSeconds;
     await saveProgressToDB();
     await renderContinueWatching();
   };
