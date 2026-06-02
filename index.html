@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
+    /* ========== STYLES (unchanged, fully responsive) ========== */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -486,14 +487,13 @@
   <section class="mb-12"><h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-tv text-purple-400"></i> Trending TV Shows</h2><div id="trendingTvGrid" class="trending-grid"></div></section>
 </main>
 
-<!-- Modals (unchanged) -->
 <div id="orderModal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Reorder Stream Sources</h3><div id="sourceList" class="mb-4" style="max-height: 50vh; overflow-y: auto;"></div><div class="flex gap-2"><button id="saveOrderBtn" class="bg-green-600 px-4 py-2 rounded-full">Save Order</button><button id="closeOrderBtn" class="bg-gray-600 px-4 py-2 rounded-full">Cancel</button></div></div></div>
 <div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden"><div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-yellow-500/30 relative"><h3 class="text-xl font-bold mb-4">Login</h3><input type="email" id="loginEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3"><input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4"><button id="doLoginBtn" class="w-full bg-yellow-500 text-black py-2 rounded-lg font-semibold">Login</button><p class="text-sm text-center mt-3">No account? <a id="switchToSignupModal" class="text-yellow-400 cursor-pointer">Sign up</a></p><button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button></div></div>
 <div id="signupModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden"><div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-yellow-500/30 relative"><h3 class="text-xl font-bold mb-4">Create Account</h3><input type="email" id="signupEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3"><input type="password" id="signupPassword" placeholder="Password (min 6)" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4"><button id="doSignupBtn" class="w-full bg-yellow-500 text-black py-2 rounded-lg font-semibold">Sign Up</button><p class="text-sm text-center mt-3">Already have an account? <a id="switchToLoginModal" class="text-yellow-400 cursor-pointer">Login</a></p><button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button></div></div>
 
 <script>
 (function() {
-  // ================= SOURCES (25 sources, same as before) =================
+  // ================= SOURCES (25 sources) =================
   const DEFAULT_SOURCES = [
     { name: 'Videasy', url: (type, id, s, e) => type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}` },
     { name: 'VidFast', url: (type, id, s, e) => type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
@@ -568,7 +568,7 @@
   const avatarDropdown = document.getElementById('avatarDropdown');
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
 
-  // Helper functions (search, avatar, source order – identical to previous stable version)
+  // Helper functions (search, avatar, source order – same as previous stable version)
   function updateContinueVisibility() {
     const query = globalSearch.value.trim();
     if (query !== '') continueSection.classList.add('continue-section-hidden');
@@ -642,7 +642,7 @@
     loadSelectedSourceIndex();
   }
 
-  // ========== CORE: EMBED UPDATE WITH HASH FRAGMENT FOR RESUME ==========
+  // ========== CORE: UPDATE EMBED WITH TIME PARAMETER ==========
   async function updateEmbedStream() {
     if (!currentMedia) return;
     const srcIdx = parseInt(sourceSelect.value);
@@ -658,11 +658,10 @@
     }
     if (src.openInNewTab === true && url) { window.open(url, '_blank'); return; }
     if (url) {
-      // Use hash fragment #t=seconds for resume (more widely supported)
+      // Add time parameter if progress > 0 (using query parameter &t=)
       if (currentProgressMinutes > 0 && !src.openInNewTab) {
-        // Remove any existing hash
-        url = url.split('#')[0];
-        url += `#t=${currentProgressMinutes * 60}`;
+        const separator = url.includes('?') ? '&' : '?';
+        url += `${separator}t=${currentProgressMinutes * 60}`;
       }
       embedIframe.src = url;
     } else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
@@ -690,7 +689,7 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ========== AUTO-PROGRESS (silent, no toast) ==========
+  // ========== AUTO-PROGRESS SAVING (silent) ==========
   let autoSaveTimer = null;
   function autoSaveProgress(seconds) {
     if (!currentUser || !currentMedia) return;
@@ -710,23 +709,39 @@
   window.addEventListener('message', (event) => {
     const { origin, data } = event;
     if (!data) return;
-    // Videasy
-    if (origin.includes('videasy') && typeof data === 'string') {
-      try { const parsed = JSON.parse(data); if (typeof parsed.progress === 'number') autoSaveProgress(parsed.progress * 60); } catch(e) {}
+
+    // ---- Videasy (string message like {"progress": 45} ) ----
+    // The origin may be 'https://player.videasy.net' or similar
+    if ((origin.includes('videasy') || origin.includes('player.videasy')) && typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        if (typeof parsed.progress === 'number') {
+          // progress is in minutes, convert to seconds
+          autoSaveProgress(parsed.progress * 60);
+        }
+      } catch(e) {}
     }
-    // VidFast
+
+    // ---- VidFast (PLAYER_EVENT or MEDIA_DATA) ----
     if (vidFastOrigins.includes(origin)) {
-      if (data.type === 'PLAYER_EVENT' && data.data?.currentTime) autoSaveProgress(data.data.currentTime);
+      if (data.type === 'PLAYER_EVENT' && data.data?.currentTime) {
+        autoSaveProgress(data.data.currentTime);
+      }
       if (data.type === 'MEDIA_DATA') {
         const media = data.data?.[currentMedia?.id];
-        if (media?.progress?.watched) autoSaveProgress(media.progress.watched);
+        if (media?.progress?.watched) {
+          autoSaveProgress(media.progress.watched);
+        }
       }
     }
-    // VixSrc
-    if (origin.includes('vixsrc') && data.type === 'PLAYER_EVENT' && data.data?.currentTime) autoSaveProgress(data.data.currentTime);
+
+    // ---- VixSrc (PLAYER_EVENT) ----
+    if (origin.includes('vixsrc') && data.type === 'PLAYER_EVENT' && data.data?.currentTime) {
+      autoSaveProgress(data.data.currentTime);
+    }
   });
 
-  // ========== DATABASE & WATCH HISTORY (unchanged) ==========
+  // ========== DATABASE & WATCH HISTORY ==========
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
@@ -937,7 +952,7 @@
     if (savedProgress !== null) { currentProgressMinutes = savedProgress; progressMinutesInput.value = savedProgress; }
     else await loadProgress();
     await saveProgressToDB();
-    await updateEmbedStream();  // will add #t=seconds if progress > 0
+    await updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
