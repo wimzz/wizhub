@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WIZHUB – Admin Default Order + Local Backup</title>
+  <title>WIZHUB – All Sources Working</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23facc15'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* All styles unchanged */
+    /* ========== STYLES (unchanged, fully functional) ========== */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -662,12 +662,15 @@
           return;
         }
       }
+      // Fallback to hardcoded order
       EMBED_SOURCES = [...SOURCE_DEFINITIONS];
       console.log("Using hardcoded source order");
     } catch (err) {
       console.error("Error loading default source order:", err);
       EMBED_SOURCES = [...SOURCE_DEFINITIONS];
     }
+    // Populate dropdown after sources are set
+    populateSources();
   }
 
   async function saveDefaultSourceOrder(orderNames) {
@@ -696,12 +699,14 @@
         if (orderedSources.length === SOURCE_DEFINITIONS.length) {
           EMBED_SOURCES = orderedSources;
           console.log("Loaded user's personal source order:", orderNames);
+          populateSources();
           return;
         }
       }
     } catch (err) { console.error("Error loading user source order:", err); }
-    populateSources();
-    loadSelectedSourceIndex();
+    // If no personal order, ensure default is loaded and populated
+    if (EMBED_SOURCES.length === 0) await loadDefaultSourceOrder();
+    else populateSources();
   }
 
   async function saveUserSourceOrder() {
@@ -715,6 +720,7 @@
   }
 
   function populateSources() {
+    if (!sourceSelect) return;
     sourceSelect.innerHTML = '';
     EMBED_SOURCES.forEach((src, i) => {
       const opt = document.createElement('option');
@@ -725,7 +731,7 @@
     loadSelectedSourceIndex();
   }
 
-  // ========== LOCALSTORAGE BACKUP ==========
+  // ========== LOCALSTORAGE BACKUP FUNCTIONS ==========
   function getLocalStorageKey() {
     if (!currentUser) return 'wizhub_guest_progress';
     return `wizhub_${currentUser.id}_progress`;
@@ -1500,7 +1506,7 @@
 
   // ========== INITIALIZE ==========
   async function init() {
-    await loadDefaultSourceOrder();
+    await loadDefaultSourceOrder();  // this also calls populateSources()
     await updateAuthUI();
     fetchTrending();
     sb.auth.onAuthStateChange(() => updateAuthUI());
