@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WIZHUB</title>
+  <title>WIZHUB – All Sources + New Sources + Default Order</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23facc15'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
@@ -502,7 +502,7 @@
 
 <script>
 (function() {
-  // ================= SOURCES (fixed syntax errors) =================
+  // ================= SOURCES (admin preferred order first) =================
   const DEFAULT_SOURCES = [
     { name: 'VixSrc', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://vixsrc.to/movie/${id}` : `https://vixsrc.to/tv/${id}/${s}/${e}`;
@@ -519,6 +519,21 @@
         return progressSec > 0 ? base + `&t=${progressSec}` : base;
       }
     },
+    // New sources (no resume parameter)
+    { name: 'NHD API', url: (type, id, s, e) => {
+        return type === 'movie' ? `https://nhdapi.com/embed/movie/${id}` : `https://nhdapi.com/embed/tv/${id}/${s}/${e}`;
+      }
+    },
+    { name: 'NontonGo', url: (type, id, s, e) => {
+        return type === 'movie' ? `https://www.NontonGo.win/embed/movie/${id}` : `https://www.NontonGo.win/embed/tv/${id}/${s}/${e}`;
+      }
+    },
+    { name: '2Embed', url: (type, id, s, e) => {
+        if (type === 'movie') return `https://www.2embed.cc/embed/${id}`;
+        else return `https://www.2embed.cc/embedtv/${id}&s=${s}&e=${e}`;
+      }
+    },
+    // Existing other sources
     { name: 'VidUp', url: (type, id, s, e) => type === 'movie' ? `https://vidup.to/movie/${id}` : `https://vidup.to/tv/${id}/${s}/${e}` },
     { name: 'EmbedMaster', url: (type, id, s, e) => type === 'movie' ? `https://embedmaster.link/movie/${id}` : `https://embedmaster.link/tv/${id}/${s}/${e}` },
     { name: 'ZxcStream', url: (type, id, s, e) => type === 'movie' ? `https://zxcstream.xyz/player/movie/${id}` : `https://zxcstream.xyz/player/tv/${id}/${s}/${e}` },
@@ -565,7 +580,7 @@
   // Protection: ignore auto-save for the first 10 seconds after loading a video
   let ignoreAutoSaveUntil = 0;
 
-  // DOM elements
+  // DOM elements (same as before)
   const continueContainer = document.getElementById('continueWatchingContainer');
   const trendingMoviesGrid = document.getElementById('trendingMoviesGrid');
   const trendingTvGrid = document.getElementById('trendingTvGrid');
@@ -596,7 +611,7 @@
   const avatarDropdown = document.getElementById('avatarDropdown');
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
 
-  // Helper functions
+  // Helper functions (unchanged)
   function updateContinueVisibility() {
     const query = globalSearch.value.trim();
     const continueSection = document.getElementById('continueWatchingSection');
@@ -886,6 +901,7 @@
       return;
     }
     let url = '';
+    // Only pass progress to sources that support it
     if (src.name === 'Videasy' || src.name === 'VidFast' || src.name === 'VixSrc') {
       url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
     } else {
@@ -924,11 +940,10 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ========== AUTO-SAVE WITH 10-SECOND PROTECTION (time-based only) ==========
+  // ========== AUTO-SAVE WITH 10-SECOND PROTECTION ==========
   let autoSaveTimer = null;
   function autoSaveProgress(seconds, sourceName) {
     if (!currentUser || !currentMedia) return;
-    // Ignore auto-save only during the first 10 seconds after loading
     const now = Date.now();
     if (now < ignoreAutoSaveUntil) {
       console.log(`Auto-save IGNORED (protection active, ${Math.ceil((ignoreAutoSaveUntil - now)/1000)}s left): ${sourceName} ${seconds}s`);
@@ -988,7 +1003,6 @@
     if (data.type === 'PLAYER_EVENT' && data.data) {
       const { event, currentTime, duration } = data.data;
       if (typeof currentTime === 'number' && currentTime > 0) {
-        // Update the display immediately
         currentProgressSeconds = Math.floor(currentTime);
         currentProgressMinutes = Math.floor(currentTime / 60);
         progressMinutesInput.value = currentProgressMinutes;
@@ -1110,7 +1124,6 @@
     } else {
       await loadProgress();
     }
-    // Protect for first 10 seconds after loading (prevents player overwriting saved time)
     ignoreAutoSaveUntil = Date.now() + 10000;
     lastPositionForJump = currentProgressSeconds;
     lastVidFastSave = currentProgressSeconds;
@@ -1183,7 +1196,7 @@
   }
   function showLoading(container) { container.innerHTML = '<div class="col-span-full flex justify-center py-10"><div class="loading-spinner"></div><span class="ml-2">Loading...</span></div>'; }
 
-  // Auth UI (signup disabled)
+  // Auth UI
   function updateAuthUI() {
     sb.auth.getUser().then(async ({ data: { user } }) => {
       currentUser = user;
@@ -1281,7 +1294,7 @@
     await saveProgressToDB();
   });
 
-  // Login modal only (signup disabled)
+  // Login modal only
   const loginModal = document.getElementById('loginModal');
   document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
   document.querySelectorAll('.closeModal').forEach(btn => btn.onclick = () => { loginModal.classList.add('hidden'); orderModal.style.display = 'none'; });
