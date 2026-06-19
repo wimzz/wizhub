@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* (Styles unchanged – same as previous fully functional version) */
+    /* All styles unchanged – same as previous working version */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -621,7 +621,6 @@
   let lastPositionForJump = 0;
   let lastVidFastSave = 0;
   let lastVixSrcSaved = 0;
-  let lastVideasyTimestamp = 0;
   let lastSaveTimestamp = 0;
   let ignoreAutoSaveUntil = 0;
   let supabaseAvailable = true;
@@ -1147,7 +1146,7 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ========== AUTO-SAVE (core logic) ==========
+  // ========== AUTO-SAVE (with heartbeat fallback) ==========
   let autoSaveTimer = null;
 
   function autoSaveProgress(seconds, sourceName) {
@@ -1193,7 +1192,6 @@
         return;
       }
     } else if (typeof rawData === 'object' && rawData !== null) {
-      // Fallback if it's already an object (unlikely)
       parsed = rawData;
       console.log("Videasy message (object):", parsed);
     } else {
@@ -1203,10 +1201,8 @@
     if (parsed && typeof parsed.timestamp === 'number') {
       autoSaveProgress(parsed.timestamp, 'Videasy');
     } else if (parsed && typeof parsed.currentTime === 'number') {
-      // Alternative field
       autoSaveProgress(parsed.currentTime, 'Videasy(currentTime)');
     } else if (parsed && typeof parsed.progress === 'number' && parsed.progress < 10000) {
-      // Sometimes they send progress in seconds (not percentage)
       autoSaveProgress(parsed.progress, 'Videasy(progress)');
     } else {
       console.warn("Videasy: No timestamp found in message:", parsed);
@@ -1298,14 +1294,27 @@
     }
   });
 
-  // ========== FALLBACK: every 2 seconds, if progress advanced by >=5 sec, save ==========
+  // ========== HEARTBEAT & FALLBACK SAVE (every 15 seconds, saves if progress > 0) ==========
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
     const current = currentProgressSeconds;
-    if (current > 0 && current - lastSaveTimestamp >= 5) {
+    // If progress is > 0 and we haven't saved recently (or it advanced), save every 15s
+    if (current > 0 && (current - lastSaveTimestamp >= 5 || (Date.now() - lastSaveTimestampTime) > 15000)) {
       lastSaveTimestamp = current;
       await saveProgressToDB();
-      console.log(`Fallback saved (≥5s advance): ${current}s`);
+      console.log(`Heartbeat save: ${current}s`);
+    }
+  }, 15000);
+
+  // Also keep the original fallback for large jumps (but we already handle it)
+  // We'll keep a separate interval for large jumps (already covered by the above, but let's keep both)
+  setInterval(async () => {
+    if (!currentUser || !currentMedia) return;
+    const diff = Math.abs(currentProgressSeconds - lastPositionForJump);
+    if (diff > 60) {
+      lastPositionForJump = currentProgressSeconds;
+      await saveProgressToDB();
+      console.log(`Large jump save: ${diff} sec`);
     }
   }, 2000);
 
@@ -1349,7 +1358,6 @@
     lastPositionForJump = currentProgressSeconds;
     lastVidFastSave = currentProgressSeconds;
     lastVixSrcSaved = currentProgressSeconds;
-    lastVideasyTimestamp = currentProgressSeconds;
     lastSaveTimestamp = currentProgressSeconds;
     await saveProgressToDB();
     await updateEmbedStream();
@@ -1485,7 +1493,6 @@
     lastPositionForJump = currentProgressSeconds;
     lastVidFastSave = currentProgressSeconds;
     lastVixSrcSaved = currentProgressSeconds;
-    lastVideasyTimestamp = currentProgressSeconds;
     lastSaveTimestamp = currentProgressSeconds;
     await saveProgressToDB();
     await renderContinueWatching();
