@@ -1179,33 +1179,39 @@
     console.log(`Auto-save from ${sourceName}: ${seconds} seconds`);
   }
 
-  // ========== VIDEASY HANDLER (exact docs pattern) ==========
+  // ========== VIDEASY HANDLER (with extensive debugging) ==========
   function handleVideasyMessage(rawData) {
-    // According to docs, event.data is a string that must be parsed.
+    console.log("Videasy raw event.data:", rawData, typeof rawData);
     let parsed = null;
     if (typeof rawData === 'string') {
       try {
         parsed = JSON.parse(rawData);
-        console.log("Videasy message (parsed):", parsed);
+        console.log("Videasy parsed JSON:", parsed);
       } catch (e) {
         console.warn("Videasy: Failed to parse JSON:", rawData);
         return;
       }
     } else if (typeof rawData === 'object' && rawData !== null) {
       parsed = rawData;
-      console.log("Videasy message (object):", parsed);
+      console.log("Videasy already an object:", parsed);
     } else {
       return;
     }
-    // Extract timestamp (seconds)
+    // Try to extract seconds from various fields
+    let seconds = null;
     if (parsed && typeof parsed.timestamp === 'number') {
-      autoSaveProgress(parsed.timestamp, 'Videasy');
+      seconds = parsed.timestamp;
     } else if (parsed && typeof parsed.currentTime === 'number') {
-      autoSaveProgress(parsed.currentTime, 'Videasy(currentTime)');
+      seconds = parsed.currentTime;
+    } else if (parsed && typeof parsed.watched === 'number') {
+      seconds = parsed.watched;
     } else if (parsed && typeof parsed.progress === 'number' && parsed.progress < 10000) {
-      autoSaveProgress(parsed.progress, 'Videasy(progress)');
+      seconds = parsed.progress;
+    }
+    if (seconds !== null && typeof seconds === 'number') {
+      autoSaveProgress(seconds, 'Videasy');
     } else {
-      console.warn("Videasy: No timestamp found in message:", parsed);
+      console.warn("Videasy: No timestamp found in message.", parsed);
     }
   }
 
@@ -1294,20 +1300,18 @@
     }
   });
 
-  // ========== HEARTBEAT & FALLBACK SAVE (every 15 seconds, saves if progress > 0) ==========
+  // ========== HEARTBEAT (saves every 10 seconds if progress > 0 and changed) ==========
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
     const current = currentProgressSeconds;
-    // If progress is > 0 and we haven't saved recently (or it advanced), save every 15s
-    if (current > 0 && (current - lastSaveTimestamp >= 5 || (Date.now() - lastSaveTimestampTime) > 15000)) {
+    if (current > 0 && (current - lastSaveTimestamp >= 5 || Date.now() - lastSaveTime > 10000)) {
       lastSaveTimestamp = current;
       await saveProgressToDB();
       console.log(`Heartbeat save: ${current}s`);
     }
-  }, 15000);
+  }, 10000);
 
-  // Also keep the original fallback for large jumps (but we already handle it)
-  // We'll keep a separate interval for large jumps (already covered by the above, but let's keep both)
+  // ========== FALLBACK for large jumps (>60 sec) ==========
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
     const diff = Math.abs(currentProgressSeconds - lastPositionForJump);
