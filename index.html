@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WIZHUB – Fixed Source Order for Non‑Logged Users</title>
+  <title>WIZHUB – Videasy Fixed + Logo Refresh</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23facc15'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* All styles unchanged (same as fully working version) */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -28,7 +27,7 @@
       justify-content: space-between;
       gap: 1rem;
     }
-    .brand { display: flex; align-items: center; gap: 0.5rem; }
+    .brand { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
     .brand i { font-size: 1.8rem; }
     .brand span {
       font-size: 1.5rem;
@@ -417,7 +416,10 @@
 <body class="text-gray-200">
 
 <nav class="glass-nav">
-  <div class="brand"><i class="fas fa-crown text-yellow-400"></i><span>WIZHUB</span></div>
+  <div class="brand" id="brandLogo">
+    <i class="fas fa-crown text-yellow-400"></i>
+    <span>WIZHUB</span>
+  </div>
   <div class="search-wrapper">
     <i class="fas fa-search search-icon"></i>
     <input type="text" id="globalSearch" placeholder="Search movies or TV shows..." class="search-input" autocomplete="off">
@@ -501,7 +503,7 @@
 
 <script>
 (function() {
-  // ================= SOURCE DEFINITIONS (all possible sources) =================
+  // ================= SOURCE DEFINITIONS (all sources) =================
   const SOURCE_DEFINITIONS = [
     { name: 'VixSrc', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://vixsrc.to/movie/${id}` : `https://vixsrc.to/tv/${id}/${s}/${e}`;
@@ -556,7 +558,7 @@
     { name: '🎌 AnimePahe (Site)', url: () => `https://animepahe.org`, openInNewTab: true }
   ];
 
-  // Hardcoded order for non-logged users (your desired order)
+  // Hardcoded default order for non-logged users
   const DEFAULT_ORDER_NAMES = [
     "VixSrc",
     "Videasy",
@@ -594,9 +596,8 @@
     for (const name of orderNames) {
       const found = SOURCE_DEFINITIONS.find(s => s.name === name);
       if (found) ordered.push(found);
-      else console.warn(`Source not found: ${name}`);
     }
-    // Append any missing sources (should not happen if orderNames is complete)
+    // Append any missing sources (just in case)
     for (const src of SOURCE_DEFINITIONS) {
       if (!ordered.find(s => s.name === src.name)) ordered.push(src);
     }
@@ -653,6 +654,12 @@
   const userAvatarDiv = document.getElementById('userAvatar');
   const avatarDropdown = document.getElementById('avatarDropdown');
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
+  const brandLogo = document.getElementById('brandLogo');
+
+  // Brand logo click → reload page
+  brandLogo.addEventListener('click', function() {
+    window.location.reload();
+  });
 
   // Helper functions
   function updateContinueVisibility() {
@@ -688,7 +695,7 @@
     }
   }
 
-  // ========== USER PERSONAL SOURCE ORDER (for logged-in users) ==========
+  // ========== USER PERSONAL SOURCE ORDER ==========
   async function loadUserSourceOrder() {
     if (!currentUser) return;
     try {
@@ -702,10 +709,9 @@
           return;
         }
       }
-      // Fallback to default order for logged-in users without personal order
-      console.log("No personal order, using hardcoded default order");
       EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
-    } catch (err) { 
+      console.log("No personal order, using default order");
+    } catch (err) {
       console.error("Error loading user source order:", err);
       EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
     }
@@ -717,10 +723,6 @@
     const namesOnly = EMBED_SOURCES.map(s => s.name);
     await sb.from('user_settings').upsert({ id: currentUser.id, source_order: namesOnly, updated_at: new Date().toISOString() });
     console.log("User's personal source order saved");
-    // Admin can still save personal order, but it will NOT affect non-logged users
-    if (currentUser.email === 'vimell777@gmail.com') {
-      console.log("Admin order saved (personal only, not global default)");
-    }
   }
 
   function populateSources() {
@@ -735,7 +737,7 @@
     loadSelectedSourceIndex();
   }
 
-  // ========== LOCALSTORAGE BACKUP (full implementation) ==========
+  // ========== LOCALSTORAGE BACKUP ==========
   function getLocalStorageKey() {
     if (!currentUser) return 'wizhub_guest_progress';
     return `wizhub_${currentUser.id}_progress`;
@@ -839,7 +841,7 @@
     }
   }
 
-  // ========== SAVE/LOAD PROGRESS (unchanged) ==========
+  // ========== SAVE/LOAD PROGRESS ==========
   async function saveProgressToDB() {
     if (!currentUser || !currentMedia) return;
     const season = currentMedia.type === 'tv' ? currentSeason : 0;
@@ -1163,35 +1165,41 @@
     console.log(`Auto-save from ${sourceName}: ${seconds} seconds`);
   }
 
-  // ========== VIDEASY HANDLER ==========
+  // ========== VIDEASY HANDLER (fixed using official pattern) ==========
   function handleVideasyMessage(rawData) {
-    let msg = rawData;
+    // Videasy sends stringified JSON as per docs
     if (typeof rawData === 'string') {
-      try { msg = JSON.parse(rawData); } catch(e) { return; }
-    }
-    if (!msg || typeof msg !== 'object') return;
-    console.log("Videasy message:", msg);
-    if (typeof msg.timestamp === 'number') {
-      autoSaveProgress(msg.timestamp, 'Videasy(timestamp)');
-      return;
-    }
-    if (msg.type === 'MEDIA_DATA' && typeof msg.data === 'string') {
       try {
-        const inner = JSON.parse(msg.data);
-        for (let key in inner) {
-          const item = inner[key];
-          if (item?.progress?.watched !== undefined) {
-            const watchedSec = item.progress.watched;
-            if (typeof watchedSec === 'number') {
-              autoSaveProgress(watchedSec, 'Videasy(MEDIA_DATA)');
-              return;
-            }
-          }
+        const parsed = JSON.parse(rawData);
+        console.log("Videasy message (parsed):", parsed);
+        // The docs say timestamp is current playback position in seconds
+        if (typeof parsed.timestamp === 'number') {
+          autoSaveProgress(parsed.timestamp, 'Videasy(timestamp)');
+          return;
         }
-      } catch(e) {}
-    }
-    if (msg.event === 'timeupdate' && typeof msg.currentTime === 'number') {
-      autoSaveProgress(msg.currentTime, 'Videasy(timeupdate)');
+        // Also handle MEDIA_DATA with nested progress.watched
+        if (parsed.type === 'MEDIA_DATA' && typeof parsed.data === 'string') {
+          try {
+            const inner = JSON.parse(parsed.data);
+            for (let key in inner) {
+              const item = inner[key];
+              if (item?.progress?.watched !== undefined) {
+                const watchedSec = item.progress.watched;
+                if (typeof watchedSec === 'number') {
+                  autoSaveProgress(watchedSec, 'Videasy(MEDIA_DATA)');
+                  return;
+                }
+              }
+            }
+          } catch(e) {}
+        }
+        // Fallback: if progress field exists
+        if (typeof parsed.progress === 'number') {
+          autoSaveProgress(parsed.progress, 'Videasy(progress)');
+        }
+      } catch(e) {
+        console.warn("Failed to parse Videasy message:", e);
+      }
     }
   }
 
@@ -1413,7 +1421,6 @@
     } else {
       document.getElementById('authContainer').classList.remove('hidden');
       document.getElementById('userContainer').classList.add('hidden');
-      // Non-logged-in users always get the hardcoded default order
       EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
       console.log("Non-logged user: using hardcoded default order");
       populateSources();
@@ -1514,12 +1521,8 @@
 
   // ========== INITIALIZE ==========
   async function init() {
-    // For non-logged users, the order is set in updateAuthUI.
-    // But we need to set it also before auth check to avoid empty dropdown.
-    if (!currentUser) {
-      EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
-      populateSources();
-    }
+    EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
+    populateSources();
     await updateAuthUI();
     fetchTrending();
     sb.auth.onAuthStateChange(() => updateAuthUI());
