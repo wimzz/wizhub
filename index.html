@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* All styles unchanged – same as previous working version */
+    /* All styles unchanged – same as previous fully working version */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -624,6 +624,7 @@
   let lastSaveTimestamp = 0;
   let ignoreAutoSaveUntil = 0;
   let supabaseAvailable = true;
+  let lastSaveTime = 0; // for heartbeat timing
 
   // DOM elements
   const continueContainer = document.getElementById('continueWatchingContainer');
@@ -1146,7 +1147,7 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ========== AUTO-SAVE (with heartbeat fallback) ==========
+  // ========== AUTO-SAVE CORE ==========
   let autoSaveTimer = null;
 
   function autoSaveProgress(seconds, sourceName) {
@@ -1179,7 +1180,7 @@
     console.log(`Auto-save from ${sourceName}: ${seconds} seconds`);
   }
 
-  // ========== VIDEASY HANDLER (with extensive debugging) ==========
+  // ========== VIDEASY HANDLER (FIXED: extract from parsed.data.timestamp) ==========
   function handleVideasyMessage(rawData) {
     console.log("Videasy raw event.data:", rawData, typeof rawData);
     let parsed = null;
@@ -1197,16 +1198,42 @@
     } else {
       return;
     }
-    // Try to extract seconds from various fields
     let seconds = null;
-    if (parsed && typeof parsed.timestamp === 'number') {
-      seconds = parsed.timestamp;
-    } else if (parsed && typeof parsed.currentTime === 'number') {
-      seconds = parsed.currentTime;
-    } else if (parsed && typeof parsed.watched === 'number') {
-      seconds = parsed.watched;
-    } else if (parsed && typeof parsed.progress === 'number' && parsed.progress < 10000) {
-      seconds = parsed.progress;
+
+    // First, try to extract from data.timestamp (PLAYER_EVENT structure)
+    if (parsed && parsed.data) {
+      if (typeof parsed.data.timestamp === 'number') {
+        seconds = parsed.data.timestamp;
+      } else if (typeof parsed.data.currentTime === 'number') {
+        seconds = parsed.data.currentTime;
+      } else if (typeof parsed.data.watched === 'number') {
+        seconds = parsed.data.watched;
+      }
+    }
+    // If not found, fallback to top-level
+    if (seconds === null) {
+      if (typeof parsed.timestamp === 'number') {
+        seconds = parsed.timestamp;
+      } else if (typeof parsed.currentTime === 'number') {
+        seconds = parsed.currentTime;
+      } else if (typeof parsed.watched === 'number') {
+        seconds = parsed.watched;
+      } else if (typeof parsed.progress === 'number' && parsed.progress < 10000) {
+        seconds = parsed.progress;
+      }
+    }
+    // Handle MEDIA_DATA with nested watched
+    if (seconds === null && parsed.type === 'MEDIA_DATA' && typeof parsed.data === 'string') {
+      try {
+        const inner = JSON.parse(parsed.data);
+        for (let key in inner) {
+          const item = inner[key];
+          if (item?.progress?.watched !== undefined && typeof item.progress.watched === 'number') {
+            seconds = item.progress.watched;
+            break;
+          }
+        }
+      } catch(e) {}
     }
     if (seconds !== null && typeof seconds === 'number') {
       autoSaveProgress(seconds, 'Videasy');
@@ -1300,18 +1327,22 @@
     }
   });
 
-  // ========== HEARTBEAT (saves every 10 seconds if progress > 0 and changed) ==========
+  // ========== HEARTBEAT & FALLBACK (fixed lastSaveTime) ==========
+  // Heartbeat: save every 15 seconds if progress > 0 and advanced
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
     const current = currentProgressSeconds;
-    if (current > 0 && (current - lastSaveTimestamp >= 5 || Date.now() - lastSaveTime > 10000)) {
+    const now = Date.now();
+    // If progress > 0 and (saved time difference >= 5 sec OR last save was > 15 sec ago)
+    if (current > 0 && (current - lastSaveTimestamp >= 5 || (now - lastSaveTime) > 15000)) {
       lastSaveTimestamp = current;
+      lastSaveTime = now;
       await saveProgressToDB();
       console.log(`Heartbeat save: ${current}s`);
     }
-  }, 10000);
+  }, 15000);
 
-  // ========== FALLBACK for large jumps (>60 sec) ==========
+  // Large jump fallback (every 2 seconds)
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
     const diff = Math.abs(currentProgressSeconds - lastPositionForJump);
@@ -1363,6 +1394,7 @@
     lastVidFastSave = currentProgressSeconds;
     lastVixSrcSaved = currentProgressSeconds;
     lastSaveTimestamp = currentProgressSeconds;
+    lastSaveTime = Date.now();
     await saveProgressToDB();
     await updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1498,6 +1530,7 @@
     lastVidFastSave = currentProgressSeconds;
     lastVixSrcSaved = currentProgressSeconds;
     lastSaveTimestamp = currentProgressSeconds;
+    lastSaveTime = Date.now();
     await saveProgressToDB();
     await renderContinueWatching();
   };
