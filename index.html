@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* All styles unchanged – same as previous fully working version */
+    /* (Styles unchanged – same as previous fully functional version) */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -621,6 +621,8 @@
   let lastPositionForJump = 0;
   let lastVidFastSave = 0;
   let lastVixSrcSaved = 0;
+  let lastVideasyTimestamp = 0;
+  let lastSaveTimestamp = 0;
   let ignoreAutoSaveUntil = 0;
   let supabaseAvailable = true;
 
@@ -1145,26 +1147,32 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ========== AUTO-SAVE: ignore 0, and allow positive changes ==========
+  // ========== AUTO-SAVE (core logic) ==========
   let autoSaveTimer = null;
+
   function autoSaveProgress(seconds, sourceName) {
     if (!currentUser || !currentMedia) return;
-    // Protect from overwriting during first 10 seconds
+    // Protection for first 10 seconds (ignore initial 0)
     const now = Date.now();
     if (now < ignoreAutoSaveUntil) {
-      console.log(`Auto-save IGNORED (protection active, ${Math.ceil((ignoreAutoSaveUntil - now)/1000)}s left): ${sourceName} ${seconds}s`);
+      console.log(`Auto-save IGNORED (protection active): ${sourceName} ${seconds}s`);
       return;
     }
-    // Never save 0 or negative (prevents resetting to start)
+    // Ignore zero or negative
     if (seconds <= 0) {
       console.log(`Auto-save IGNORED (seconds <= 0): ${sourceName} ${seconds}s`);
       return;
     }
-    // Only save if change >= 1 second (avoid excessive saves)
-    if (Math.abs(seconds - currentProgressSeconds) < 1) return;
+    // Only save if change is at least 1 second (avoid spam)
+    if (Math.abs(seconds - currentProgressSeconds) < 1) {
+      console.log(`Auto-save SKIPPED (change < 1s): ${sourceName} ${seconds}s`);
+      return;
+    }
+    // Update local state
     currentProgressSeconds = seconds;
     currentProgressMinutes = Math.floor(seconds / 60);
     progressMinutesInput.value = currentProgressMinutes;
+    // Debounce saving
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
     autoSaveTimer = setTimeout(() => {
       saveProgressToDB();
@@ -1172,46 +1180,36 @@
     console.log(`Auto-save from ${sourceName}: ${seconds} seconds`);
   }
 
-  // ========== VIDEASY HANDLER (robust extraction) ==========
+  // ========== VIDEASY HANDLER (exact docs pattern) ==========
   function handleVideasyMessage(rawData) {
+    // According to docs, event.data is a string that must be parsed.
     let parsed = null;
-    // If string, parse; if object, use directly
     if (typeof rawData === 'string') {
       try {
         parsed = JSON.parse(rawData);
-      } catch(e) {
-        console.warn("Videasy: failed to parse JSON:", rawData);
+        console.log("Videasy message (parsed):", parsed);
+      } catch (e) {
+        console.warn("Videasy: Failed to parse JSON:", rawData);
         return;
       }
     } else if (typeof rawData === 'object' && rawData !== null) {
+      // Fallback if it's already an object (unlikely)
       parsed = rawData;
+      console.log("Videasy message (object):", parsed);
     } else {
       return;
     }
-    console.log("Videasy message (parsed):", parsed);
-    // Attempt to extract seconds from various known fields
-    let seconds = null;
-    if (typeof parsed.timestamp === 'number') {
-      seconds = parsed.timestamp;
-    } else if (typeof parsed.currentTime === 'number') {
-      seconds = parsed.currentTime;
-    } else if (typeof parsed.progress === 'number' && parsed.progress > 0 && parsed.progress < 10000) {
-      // If progress is likely seconds (not percentage)
-      seconds = parsed.progress;
-    } else if (parsed.type === 'MEDIA_DATA' && typeof parsed.data === 'string') {
-      try {
-        const inner = JSON.parse(parsed.data);
-        for (let key in inner) {
-          const item = inner[key];
-          if (item?.progress?.watched !== undefined && typeof item.progress.watched === 'number') {
-            seconds = item.progress.watched;
-            break;
-          }
-        }
-      } catch(e) {}
-    }
-    if (seconds !== null && typeof seconds === 'number') {
-      autoSaveProgress(seconds, 'Videasy');
+    // Extract timestamp (seconds)
+    if (parsed && typeof parsed.timestamp === 'number') {
+      autoSaveProgress(parsed.timestamp, 'Videasy');
+    } else if (parsed && typeof parsed.currentTime === 'number') {
+      // Alternative field
+      autoSaveProgress(parsed.currentTime, 'Videasy(currentTime)');
+    } else if (parsed && typeof parsed.progress === 'number' && parsed.progress < 10000) {
+      // Sometimes they send progress in seconds (not percentage)
+      autoSaveProgress(parsed.progress, 'Videasy(progress)');
+    } else {
+      console.warn("Videasy: No timestamp found in message:", parsed);
     }
   }
 
@@ -1300,14 +1298,14 @@
     }
   });
 
-  // ========== FALLBACK: every 2 seconds, if position jumped >60 sec, save ==========
+  // ========== FALLBACK: every 2 seconds, if progress advanced by >=5 sec, save ==========
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
-    const diff = Math.abs(currentProgressSeconds - lastPositionForJump);
-    if (diff > 60) {
-      lastPositionForJump = currentProgressSeconds;
+    const current = currentProgressSeconds;
+    if (current > 0 && current - lastSaveTimestamp >= 5) {
+      lastSaveTimestamp = current;
       await saveProgressToDB();
-      console.log(`Fallback saved large jump: ${diff} sec`);
+      console.log(`Fallback saved (≥5s advance): ${current}s`);
     }
   }, 2000);
 
@@ -1347,11 +1345,12 @@
     } else {
       await loadProgress();
     }
-    // Protection for first 10 seconds to prevent initial 0 overwrite
     ignoreAutoSaveUntil = Date.now() + 10000;
     lastPositionForJump = currentProgressSeconds;
     lastVidFastSave = currentProgressSeconds;
     lastVixSrcSaved = currentProgressSeconds;
+    lastVideasyTimestamp = currentProgressSeconds;
+    lastSaveTimestamp = currentProgressSeconds;
     await saveProgressToDB();
     await updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1486,6 +1485,8 @@
     lastPositionForJump = currentProgressSeconds;
     lastVidFastSave = currentProgressSeconds;
     lastVixSrcSaved = currentProgressSeconds;
+    lastVideasyTimestamp = currentProgressSeconds;
+    lastSaveTimestamp = currentProgressSeconds;
     await saveProgressToDB();
     await renderContinueWatching();
   };
