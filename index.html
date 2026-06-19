@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>WIZHUB – Videasy Fixed (Resume & Auto‑Save)</title>
+  <title>WIZHUB</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23facc15'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* All styles unchanged – same as previous working version */
+    /* All styles unchanged – same as previous fully working version */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -1145,22 +1145,22 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ========== AUTO-SAVE WITH PROTECTION AND MINIMUM THRESHOLD ==========
+  // ========== AUTO-SAVE: ignore 0, and allow positive changes ==========
   let autoSaveTimer = null;
   function autoSaveProgress(seconds, sourceName) {
     if (!currentUser || !currentMedia) return;
-    // Protect from overwriting saved time during first 10 seconds
+    // Protect from overwriting during first 10 seconds
     const now = Date.now();
     if (now < ignoreAutoSaveUntil) {
       console.log(`Auto-save IGNORED (protection active, ${Math.ceil((ignoreAutoSaveUntil - now)/1000)}s left): ${sourceName} ${seconds}s`);
       return;
     }
-    // Never save if seconds is 0 or very small (prevents resetting to 0)
-    if (seconds <= 5) {
-      console.log(`Auto-save IGNORED (seconds <= 5): ${sourceName} ${seconds}s`);
+    // Never save 0 or negative (prevents resetting to start)
+    if (seconds <= 0) {
+      console.log(`Auto-save IGNORED (seconds <= 0): ${sourceName} ${seconds}s`);
       return;
     }
-    // Only save if the change is significant (>=1 second) to avoid excessive saves
+    // Only save if change >= 1 second (avoid excessive saves)
     if (Math.abs(seconds - currentProgressSeconds) < 1) return;
     currentProgressSeconds = seconds;
     currentProgressMinutes = Math.floor(seconds / 60);
@@ -1172,15 +1172,15 @@
     console.log(`Auto-save from ${sourceName}: ${seconds} seconds`);
   }
 
-  // ========== VIDEASY HANDLER (fix: accept string and object, log, ignore 0) ==========
+  // ========== VIDEASY HANDLER (robust extraction) ==========
   function handleVideasyMessage(rawData) {
     let parsed = null;
-    // If it's a string, parse it; if it's already an object, use it directly.
+    // If string, parse; if object, use directly
     if (typeof rawData === 'string') {
       try {
         parsed = JSON.parse(rawData);
       } catch(e) {
-        console.warn("Videasy: Failed to parse string message:", rawData);
+        console.warn("Videasy: failed to parse JSON:", rawData);
         return;
       }
     } else if (typeof rawData === 'object' && rawData !== null) {
@@ -1189,30 +1189,29 @@
       return;
     }
     console.log("Videasy message (parsed):", parsed);
-    // Extract timestamp (in seconds)
+    // Attempt to extract seconds from various known fields
+    let seconds = null;
     if (typeof parsed.timestamp === 'number') {
-      autoSaveProgress(parsed.timestamp, 'Videasy(timestamp)');
-      return;
-    }
-    // Fallback: MEDIA_DATA with nested progress.watched
-    if (parsed.type === 'MEDIA_DATA' && typeof parsed.data === 'string') {
+      seconds = parsed.timestamp;
+    } else if (typeof parsed.currentTime === 'number') {
+      seconds = parsed.currentTime;
+    } else if (typeof parsed.progress === 'number' && parsed.progress > 0 && parsed.progress < 10000) {
+      // If progress is likely seconds (not percentage)
+      seconds = parsed.progress;
+    } else if (parsed.type === 'MEDIA_DATA' && typeof parsed.data === 'string') {
       try {
         const inner = JSON.parse(parsed.data);
         for (let key in inner) {
           const item = inner[key];
-          if (item?.progress?.watched !== undefined) {
-            const watchedSec = item.progress.watched;
-            if (typeof watchedSec === 'number') {
-              autoSaveProgress(watchedSec, 'Videasy(MEDIA_DATA)');
-              return;
-            }
+          if (item?.progress?.watched !== undefined && typeof item.progress.watched === 'number') {
+            seconds = item.progress.watched;
+            break;
           }
         }
       } catch(e) {}
     }
-    // Fallback: direct progress field (some versions)
-    if (typeof parsed.progress === 'number') {
-      autoSaveProgress(parsed.progress, 'Videasy(progress)');
+    if (seconds !== null && typeof seconds === 'number') {
+      autoSaveProgress(seconds, 'Videasy');
     }
   }
 
