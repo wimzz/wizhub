@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* ===== ALL STYLES UNCHANGED (same as fully working version) ===== */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -516,7 +515,6 @@
         return progressSec > 0 ? base + `?progress=${progressSec}` : base;
       }
     },
-    // ===== FIXED: VidFast uses &startAt= for resume =====
     { name: 'VidFast', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true`;
         if (progressSec > 0) {
@@ -563,7 +561,6 @@
     { name: '🎌 AnimePahe (Site)', url: () => `https://animepahe.org`, openInNewTab: true }
   ];
 
-  // Hardcoded default order for non-logged users
   const DEFAULT_ORDER_NAMES = [
     "VixSrc",
     "Videasy",
@@ -629,7 +626,7 @@
   let ignoreAutoSaveUntil = 0;
   let supabaseAvailable = true;
   let lastSaveTime = 0;
-  let loadedResumeTime = 0; // PROTECTION: store loaded time to prevent older timestamps
+  let loadedResumeTime = 0; // PROTECTION: stored loaded time
 
   // DOM elements
   const continueContainer = document.getElementById('continueWatchingContainer');
@@ -663,10 +660,7 @@
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
   const brandLogo = document.getElementById('brandLogo');
 
-  // Brand logo click → reload page
-  brandLogo.addEventListener('click', function() {
-    window.location.reload();
-  });
+  brandLogo.addEventListener('click', () => window.location.reload());
 
   // Helper functions
   function updateContinueVisibility() {
@@ -702,7 +696,6 @@
     }
   }
 
-  // ========== USER PERSONAL SOURCE ORDER ==========
   async function loadUserSourceOrder() {
     if (!currentUser) return;
     try {
@@ -890,13 +883,12 @@
     }
   }
 
-  // ===== EMERGENCY LOAD (reads localStorage emergency progress) =====
+  // Emergency load (localStorage)
   function loadEmergencyProgress() {
     try {
       const raw = localStorage.getItem('wizhub_emergency_progress');
       if (!raw) return null;
       const data = JSON.parse(raw);
-      // Only use if less than 30 seconds old (to avoid stale data)
       if (Date.now() - data.time > 30000) {
         localStorage.removeItem('wizhub_emergency_progress');
         return null;
@@ -911,24 +903,22 @@
     localStorage.removeItem('wizhub_emergency_progress');
   }
 
+  // ===== FIXED: loadProgress sets loadedResumeTime in all branches =====
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
 
-    // 1) Check emergency storage first
+    // 1) Emergency progress
     const emergency = loadEmergencyProgress();
     if (emergency && emergency.mediaId === currentMedia.id && emergency.mediaType === currentMedia.type) {
       currentProgressSeconds = emergency.seconds;
       currentProgressMinutes = Math.floor(emergency.seconds / 60);
       progressMinutesInput.value = currentProgressMinutes;
+      loadedResumeTime = currentProgressSeconds; // ← CRITICAL
       console.log("Loaded emergency progress:", emergency.seconds);
-      // Remove emergency after loading
       clearEmergencyProgress();
-      // Still try to fetch from DB later to sync (but we'll keep the emergency value)
-      // We'll do this inside loadProgress after returning emergency.
-      // Actually we want to return early to avoid overwriting with older DB.
-      return;
     }
 
+    // 2) Supabase
     if (supabaseAvailable) {
       try {
         const { data, error } = await sb.from('watch_history')
@@ -939,15 +929,18 @@
           .maybeSingle();
         console.log("LOADED from DB:", data);
         if (!error && data) {
-          currentProgressSeconds = data.progress_seconds || 0;
-          currentProgressMinutes = Math.floor(currentProgressSeconds / 60);
-          progressMinutesInput.value = currentProgressMinutes;
+          const dbSeconds = data.progress_seconds || 0;
+          if (dbSeconds > currentProgressSeconds) {
+            currentProgressSeconds = dbSeconds;
+            currentProgressMinutes = Math.floor(dbSeconds / 60);
+            progressMinutesInput.value = currentProgressMinutes;
+          }
           if (currentMedia.type === 'tv') {
             if (data.season_number) currentSeason = data.season_number;
             if (data.episode_number) currentEpisode = data.episode_number;
           }
-          // Store loaded resume time for protection
-          loadedResumeTime = currentProgressSeconds;
+          loadedResumeTime = currentProgressSeconds; // ← CRITICAL
+          console.log("Loaded from DB:", currentProgressSeconds);
           return;
         }
       } catch (err) {
@@ -955,18 +948,24 @@
         supabaseAvailable = false;
       }
     }
+
+    // 3) localStorage fallback
     const localData = loadProgressFromLocal();
     if (localData) {
-      currentProgressSeconds = localData.progress_seconds || 0;
-      currentProgressMinutes = Math.floor(currentProgressSeconds / 60);
-      progressMinutesInput.value = currentProgressMinutes;
+      const localSeconds = localData.progress_seconds || 0;
+      if (localSeconds > currentProgressSeconds) {
+        currentProgressSeconds = localSeconds;
+        currentProgressMinutes = Math.floor(localSeconds / 60);
+        progressMinutesInput.value = currentProgressMinutes;
+      }
       if (currentMedia.type === 'tv') {
         if (localData.season_number) currentSeason = localData.season_number;
         if (localData.episode_number) currentEpisode = localData.episode_number;
       }
-      loadedResumeTime = currentProgressSeconds;
-      console.log("LOADED from localStorage:", localData);
+      loadedResumeTime = currentProgressSeconds; // ← CRITICAL
+      console.log("Loaded from localStorage:", localData);
     } else {
+      // No data at all
       currentProgressSeconds = 0;
       currentProgressMinutes = 0;
       progressMinutesInput.value = 0;
@@ -1198,16 +1197,15 @@
 
   function autoSaveProgress(seconds, sourceName) {
     if (!currentUser || !currentMedia) return;
-    // Protection window (reduced to 3 seconds)
     const now = Date.now();
     if (now < ignoreAutoSaveUntil) {
       console.log(`Auto-save IGNORED (protection active): ${sourceName} ${seconds}s`);
       return;
     }
     if (seconds <= 0) return;
-    // Only allow newer timestamps (respect loadedResumeTime)
+    // PROTECTION: only accept newer timestamps
     if (seconds < loadedResumeTime) {
-      console.log(`Auto-save IGNORED (older than loaded time): ${sourceName} ${seconds} < ${loadedResumeTime}`);
+      console.log(`Auto-save IGNORED (older than loaded): ${sourceName} ${seconds} < ${loadedResumeTime}`);
       return;
     }
     if (Math.abs(seconds - currentProgressSeconds) < 1) return;
@@ -1221,7 +1219,6 @@
     console.log(`Auto-save from ${sourceName}: ${seconds} seconds`);
   }
 
-  // Immediate save for pause/seek/ended
   function saveProgressImmediately(seconds, sourceName) {
     if (!currentUser || !currentMedia) return;
     if (seconds <= 0) return;
@@ -1236,7 +1233,7 @@
     console.log(`Immediate save from ${sourceName}: ${seconds}s`);
   }
 
-  // ========== VIDEASY HANDLER (FIXED) ==========
+  // ========== VIDEASY HANDLER ==========
   function handleVideasyMessage(rawData) {
     let parsed;
     try {
@@ -1267,22 +1264,19 @@
       return;
     }
 
-    // Update local state immediately
+    // Update local state
     currentProgressSeconds = Math.floor(seconds);
     currentProgressMinutes = Math.floor(seconds / 60);
     progressMinutesInput.value = currentProgressMinutes;
 
-    // Save immediately on pause, seeked, ended
     if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
       saveProgressImmediately(currentProgressSeconds, `Videasy(${eventType})`);
       return;
     }
-
-    // Otherwise use debounced auto-save (timeupdate)
     autoSaveProgress(currentProgressSeconds, 'Videasy');
   }
 
-  // ========== VIDFAST HANDLER (FIXED) ==========
+  // ========== VIDFAST HANDLER ==========
   const vidfastOrigins = [
     'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
     'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
@@ -1311,13 +1305,12 @@
       return;
     }
 
-    // MEDIA_DATA: only update if newer than loadedResumeTime
+    // MEDIA_DATA: only update if newer
     if (data.type === 'MEDIA_DATA' && data.data) {
       const mediaKey = currentMedia?.type === 'movie' ? `m${currentMedia.id}` : `t${currentMedia.id}`;
       const media = data.data[mediaKey];
       if (!media) return;
 
-      // For TV shows, check episode-specific progress
       if (currentMedia?.type === 'tv') {
         const episodeKey = `s${currentSeason}e${currentEpisode}`;
         const ep = media.show_progress?.[episodeKey];
@@ -1327,7 +1320,6 @@
             currentProgressSeconds = watched;
             currentProgressMinutes = Math.floor(watched / 60);
             progressMinutesInput.value = currentProgressMinutes;
-            // Update the iframe URL to resume from episode progress
             updateEmbedStream();
             console.log(`VidFast restored episode progress: ${episodeKey} = ${watched}s`);
           }
@@ -1339,7 +1331,6 @@
           }
         }
       } else {
-        // For movies
         if (media.progress?.watched !== undefined) {
           const watchedSec = Math.floor(media.progress.watched);
           if (watchedSec > currentProgressSeconds && watchedSec > loadedResumeTime) {
@@ -1420,10 +1411,9 @@
     }
   }, 2000);
 
-  // ========== EMERGENCY SAVES (store to localStorage and DB) ==========
+  // ========== EMERGENCY SAVES ==========
   function emergencySave() {
     if (currentUser && currentMedia && currentProgressSeconds > 0) {
-      // Store to localStorage for instant recovery
       const emergencyData = {
         mediaId: currentMedia.id,
         mediaType: currentMedia.type,
@@ -1433,25 +1423,17 @@
         time: Date.now()
       };
       localStorage.setItem('wizhub_emergency_progress', JSON.stringify(emergencyData));
-      // Also try to save to DB (non-blocking)
       saveProgressToDB();
       console.log('Emergency saved to localStorage');
     }
   }
 
-  // visibilitychange: when tab becomes hidden
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      emergencySave();
-    }
+    if (document.visibilityState === 'hidden') emergencySave();
   });
+  window.addEventListener('beforeunload', () => emergencySave());
 
-  // beforeunload: when user refreshes or closes
-  window.addEventListener('beforeunload', () => {
-    emergencySave();
-  });
-
-  // ========== SHOW DETAILS (REMOVED redundant save) ==========
+  // ========== SHOW DETAILS ==========
   async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null, savedSeconds = null) {
     playerPanel.classList.remove('hidden');
     const title = item.title || item.name;
@@ -1477,7 +1459,6 @@
       tvControlsDiv.classList.add('hidden');
     }
 
-    // Set progress from savedSeconds (highest) or savedProgress (minutes) or load from DB
     if (savedSeconds !== null) {
       currentProgressSeconds = savedSeconds;
       currentProgressMinutes = Math.floor(currentProgressSeconds / 60);
@@ -1489,8 +1470,7 @@
       progressMinutesInput.value = savedProgress;
       loadedResumeTime = currentProgressSeconds;
     } else {
-      await loadProgress();
-      // loadProgress already set loadedResumeTime
+      await loadProgress(); // this sets loadedResumeTime
     }
 
     // Protection window (3 seconds)
@@ -1501,8 +1481,7 @@
     lastSaveTimestamp = currentProgressSeconds;
     lastSaveTime = Date.now();
 
-    // DO NOT call saveProgressToDB() here – it would overwrite with possibly older data.
-    // Only save after player updates.
+    // DO NOT call saveProgressToDB() here – let player events update
     await updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
