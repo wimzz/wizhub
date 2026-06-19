@@ -624,7 +624,7 @@
   let lastSaveTimestamp = 0;
   let ignoreAutoSaveUntil = 0;
   let supabaseAvailable = true;
-  let lastSaveTime = 0; // for heartbeat timing
+  let lastSaveTime = 0;
 
   // DOM elements
   const continueContainer = document.getElementById('continueWatchingContainer');
@@ -1152,27 +1152,22 @@
 
   function autoSaveProgress(seconds, sourceName) {
     if (!currentUser || !currentMedia) return;
-    // Protection for first 10 seconds (ignore initial 0)
     const now = Date.now();
     if (now < ignoreAutoSaveUntil) {
       console.log(`Auto-save IGNORED (protection active): ${sourceName} ${seconds}s`);
       return;
     }
-    // Ignore zero or negative
     if (seconds <= 0) {
       console.log(`Auto-save IGNORED (seconds <= 0): ${sourceName} ${seconds}s`);
       return;
     }
-    // Only save if change is at least 1 second (avoid spam)
     if (Math.abs(seconds - currentProgressSeconds) < 1) {
       console.log(`Auto-save SKIPPED (change < 1s): ${sourceName} ${seconds}s`);
       return;
     }
-    // Update local state
     currentProgressSeconds = seconds;
     currentProgressMinutes = Math.floor(seconds / 60);
     progressMinutesInput.value = currentProgressMinutes;
-    // Debounce saving
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
     autoSaveTimer = setTimeout(() => {
       saveProgressToDB();
@@ -1180,7 +1175,18 @@
     console.log(`Auto-save from ${sourceName}: ${seconds} seconds`);
   }
 
-  // ========== VIDEASY HANDLER (FIXED: extract from parsed.data.timestamp) ==========
+  // Immediate save for pause/seek/ended
+  function saveProgressImmediately(seconds, sourceName) {
+    if (!currentUser || !currentMedia) return;
+    if (seconds <= 0) return;
+    currentProgressSeconds = seconds;
+    currentProgressMinutes = Math.floor(seconds / 60);
+    progressMinutesInput.value = currentProgressMinutes;
+    saveProgressToDB();
+    console.log(`Immediate save from ${sourceName}: ${seconds}s`);
+  }
+
+  // ========== VIDEASY HANDLER (FIXED: immediate save on pause/seek/ended) ==========
   function handleVideasyMessage(rawData) {
     console.log("Videasy raw event.data:", rawData, typeof rawData);
     let parsed = null;
@@ -1199,28 +1205,22 @@
       return;
     }
     let seconds = null;
+    let eventType = null;
 
-    // First, try to extract from data.timestamp (PLAYER_EVENT structure)
+    // Extract from data object (PLAYER_EVENT structure)
     if (parsed && parsed.data) {
-      if (typeof parsed.data.timestamp === 'number') {
-        seconds = parsed.data.timestamp;
-      } else if (typeof parsed.data.currentTime === 'number') {
-        seconds = parsed.data.currentTime;
-      } else if (typeof parsed.data.watched === 'number') {
-        seconds = parsed.data.watched;
-      }
+      if (typeof parsed.data.timestamp === 'number') seconds = parsed.data.timestamp;
+      else if (typeof parsed.data.currentTime === 'number') seconds = parsed.data.currentTime;
+      else if (typeof parsed.data.watched === 'number') seconds = parsed.data.watched;
+      if (parsed.data.event) eventType = parsed.data.event;
     }
-    // If not found, fallback to top-level
+    // Fallback to top-level
     if (seconds === null) {
-      if (typeof parsed.timestamp === 'number') {
-        seconds = parsed.timestamp;
-      } else if (typeof parsed.currentTime === 'number') {
-        seconds = parsed.currentTime;
-      } else if (typeof parsed.watched === 'number') {
-        seconds = parsed.watched;
-      } else if (typeof parsed.progress === 'number' && parsed.progress < 10000) {
-        seconds = parsed.progress;
-      }
+      if (typeof parsed.timestamp === 'number') seconds = parsed.timestamp;
+      else if (typeof parsed.currentTime === 'number') seconds = parsed.currentTime;
+      else if (typeof parsed.watched === 'number') seconds = parsed.watched;
+      else if (typeof parsed.progress === 'number' && parsed.progress < 10000) seconds = parsed.progress;
+      if (parsed.event) eventType = parsed.event;
     }
     // Handle MEDIA_DATA with nested watched
     if (seconds === null && parsed.type === 'MEDIA_DATA' && typeof parsed.data === 'string') {
@@ -1235,8 +1235,15 @@
         }
       } catch(e) {}
     }
+
     if (seconds !== null && typeof seconds === 'number') {
-      autoSaveProgress(seconds, 'Videasy');
+      // If event is pause, seeked, or ended, save immediately
+      if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
+        saveProgressImmediately(seconds, 'Videasy(' + eventType + ')');
+      } else {
+        // For timeupdate and other events, use debounced auto-save
+        autoSaveProgress(seconds, 'Videasy');
+      }
     } else {
       console.warn("Videasy: No timestamp found in message.", parsed);
     }
@@ -1258,7 +1265,7 @@
         progressMinutesInput.value = currentProgressMinutes;
         console.log(`VidFast ${event}: ${currentTime}s / ${duration}s`);
         if (event === 'seeked' || event === 'pause' || event === 'ended') {
-          autoSaveProgress(Math.floor(currentTime), `VidFast(${event})`);
+          saveProgressImmediately(Math.floor(currentTime), `VidFast(${event})`);
         }
         if (event === 'timeupdate' && (Math.floor(currentTime) - lastVidFastSave) >= 15) {
           lastVidFastSave = Math.floor(currentTime);
@@ -1291,20 +1298,12 @@
       currentProgressSeconds = currentTime;
       currentProgressMinutes = Math.floor(currentTime / 60);
       progressMinutesInput.value = currentProgressMinutes;
+      if (eventName === "seeked" || eventName === "pause" || eventName === "ended") {
+        saveProgressImmediately(currentTime, `VixSrc(${eventName})`);
+      }
       if (eventName === "timeupdate" && (currentTime - lastVixSrcSaved) >= 15) {
         lastVixSrcSaved = currentTime;
-        saveProgressToDB();
-        console.log("Auto-saved from VixSrc timeupdate at", currentTime);
-      }
-      if (eventName === "seeked" && currentTime > 0) {
-        lastVixSrcSaved = currentTime;
-        saveProgressToDB();
-        console.log("Saved after VixSrc seek at", currentTime);
-      }
-      if (eventName === "pause" || eventName === "ended") {
-        lastVixSrcSaved = currentTime;
-        saveProgressToDB();
-        console.log(`Saved on VixSrc ${eventName} at`, currentTime);
+        autoSaveProgress(currentTime, 'VixSrc(timeupdate)');
       }
     }
   }
@@ -1327,13 +1326,11 @@
     }
   });
 
-  // ========== HEARTBEAT & FALLBACK (fixed lastSaveTime) ==========
-  // Heartbeat: save every 15 seconds if progress > 0 and advanced
+  // ========== HEARTBEAT & FALLBACK ==========
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
     const current = currentProgressSeconds;
     const now = Date.now();
-    // If progress > 0 and (saved time difference >= 5 sec OR last save was > 15 sec ago)
     if (current > 0 && (current - lastSaveTimestamp >= 5 || (now - lastSaveTime) > 15000)) {
       lastSaveTimestamp = current;
       lastSaveTime = now;
@@ -1342,7 +1339,6 @@
     }
   }, 15000);
 
-  // Large jump fallback (every 2 seconds)
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
     const diff = Math.abs(currentProgressSeconds - lastPositionForJump);
