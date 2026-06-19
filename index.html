@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* All styles unchanged – same as previous fully working version */
+    /* All styles unchanged – fully functional */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
     .glass-nav {
@@ -518,7 +518,11 @@
     },
     { name: 'VidFast', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true`;
-        return progressSec > 0 ? base + `&t=${progressSec}` : base;
+        // FIXED: use &startAt= for resume (not &t=)
+        if (progressSec > 0) {
+          base += `&startAt=${Math.floor(progressSec)}`;
+        }
+        return base;
       }
     },
     { name: 'VidUp', url: (type, id, s, e) => type === 'movie' ? `https://vidup.to/movie/${id}` : `https://vidup.to/tv/${id}/${s}/${e}` },
@@ -1150,21 +1154,17 @@
   // ========== AUTO-SAVE CORE ==========
   let autoSaveTimer = null;
 
+  // Debounced auto-save for timeupdate events
   function autoSaveProgress(seconds, sourceName) {
     if (!currentUser || !currentMedia) return;
+    // Protection window (reduced to 3 seconds)
     const now = Date.now();
     if (now < ignoreAutoSaveUntil) {
       console.log(`Auto-save IGNORED (protection active): ${sourceName} ${seconds}s`);
       return;
     }
-    if (seconds <= 0) {
-      console.log(`Auto-save IGNORED (seconds <= 0): ${sourceName} ${seconds}s`);
-      return;
-    }
-    if (Math.abs(seconds - currentProgressSeconds) < 1) {
-      console.log(`Auto-save SKIPPED (change < 1s): ${sourceName} ${seconds}s`);
-      return;
-    }
+    if (seconds <= 0) return;
+    if (Math.abs(seconds - currentProgressSeconds) < 1) return;
     currentProgressSeconds = seconds;
     currentProgressMinutes = Math.floor(seconds / 60);
     progressMinutesInput.value = currentProgressMinutes;
@@ -1186,43 +1186,21 @@
     console.log(`Immediate save from ${sourceName}: ${seconds}s`);
   }
 
-  // ========== VIDEASY HANDLER (FIXED: immediate save on pause/seek/ended) ==========
+  // ========== VIDEASY HANDLER (FIXED) ==========
   function handleVideasyMessage(rawData) {
-    console.log("Videasy raw event.data:", rawData, typeof rawData);
-    let parsed = null;
-    if (typeof rawData === 'string') {
-      try {
-        parsed = JSON.parse(rawData);
-        console.log("Videasy parsed JSON:", parsed);
-      } catch (e) {
-        console.warn("Videasy: Failed to parse JSON:", rawData);
-        return;
-      }
-    } else if (typeof rawData === 'object' && rawData !== null) {
-      parsed = rawData;
-      console.log("Videasy already an object:", parsed);
-    } else {
+    let parsed;
+    try {
+      parsed = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+    } catch {
       return;
     }
-    let seconds = null;
-    let eventType = null;
+    if (!parsed) return;
 
-    // Extract from data object (PLAYER_EVENT structure)
-    if (parsed && parsed.data) {
-      if (typeof parsed.data.timestamp === 'number') seconds = parsed.data.timestamp;
-      else if (typeof parsed.data.currentTime === 'number') seconds = parsed.data.currentTime;
-      else if (typeof parsed.data.watched === 'number') seconds = parsed.data.watched;
-      if (parsed.data.event) eventType = parsed.data.event;
-    }
-    // Fallback to top-level
-    if (seconds === null) {
-      if (typeof parsed.timestamp === 'number') seconds = parsed.timestamp;
-      else if (typeof parsed.currentTime === 'number') seconds = parsed.currentTime;
-      else if (typeof parsed.watched === 'number') seconds = parsed.watched;
-      else if (typeof parsed.progress === 'number' && parsed.progress < 10000) seconds = parsed.progress;
-      if (parsed.event) eventType = parsed.event;
-    }
-    // Handle MEDIA_DATA with nested watched
+    // Extract seconds from various possible locations
+    let seconds = parsed?.data?.timestamp ?? parsed?.data?.currentTime ?? parsed?.timestamp ?? parsed?.currentTime ?? null;
+    const eventType = parsed?.data?.event ?? parsed?.event ?? null;
+
+    // Also check MEDIA_DATA for watched
     if (seconds === null && parsed.type === 'MEDIA_DATA' && typeof parsed.data === 'string') {
       try {
         const inner = JSON.parse(parsed.data);
@@ -1236,27 +1214,37 @@
       } catch(e) {}
     }
 
-    if (seconds !== null && typeof seconds === 'number') {
-      // If event is pause, seeked, or ended, save immediately
-      if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
-        saveProgressImmediately(seconds, 'Videasy(' + eventType + ')');
-      } else {
-        // For timeupdate and other events, use debounced auto-save
-        autoSaveProgress(seconds, 'Videasy');
-      }
-    } else {
-      console.warn("Videasy: No timestamp found in message.", parsed);
+    if (typeof seconds !== 'number' || seconds <= 0) {
+      console.log("Videasy: No valid timestamp found", parsed);
+      return;
     }
+
+    // Update local state immediately
+    currentProgressSeconds = Math.floor(seconds);
+    currentProgressMinutes = Math.floor(seconds / 60);
+    progressMinutesInput.value = currentProgressMinutes;
+
+    // Save immediately on pause, seeked, ended
+    if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
+      saveProgressImmediately(currentProgressSeconds, `Videasy(${eventType})`);
+      return;
+    }
+
+    // Otherwise use debounced auto-save (timeupdate)
+    autoSaveProgress(currentProgressSeconds, 'Videasy');
   }
 
-  // ========== VIDFAST HANDLER ==========
+  // ========== VIDFAST HANDLER (FIXED) ==========
   const vidfastOrigins = [
     'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
     'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
   ];
+
   function handleVidFastMessage(data, origin) {
     if (!vidfastOrigins.includes(origin)) return;
     if (!data) return;
+
+    // PLAYER_EVENT handling
     if (data.type === 'PLAYER_EVENT' && data.data) {
       const { event, currentTime, duration } = data.data;
       if (typeof currentTime === 'number' && currentTime > 0) {
@@ -1264,6 +1252,7 @@
         currentProgressMinutes = Math.floor(currentTime / 60);
         progressMinutesInput.value = currentProgressMinutes;
         console.log(`VidFast ${event}: ${currentTime}s / ${duration}s`);
+
         if (event === 'seeked' || event === 'pause' || event === 'ended') {
           saveProgressImmediately(Math.floor(currentTime), `VidFast(${event})`);
         }
@@ -1274,12 +1263,39 @@
       }
       return;
     }
-    if (data.type === 'MEDIA_DATA' && data.data && currentMedia) {
-      const mediaKey = currentMedia.type === 'movie' ? `m${currentMedia.id}` : `t${currentMedia.id}`;
-      const mediaData = data.data[mediaKey];
-      if (mediaData?.progress?.watched !== undefined) {
-        const watchedSec = Math.floor(mediaData.progress.watched);
-        autoSaveProgress(watchedSec, 'VidFast(MEDIA_DATA)');
+
+    // MEDIA_DATA handling with episode progress restoration
+    if (data.type === 'MEDIA_DATA' && data.data) {
+      const mediaKey = currentMedia?.type === 'movie' ? `m${currentMedia.id}` : `t${currentMedia.id}`;
+      const media = data.data[mediaKey];
+      if (!media) return;
+
+      // For TV shows, check episode-specific progress
+      if (currentMedia?.type === 'tv') {
+        const episodeKey = `s${currentSeason}e${currentEpisode}`;
+        const ep = media.show_progress?.[episodeKey];
+        if (ep?.progress?.watched) {
+          const watched = Math.floor(ep.progress.watched);
+          if (watched > currentProgressSeconds) {
+            currentProgressSeconds = watched;
+            currentProgressMinutes = Math.floor(watched / 60);
+            progressMinutesInput.value = currentProgressMinutes;
+            // Update the iframe URL to resume from episode progress
+            updateEmbedStream();
+            console.log(`VidFast restored episode progress: ${episodeKey} = ${watched}s`);
+          }
+        }
+        // Also check overall progress
+        if (media.progress?.watched) {
+          const watched = Math.floor(media.progress.watched);
+          autoSaveProgress(watched, 'VidFast(MEDIA_DATA)');
+        }
+      } else {
+        // For movies, use overall progress
+        if (media.progress?.watched !== undefined) {
+          const watchedSec = Math.floor(media.progress.watched);
+          autoSaveProgress(watchedSec, 'VidFast(MEDIA_DATA)');
+        }
       }
     }
   }
@@ -1298,10 +1314,11 @@
       currentProgressSeconds = currentTime;
       currentProgressMinutes = Math.floor(currentTime / 60);
       progressMinutesInput.value = currentProgressMinutes;
-      if (eventName === "seeked" || eventName === "pause" || eventName === "ended") {
+
+      if (eventName === 'seeked' || eventName === 'pause' || eventName === 'ended') {
         saveProgressImmediately(currentTime, `VixSrc(${eventName})`);
       }
-      if (eventName === "timeupdate" && (currentTime - lastVixSrcSaved) >= 15) {
+      if (eventName === 'timeupdate' && (currentTime - lastVixSrcSaved) >= 15) {
         lastVixSrcSaved = currentTime;
         autoSaveProgress(currentTime, 'VixSrc(timeupdate)');
       }
@@ -1349,6 +1366,23 @@
     }
   }, 2000);
 
+  // ========== EMERGENCY SAVES ==========
+  // Save when tab is hidden (user switches tabs, minimizes, or closes)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && currentUser && currentMedia && currentProgressSeconds > 0) {
+      saveProgressToDB();
+      console.log('Emergency save on visibility change');
+    }
+  });
+
+  // Save before page unload (refresh, back button, etc.)
+  window.addEventListener('beforeunload', () => {
+    if (currentUser && currentMedia && currentProgressSeconds > 0) {
+      saveProgressToDB();
+      console.log('Emergency save on beforeunload');
+    }
+  });
+
   // ========== SHOW DETAILS ==========
   async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null, savedSeconds = null) {
     playerPanel.classList.remove('hidden');
@@ -1385,7 +1419,8 @@
     } else {
       await loadProgress();
     }
-    ignoreAutoSaveUntil = Date.now() + 10000;
+    // Protection window reduced to 3 seconds (was 10 seconds)
+    ignoreAutoSaveUntil = Date.now() + 3000;
     lastPositionForJump = currentProgressSeconds;
     lastVidFastSave = currentProgressSeconds;
     lastVixSrcSaved = currentProgressSeconds;
@@ -1556,10 +1591,6 @@
   clearSearchBtn.addEventListener('click', clearSearch);
   globalSearch.addEventListener('focus', updateContinueVisibility);
   globalSearch.addEventListener('blur', () => { setTimeout(() => { if (!globalSearch.value.trim()) updateContinueVisibility(); }, 200); });
-
-  window.addEventListener('beforeunload', async () => {
-    await saveProgressToDB();
-  });
 
   // ========== LOGIN MODAL ==========
   const loginModal = document.getElementById('loginModal');
