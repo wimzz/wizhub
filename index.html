@@ -626,7 +626,7 @@
   let ignoreAutoSaveUntil = 0;
   let supabaseAvailable = true;
   let lastSaveTime = 0;
-  let loadedResumeTime = 0; // PROTECTION: stored loaded time
+  let loadedResumeTime = 0;
 
   // DOM elements
   const continueContainer = document.getElementById('continueWatchingContainer');
@@ -903,7 +903,6 @@
     localStorage.removeItem('wizhub_emergency_progress');
   }
 
-  // ===== FIXED: loadProgress sets loadedResumeTime in all branches =====
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
 
@@ -913,7 +912,7 @@
       currentProgressSeconds = emergency.seconds;
       currentProgressMinutes = Math.floor(emergency.seconds / 60);
       progressMinutesInput.value = currentProgressMinutes;
-      loadedResumeTime = currentProgressSeconds; // ← CRITICAL
+      loadedResumeTime = currentProgressSeconds;
       console.log("Loaded emergency progress:", emergency.seconds);
       clearEmergencyProgress();
     }
@@ -939,7 +938,7 @@
             if (data.season_number) currentSeason = data.season_number;
             if (data.episode_number) currentEpisode = data.episode_number;
           }
-          loadedResumeTime = currentProgressSeconds; // ← CRITICAL
+          loadedResumeTime = currentProgressSeconds;
           console.log("Loaded from DB:", currentProgressSeconds);
           return;
         }
@@ -962,10 +961,9 @@
         if (localData.season_number) currentSeason = localData.season_number;
         if (localData.episode_number) currentEpisode = localData.episode_number;
       }
-      loadedResumeTime = currentProgressSeconds; // ← CRITICAL
+      loadedResumeTime = currentProgressSeconds;
       console.log("Loaded from localStorage:", localData);
     } else {
-      // No data at all
       currentProgressSeconds = 0;
       currentProgressMinutes = 0;
       progressMinutesInput.value = 0;
@@ -1199,19 +1197,23 @@
     if (!currentUser || !currentMedia) return;
     const now = Date.now();
     if (now < ignoreAutoSaveUntil) {
-      console.log(`Auto-save IGNORED (protection active): ${sourceName} ${seconds}s`);
+      console.log(`Auto-save IGNORED (protection window): ${sourceName} ${seconds}s`);
       return;
     }
     if (seconds <= 0) return;
-    // PROTECTION: only accept newer timestamps
-    if (seconds < loadedResumeTime) {
-      console.log(`Auto-save IGNORED (older than loaded): ${sourceName} ${seconds} < ${loadedResumeTime}`);
+    // PROTECTION: reject timestamps older than what we loaded (with 5s tolerance)
+    if (seconds < loadedResumeTime - 5) {
+      console.log(`Auto-save IGNORED (older than loaded): ${sourceName} ${seconds}s < loaded ${loadedResumeTime}s`);
       return;
     }
     if (Math.abs(seconds - currentProgressSeconds) < 1) return;
     currentProgressSeconds = seconds;
     currentProgressMinutes = Math.floor(seconds / 60);
     progressMinutesInput.value = currentProgressMinutes;
+    // Track latest known position so stale events are always rejected
+    if (seconds > loadedResumeTime) {
+      loadedResumeTime = seconds;
+    }
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
     autoSaveTimer = setTimeout(() => {
       saveProgressToDB();
@@ -1222,18 +1224,23 @@
   function saveProgressImmediately(seconds, sourceName) {
     if (!currentUser || !currentMedia) return;
     if (seconds <= 0) return;
-    if (seconds < loadedResumeTime) {
-      console.log(`Immediate save IGNORED (older than loaded): ${sourceName} ${seconds} < ${loadedResumeTime}`);
+    // PROTECTION: reject timestamps older than what we loaded (with 5s tolerance)
+    if (seconds < loadedResumeTime - 5) {
+      console.log(`Immediate save IGNORED (older than loaded): ${sourceName} ${seconds}s < loaded ${loadedResumeTime}s`);
       return;
     }
     currentProgressSeconds = seconds;
     currentProgressMinutes = Math.floor(seconds / 60);
     progressMinutesInput.value = currentProgressMinutes;
+    // Track latest known position
+    if (seconds > loadedResumeTime) {
+      loadedResumeTime = seconds;
+    }
     saveProgressToDB();
     console.log(`Immediate save from ${sourceName}: ${seconds}s`);
   }
 
-  // ========== VIDEASY HANDLER ==========
+  // ========== VIDEASY HANDLER (FIXED) ==========
   function handleVideasyMessage(rawData) {
     let parsed;
     try {
@@ -1245,8 +1252,9 @@
 
     let seconds = parsed?.data?.timestamp ?? parsed?.data?.currentTime ?? parsed?.timestamp ?? parsed?.currentTime ?? null;
     const eventType = parsed?.data?.event ?? parsed?.event ?? null;
+    const isMediaData = parsed.type === 'MEDIA_DATA';
 
-    if (seconds === null && parsed.type === 'MEDIA_DATA' && typeof parsed.data === 'string') {
+    if (seconds === null && isMediaData && typeof parsed.data === 'string') {
       try {
         const inner = JSON.parse(parsed.data);
         for (let key in inner) {
@@ -1260,14 +1268,35 @@
     }
 
     if (typeof seconds !== 'number' || seconds <= 0) {
-      console.log("Videasy: No valid timestamp found", parsed);
       return;
     }
 
-    // Update local state
-    currentProgressSeconds = Math.floor(seconds);
+    seconds = Math.floor(seconds);
+
+    // ===== CRITICAL FIX: Check protection BEFORE updating currentProgressSeconds =====
+    // MEDIA_DATA contains Videasy's own stored progress — only accept if NEWER than what we have
+    if (isMediaData) {
+      if (seconds <= currentProgressSeconds) {
+        console.log(`Videasy MEDIA_DATA IGNORED (not newer): ${seconds}s <= current ${currentProgressSeconds}s`);
+        return;
+      }
+    } else {
+      // Regular player events: reject if significantly older than loaded resume time
+      if (seconds < loadedResumeTime - 5) {
+        console.log(`Videasy IGNORED (older than loaded): ${seconds}s < loaded ${loadedResumeTime}s`);
+        return;
+      }
+    }
+
+    // Now safe to update state
+    currentProgressSeconds = seconds;
     currentProgressMinutes = Math.floor(seconds / 60);
     progressMinutesInput.value = currentProgressMinutes;
+
+    // Track latest known position so future stale events are rejected
+    if (seconds > loadedResumeTime) {
+      loadedResumeTime = seconds;
+    }
 
     if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
       saveProgressImmediately(currentProgressSeconds, `Videasy(${eventType})`);
@@ -1276,7 +1305,7 @@
     autoSaveProgress(currentProgressSeconds, 'Videasy');
   }
 
-  // ========== VIDFAST HANDLER ==========
+  // ========== VIDFAST HANDLER (FIXED) ==========
   const vidfastOrigins = [
     'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
     'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
@@ -1289,17 +1318,30 @@
     if (data.type === 'PLAYER_EVENT' && data.data) {
       const { event, currentTime, duration } = data.data;
       if (typeof currentTime === 'number' && currentTime > 0) {
-        currentProgressSeconds = Math.floor(currentTime);
+        const seconds = Math.floor(currentTime);
+
+        // ===== CRITICAL FIX: Check BEFORE updating state =====
+        if (seconds < loadedResumeTime - 5) {
+          console.log(`VidFast IGNORED (older than loaded): ${seconds}s < loaded ${loadedResumeTime}s`);
+          return;
+        }
+
+        currentProgressSeconds = seconds;
         currentProgressMinutes = Math.floor(currentTime / 60);
         progressMinutesInput.value = currentProgressMinutes;
+
+        if (seconds > loadedResumeTime) {
+          loadedResumeTime = seconds;
+        }
+
         console.log(`VidFast ${event}: ${currentTime}s / ${duration}s`);
 
         if (event === 'seeked' || event === 'pause' || event === 'ended') {
-          saveProgressImmediately(Math.floor(currentTime), `VidFast(${event})`);
+          saveProgressImmediately(seconds, `VidFast(${event})`);
         }
-        if (event === 'timeupdate' && (Math.floor(currentTime) - lastVidFastSave) >= 15) {
-          lastVidFastSave = Math.floor(currentTime);
-          autoSaveProgress(Math.floor(currentTime), 'VidFast(timeupdate)');
+        if (event === 'timeupdate' && (seconds - lastVidFastSave) >= 15) {
+          lastVidFastSave = seconds;
+          autoSaveProgress(seconds, 'VidFast(timeupdate)');
         }
       }
       return;
@@ -1320,6 +1362,7 @@
             currentProgressSeconds = watched;
             currentProgressMinutes = Math.floor(watched / 60);
             progressMinutesInput.value = currentProgressMinutes;
+            loadedResumeTime = watched;
             updateEmbedStream();
             console.log(`VidFast restored episode progress: ${episodeKey} = ${watched}s`);
           }
@@ -1341,7 +1384,7 @@
     }
   }
 
-  // ========== VIXSRC HANDLER ==========
+  // ========== VIXSRC HANDLER (FIXED) ==========
   function handleVixSrcMessage(data, origin) {
     if (!origin.includes('vixsrc') && !origin.includes('vixcloud')) return;
     if (data?.type !== "PLAYER_EVENT") return;
@@ -1352,13 +1395,18 @@
       currentTime = Math.floor(data.event.currentTime || 0);
     }
     if (currentTime > 0) {
-      if (currentTime < loadedResumeTime) {
-        console.log(`VixSrc IGNORED (older than loaded): ${currentTime} < ${loadedResumeTime}`);
+      // ===== CRITICAL FIX: Check BEFORE updating state =====
+      if (currentTime < loadedResumeTime - 5) {
+        console.log(`VixSrc IGNORED (older than loaded): ${currentTime} < loaded ${loadedResumeTime}`);
         return;
       }
       currentProgressSeconds = currentTime;
       currentProgressMinutes = Math.floor(currentTime / 60);
       progressMinutesInput.value = currentProgressMinutes;
+
+      if (currentTime > loadedResumeTime) {
+        loadedResumeTime = currentTime;
+      }
 
       if (eventName === 'seeked' || eventName === 'pause' || eventName === 'ended') {
         saveProgressImmediately(currentTime, `VixSrc(${eventName})`);
@@ -1388,11 +1436,16 @@
     }
   });
 
-  // ========== HEARTBEAT & FALLBACK ==========
+  // ========== HEARTBEAT & FALLBACK (FIXED) ==========
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
     const current = currentProgressSeconds;
     const now = Date.now();
+    // Extra protection: don't save if current is somehow less than loaded (shouldn't happen with fix)
+    if (current < loadedResumeTime - 5) {
+      console.log(`Heartbeat SKIP (current ${current}s < loaded ${loadedResumeTime}s)`);
+      return;
+    }
     if (current > 0 && (current - lastSaveTimestamp >= 5 || (now - lastSaveTime) > 15000)) {
       lastSaveTimestamp = current;
       lastSaveTime = now;
@@ -1405,6 +1458,12 @@
     if (!currentUser || !currentMedia) return;
     const diff = Math.abs(currentProgressSeconds - lastPositionForJump);
     if (diff > 60) {
+      // Extra protection: don't save if going backward unexpectedly
+      if (currentProgressSeconds < loadedResumeTime - 5) {
+        console.log(`Large jump SKIP (current ${currentProgressSeconds}s < loaded ${loadedResumeTime}s)`);
+        lastPositionForJump = currentProgressSeconds;
+        return;
+      }
       lastPositionForJump = currentProgressSeconds;
       await saveProgressToDB();
       console.log(`Large jump save: ${diff} sec`);
@@ -1470,18 +1529,17 @@
       progressMinutesInput.value = savedProgress;
       loadedResumeTime = currentProgressSeconds;
     } else {
-      await loadProgress(); // this sets loadedResumeTime
+      await loadProgress();
     }
 
-    // Protection window (3 seconds)
-    ignoreAutoSaveUntil = Date.now() + 3000;
+    // Protection window (5 seconds) — prevents stale events from overwriting during load
+    ignoreAutoSaveUntil = Date.now() + 5000;
     lastPositionForJump = currentProgressSeconds;
     lastVidFastSave = currentProgressSeconds;
     lastVixSrcSaved = currentProgressSeconds;
     lastSaveTimestamp = currentProgressSeconds;
     lastSaveTime = Date.now();
 
-    // DO NOT call saveProgressToDB() here – let player events update
     await updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
