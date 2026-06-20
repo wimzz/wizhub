@@ -512,7 +512,6 @@
     },
     { name: 'Videasy', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}`;
-        // Standard 't' parameter for seconds to match Videasy resume functionality
         return progressSec > 0 ? base + `?t=${progressSec}` : base;
       }
     },
@@ -628,6 +627,10 @@
   let supabaseAvailable = true;
   let lastSaveTime = 0;
   let loadedResumeTime = 0;
+
+  // Force seek state variables to bypass internal player localStorage
+  let hasForcedSeekVideasy = false;
+  let forceSeekStartTime = 0;
 
   // DOM elements
   const continueContainer = document.getElementById('continueWatchingContainer');
@@ -1191,7 +1194,7 @@
     } catch (err) { alert('Could not copy URL'); }
   }
 
-  // ========== AUTO-SAVE CORE (FIXED) ==========
+  // ========== AUTO-SAVE CORE ==========
   let autoSaveTimer = null;
 
   function autoSaveProgress(seconds, sourceName) {
@@ -1236,7 +1239,7 @@
     console.log(`Immediate save from ${sourceName}: ${seconds}s`);
   }
 
-  // ========== VIDEASY HANDLER (STRICTLY ALIGNED TO DOCS) ==========
+  // ========== VIDEASY HANDLER (WITH FORCE SEEK) ==========
   function handleVideasyMessage(rawData) {
     let parsed;
     try {
@@ -1247,9 +1250,22 @@
     if (!parsed) return;
 
     // Per Docs: The player sends progress updates containing: id, type, progress, timestamp, duration, season, episode
-    // We look for the "timestamp" property directly, but also check nested data just in case of future changes.
     let seconds = parsed?.timestamp ?? parsed?.data?.timestamp ?? parsed?.currentTime ?? parsed?.data?.currentTime ?? null;
     let eventType = parsed?.event ?? parsed?.data?.event ?? null;
+
+    // FORCE SEEK HANDSHAKE: Bypass Videasy's internal localStorage and force it to our DB time
+    if (!hasForcedSeekVideasy && loadedResumeTime > 0 && (Date.now() - forceSeekStartTime < 15000)) {
+      try {
+        // Try multiple common postMessage formats to command the player to seek
+        embedIframe.contentWindow.postMessage(JSON.stringify({ event: 'seek', timestamp: loadedResumeTime }), '*');
+        embedIframe.contentWindow.postMessage(JSON.stringify({ action: 'seek', value: loadedResumeTime }), '*');
+      } catch(e) {}
+      
+      // If the player reports a time close to our loaded time, we consider the seek successful
+      if (seconds > 0 && Math.abs(seconds - loadedResumeTime) < 10) {
+        hasForcedSeekVideasy = true;
+      }
+    }
 
     if (typeof seconds !== 'number' || seconds <= 0) {
       return;
@@ -1265,7 +1281,7 @@
     }
   }
 
-  // ========== VIDFAST HANDLER (FIXED) ==========
+  // ========== VIDFAST HANDLER ==========
   const vidfastOrigins = [
     'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
     'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
@@ -1291,13 +1307,9 @@
       }
       return;
     }
-
-    // INTENTIONALLY IGNORING MEDIA_DATA: 
-    // Relying on VidFast's internal localStorage caused database revert bugs. 
-    // We only trust real-time PLAYER_EVENT updates.
   }
 
-  // ========== VIXSRC HANDLER (FIXED) ==========
+  // ========== VIXSRC HANDLER ==========
   function handleVixSrcMessage(data, origin) {
     if (!origin.includes('vixsrc') && !origin.includes('vixcloud')) return;
     if (data?.type !== "PLAYER_EVENT") return;
@@ -1338,7 +1350,7 @@
     }
   });
 
-  // ========== HEARTBEAT & FALLBACK (FIXED) ==========
+  // ========== HEARTBEAT & FALLBACK ==========
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
     if (Date.now() < ignoreAutoSaveUntil) return; // Skip during load protection
@@ -1402,6 +1414,11 @@
     document.getElementById('detailYear').innerText = year;
     document.getElementById('detailType').innerHTML = type === 'movie' ? 'Movie' : 'TV Series';
     currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
+    
+    // Reset force seek state for the new media item
+    hasForcedSeekVideasy = false;
+    forceSeekStartTime = Date.now();
+
     if (type === 'tv') {
       tvControlsDiv.classList.remove('hidden');
       if (savedSeason !== null && savedEpisode !== null) {
