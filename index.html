@@ -512,14 +512,13 @@
     },
     { name: 'Videasy', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}`;
-        return progressSec > 0 ? base + `?t=${progressSec}` : base;
+        // Official Docs: Use ?progress=SEC for start time
+        return progressSec > 0 ? base + `?progress=${progressSec}` : base;
       }
     },
     { name: 'VidFast', url: (type, id, s, e, progressSec) => {
+        // Official Docs: Use postMessage API for seeking, not URL params
         let base = type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true`;
-        if (progressSec > 0) {
-          base += `&startAt=${Math.floor(progressSec)}`;
-        }
         return base;
       }
     },
@@ -628,8 +627,9 @@
   let lastSaveTime = 0;
   let loadedResumeTime = 0;
 
-  // Force seek state variables to bypass internal player localStorage
-  let hasForcedSeekVideasy = false;
+  // Force seek state variables for VidFast postMessage API
+  let hasForcedSeekVidFast = false;
+  let seekCommandSent = false;
   let forceSeekStartTime = 0;
 
   // DOM elements
@@ -1156,11 +1156,13 @@
       return;
     }
     let url = '';
-    if (src.name === 'Videasy' || src.name === 'VidFast' || src.name === 'VixSrc') {
+    // Videasy & VixSrc handle resume time natively via URL params
+    if (src.name === 'Videasy' || src.name === 'VixSrc') {
       url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
     } else {
       url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
     }
+    
     if (url && typeof url.then === 'function') {
       embedIframe.srcdoc = '<div class="text-center py-20 text-gray-400"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
       try { url = await url; } catch (err) { embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to load</div>'; return; }
@@ -1168,6 +1170,12 @@
     if (src.openInNewTab === true && url) { window.open(url, '_blank'); return; }
     console.log("RESUME TIME (seconds)", currentProgressSeconds);
     console.log("FINAL URL", url);
+    
+    // Reset VidFast seek flags when the source changes/reloads
+    hasForcedSeekVidFast = false;
+    seekCommandSent = false;
+    forceSeekStartTime = Date.now();
+    
     if (url) embedIframe.src = url;
     else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
   }
@@ -1239,7 +1247,7 @@
     console.log(`Immediate save from ${sourceName}: ${seconds}s`);
   }
 
-  // ========== VIDEASY HANDLER (WITH FORCE SEEK) ==========
+  // ========== VIDEASY HANDLER ==========
   function handleVideasyMessage(rawData) {
     let parsed;
     try {
@@ -1252,20 +1260,6 @@
     // Per Docs: The player sends progress updates containing: id, type, progress, timestamp, duration, season, episode
     let seconds = parsed?.timestamp ?? parsed?.data?.timestamp ?? parsed?.currentTime ?? parsed?.data?.currentTime ?? null;
     let eventType = parsed?.event ?? parsed?.data?.event ?? null;
-
-    // FORCE SEEK HANDSHAKE: Bypass Videasy's internal localStorage and force it to our DB time
-    if (!hasForcedSeekVideasy && loadedResumeTime > 0 && (Date.now() - forceSeekStartTime < 15000)) {
-      try {
-        // Try multiple common postMessage formats to command the player to seek
-        embedIframe.contentWindow.postMessage(JSON.stringify({ event: 'seek', timestamp: loadedResumeTime }), '*');
-        embedIframe.contentWindow.postMessage(JSON.stringify({ action: 'seek', value: loadedResumeTime }), '*');
-      } catch(e) {}
-      
-      // If the player reports a time close to our loaded time, we consider the seek successful
-      if (seconds > 0 && Math.abs(seconds - loadedResumeTime) < 10) {
-        hasForcedSeekVideasy = true;
-      }
-    }
 
     if (typeof seconds !== 'number' || seconds <= 0) {
       return;
@@ -1281,7 +1275,7 @@
     }
   }
 
-  // ========== VIDFAST HANDLER ==========
+  // ========== VIDFAST HANDLER (WITH POSTMESSAGE SEEK) ==========
   const vidfastOrigins = [
     'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
     'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
@@ -1293,10 +1287,28 @@
 
     if (data.type === 'PLAYER_EVENT' && data.data) {
       const { event, currentTime, duration } = data.data;
-      if (typeof currentTime === 'number' && currentTime > 0) {
-        const seconds = Math.floor(currentTime);
+      
+      // FORCE SEEK HANDSHAKE for VidFast
+      if (!hasForcedSeekVidFast && loadedResumeTime > 0 && !seekCommandSent) {
+        if (event === 'ready' || event === 'loaded' || event === 'canplay' || event === 'play' || event === 'playing' || event === 'timeupdate') {
+          console.log(`VidFast: Sending seek command to ${loadedResumeTime}`);
+          embedIframe.contentWindow.postMessage({ command: 'seek', time: loadedResumeTime }, '*');
+          seekCommandSent = true;
+        }
+      }
 
-        // Pass to save functions (they handle protection window)
+      if (typeof currentTime === 'number' && currentTime > 0) {
+        // Block saving if player is stuck at a low timestamp while seek is applying
+        if (!hasForcedSeekVidFast && loadedResumeTime > 0 && currentTime < loadedResumeTime - 5 && (Date.now() - forceSeekStartTime < 15000)) {
+          return;
+        }
+        
+        // Mark as successfully seeked if we reach the target
+        if (loadedResumeTime > 0 && Math.abs(currentTime - loadedResumeTime) <= 5) {
+          hasForcedSeekVidFast = true;
+        }
+        
+        const seconds = Math.floor(currentTime);
         if (event === 'seeked' || event === 'pause' || event === 'ended') {
           saveProgressImmediately(seconds, `VidFast(${event})`);
         }
@@ -1416,7 +1428,8 @@
     currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
     
     // Reset force seek state for the new media item
-    hasForcedSeekVideasy = false;
+    hasForcedSeekVidFast = false;
+    seekCommandSent = false;
     forceSeekStartTime = Date.now();
 
     if (type === 'tv') {
