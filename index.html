@@ -1069,6 +1069,15 @@
     hasForcedSeekVidFast = false;
     seekCommandSent = false;
     forceSeekStartTime = Date.now();
+    
+    // CRITICAL FIX: Block incoming messages from the old iframe so they don't overwrite the 0s progress
+    ignoreAutoSaveUntil = Date.now() + 5000;
+    
+    lastPositionForJump = 0;
+    lastVidFastSave = 0;
+    lastVixSrcSaved = 0;
+    lastSaveTimestamp = 0;
+    lastSaveTime = Date.now();
   }
 
   async function goToPreviousEpisode() {
