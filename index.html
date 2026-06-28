@@ -251,11 +251,13 @@
       overflow: hidden;
       aspect-ratio: 16/9;
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+      position: relative;
     }
     iframe {
       width: 100%;
       height: 100%;
       border: none;
+      background: #000;
     }
     ::-webkit-scrollbar {
       width: 6px;
@@ -619,7 +621,6 @@
       <button id="clearSearchBtn" class="clear-search" aria-label="Clear search"><i class="fas fa-times-circle"></i></button>
     </div>
     <div class="nav-right">
-      <a href="#" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
       <button id="simklNavBtn" class="nav-btn" title="Simkl Integration"><i class="fas fa-sync-alt mr-1"></i> <span id="simklNavLabel">Simkl</span></button>
       <div id="userContainer" class="hidden avatar-wrapper">
         <div class="user-avatar" id="userAvatar">U</div>
@@ -645,7 +646,9 @@
     </section>
 
     <div id="playerPanel" class="hidden mb-12 player-modern">
-      <div class="embed-container"><iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="autoplay; encrypted-media"></iframe></div>
+      <div class="embed-container">
+        <iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="autoplay; encrypted-media" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"></iframe>
+      </div>
       <div class="info-section">
         <div id="tvControls" class="hidden mb-4">
           <div class="control-group flex flex-wrap items-center justify-between gap-3">
@@ -1606,7 +1609,10 @@
       // ─── PLAYER – FIXED RELOAD ──────────────────────────────────
 
       async function updateEmbedStream() {
-        if (!currentMedia) return;
+        if (!currentMedia) {
+          embedIframe.srcdoc = '<div style="color:red;padding:2rem">No media selected</div>';
+          return;
+        }
         const srcIdx = parseInt(sourceSelect.value);
         const src = EMBED_SOURCES[srcIdx];
         if (!src || typeof src.url !== 'function') {
@@ -1614,10 +1620,15 @@
           return;
         }
         let url = '';
-        if (src.name === 'Videasy' || src.name === 'VixSrc') {
-          url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
-        } else {
-          url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
+        try {
+          if (src.name === 'Videasy' || src.name === 'VixSrc') {
+            url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
+          } else {
+            url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
+          }
+        } catch (e) {
+          embedIframe.srcdoc = `<div style="color:red;padding:2rem">Error building URL</div>`;
+          return;
         }
         if (src.openInNewTab === true && url) {
           window.open(url, '_blank');
@@ -1628,12 +1639,16 @@
           // Force a complete reload: clear iframe, then set with cache buster
           embedIframe.src = 'about:blank';
           embedIframe.srcdoc = '';
-          // Wait a moment for the browser to clear
-          await new Promise(resolve => setTimeout(resolve, 150));
+          // Wait for browser to clear
+          await new Promise(resolve => setTimeout(resolve, 200));
           const separator = url.includes('?') ? '&' : '?';
           const cacheBuster = `_t=${Date.now()}`;
           const finalUrl = url + separator + cacheBuster;
           embedIframe.src = finalUrl;
+          // Also add a fallback if the iframe fails to load
+          embedIframe.onerror = function() {
+            showToast('Failed to load video. Try another source.');
+          };
         } else {
           embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
         }
