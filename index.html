@@ -364,7 +364,16 @@
   <div id="orderModal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Reorder Stream Sources</h3><div id="sourceList" class="mb-4" style="max-height: 50vh; overflow-y: auto;"></div><div class="flex gap-2"><button id="saveOrderBtn" class="bg-green-600 px-4 py-2 rounded-full">Save Order</button><button id="closeOrderBtn" class="bg-gray-600 px-4 py-2 rounded-full">Cancel</button></div></div></div>
 
   <!-- ===== LOGIN MODAL ===== -->
-  <div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden"><div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-green-500/30 relative"><h3 class="text-xl font-bold mb-4">Login</h3><input type="email" id="loginEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3"><input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4"><button id="doLoginBtn" class="w-full bg-green-500 text-black py-2 rounded-lg font-semibold">Login</button><p class="text-sm text-center mt-3 text-gray-400">New registrations are currently closed.</p><button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button></div></div>
+  <div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
+    <div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-green-500/30 relative">
+      <h3 class="text-xl font-bold mb-4">Login</h3>
+      <input type="email" id="loginEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3" />
+      <input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4" />
+      <button id="doLoginBtn" class="w-full bg-green-500 text-black py-2 rounded-lg font-semibold">Login</button>
+      <p class="text-sm text-center mt-3 text-gray-400">New registrations are currently closed.</p>
+      <button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button>
+    </div>
+  </div>
 
   <!-- ===== SIMKL MODAL ===== -->
   <div id="simklModal" class="modal">
@@ -448,6 +457,7 @@
 
   <script>
     (function() {
+      'use strict';
       console.log('WIZHUB starting...');
 
       // ─── SOURCES ────────────────────────────────────────────────
@@ -571,7 +581,7 @@
       const watchedSection = document.getElementById('watchedSection');
       const planToWatchSection = document.getElementById('planToWatchSection');
       const planToWatchContainer = document.getElementById('planToWatchContainer');
-      const simklNavBtn = document.getElementById('simklNavBtn'); // Now we'll show/hide
+      const simklNavBtn = document.getElementById('simklNavBtn');
 
       // Simkl modal refs
       const simklModal = document.getElementById('simklModal');
@@ -1930,7 +1940,48 @@
       closeOrderBtn.onclick = () => orderModal.style.display = 'none';
       orderSourcesBtn.onclick = openOrderModal;
 
-      // ─── EVENT BINDINGS ─────────────────────────────────────────
+      // ─── LOGIN / LOGOUT EVENTS ─────────────────────────────────
+
+      const loginModal = document.getElementById('loginModal');
+      document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
+      document.querySelectorAll('.closeModal').forEach(btn => btn.onclick = () => { loginModal.classList.add('hidden'); orderModal.style.display = 'none'; });
+
+      // Login button
+      document.getElementById('doLoginBtn').onclick = async () => {
+        const email = document.getElementById('loginEmail').value;
+        const pass = document.getElementById('loginPassword').value;
+        if (!email || !pass) {
+          alert('Please enter both email and password.');
+          return;
+        }
+        const btn = document.getElementById('doLoginBtn');
+        btn.disabled = true;
+        btn.textContent = 'Logging in...';
+        try {
+          const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+          if (error) {
+            alert(error.message);
+          } else {
+            loginModal.classList.add('hidden');
+            await updateAuthUI();
+          }
+        } catch (err) {
+          alert('Login error: ' + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Login';
+        }
+      };
+
+      // Logout
+      dropdownLogoutBtn.onclick = async () => {
+        await sb.auth.signOut();
+        await updateAuthUI();
+        playerPanel.classList.add('hidden');
+        closeDropdown();
+      };
+
+      // ─── OTHER EVENT BINDINGS ─────────────────────────────────
 
       brandLogo.addEventListener('click', () => window.location.reload());
 
@@ -1957,31 +2008,12 @@
       prevEpisodeBtn.onclick = goToPreviousEpisode;
       nextEpisodeBtn.onclick = goToNextEpisode;
       userAvatarDiv.addEventListener('click', toggleDropdown);
-      dropdownLogoutBtn.onclick = async () => {
-        await sb.auth.signOut();
-        updateAuthUI();
-        playerPanel.classList.add('hidden');
-        closeDropdown();
-      };
       detailTitleSpan.addEventListener('click', copyTitleToClipboard);
       copyTitleIcon.addEventListener('click', copyTitleToClipboard);
       globalSearch.addEventListener('input', handleSearchInput);
       clearSearchBtn.addEventListener('click', clearSearch);
       globalSearch.addEventListener('focus', updateContinueVisibility);
       globalSearch.addEventListener('blur', () => { setTimeout(() => { if (!globalSearch.value.trim()) updateContinueVisibility(); }, 200); });
-
-      // ─── LOGIN ──────────────────────────────────────────────────
-
-      const loginModal = document.getElementById('loginModal');
-      document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
-      document.querySelectorAll('.closeModal').forEach(btn => btn.onclick = () => { loginModal.classList.add('hidden'); orderModal.style.display = 'none'; });
-      document.getElementById('doLoginBtn').onclick = async () => {
-        const email = document.getElementById('loginEmail').value;
-        const pass = document.getElementById('loginPassword').value;
-        const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-        if (error) alert(error.message);
-        else { loginModal.classList.add('hidden'); updateAuthUI(); }
-      };
 
       // ─── INIT ────────────────────────────────────────────────────
 
@@ -1998,7 +2030,7 @@
       }
       init();
 
-      // Expose fetchSimklWatchlist so it can be called after Simkl connect
+      // Expose for debugging/refresh
       window.fetchSimklWatchlist = fetchSimklWatchlist;
 
     })();
