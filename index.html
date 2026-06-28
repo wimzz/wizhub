@@ -7,7 +7,8 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300A65F'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+  </script>
   <style>
     :root {
       --primary: #00A65F;
@@ -1262,7 +1263,7 @@
               const res = await fetchWithRetry(
                 `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`);
               const data = await res.json();
-              showDetails(data, type);
+              await showDetails(data, type);
             } catch (err) { alert('Failed to load details'); }
           });
         });
@@ -1366,7 +1367,7 @@
                   const res = await fetchWithRetry(
                     `https://api.themoviedb.org/3/${item.media_type}/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
                   const data = await res.json();
-                  showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
+                  await showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
                     .progress_seconds);
                 } catch (err) { alert('Failed to load'); }
               });
@@ -1427,7 +1428,7 @@
               const res = await fetchWithRetry(
                 `https://api.themoviedb.org/3/${item.media_type}/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
               const data = await res.json();
-              showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
+              await showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
                 .progress_seconds);
             } catch (err) { alert('Failed to load'); }
           });
@@ -1509,7 +1510,7 @@
           await loadEpisodes(tvId, currentSeason);
           await saveProgress();
           renderContinueWatching();
-          updateEmbedStream();
+          await updateEmbedStream();
           updateEpisodeNav();
         };
 
@@ -1521,7 +1522,7 @@
           loadedResumeTime = 0;
           await saveProgress();
           renderContinueWatching();
-          updateEmbedStream();
+          await updateEmbedStream();
           updateEpisodeNav();
         };
         updateEpisodeNav();
@@ -1568,7 +1569,7 @@
           loadedResumeTime = 0;
           await saveProgress();
           renderContinueWatching();
-          updateEmbedStream();
+          await updateEmbedStream();
           updateEpisodeNav();
         }
       }
@@ -1591,12 +1592,12 @@
           loadedResumeTime = 0;
           await saveProgress();
           renderContinueWatching();
-          updateEmbedStream();
+          await updateEmbedStream();
           updateEpisodeNav();
         }
       }
 
-      // ─── PLAYER ──────────────────────────────────────────────────
+      // ─── PLAYER – FIXED RELOAD ──────────────────────────────────
 
       async function updateEmbedStream() {
         if (!currentMedia) return;
@@ -1612,9 +1613,26 @@
         } else {
           url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
         }
-        if (src.openInNewTab === true && url) { window.open(url, '_blank'); return; }
-        if (url) embedIframe.src = url;
-        else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
+        if (src.openInNewTab === true && url) {
+          window.open(url, '_blank');
+          return;
+        }
+
+        // 🔥 FORCE HARD RELOAD – clear iframe, add cache buster
+        if (url) {
+          // Add a unique cache-busting parameter
+          const separator = url.includes('?') ? '&' : '?';
+          const cacheBuster = `_t=${Date.now()}`;
+          const finalUrl = url + separator + cacheBuster;
+
+          // Clear iframe then set new src (forces reload)
+          embedIframe.src = 'about:blank';
+          // Use requestAnimationFrame to ensure the clear takes effect
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          embedIframe.src = finalUrl;
+        } else {
+          embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
+        }
       }
 
       function nextSource() {
@@ -1823,7 +1841,9 @@
         playerPanel.classList.add('hidden');
       });
 
+      // Fix: reload button uses the same forced-reload function
       reloadEmbedBtn.addEventListener('click', updateEmbedStream);
+
       sourceSelect.addEventListener('change', () => {
         saveSelectedSource(parseInt(sourceSelect.value));
         updateEmbedStream();
