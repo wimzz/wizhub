@@ -7,8 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300A65F'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --primary: #00A65F;
@@ -256,7 +255,6 @@
       width: 100%;
       height: 100%;
       border: none;
-      background: #000;
     }
     ::-webkit-scrollbar {
       width: 6px;
@@ -620,6 +618,7 @@
       <button id="clearSearchBtn" class="clear-search" aria-label="Clear search"><i class="fas fa-times-circle"></i></button>
     </div>
     <div class="nav-right">
+      <a href="#" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
       <button id="simklNavBtn" class="nav-btn" title="Simkl Integration"><i class="fas fa-sync-alt mr-1"></i> <span id="simklNavLabel">Simkl</span></button>
       <div id="userContainer" class="hidden avatar-wrapper">
         <div class="user-avatar" id="userAvatar">U</div>
@@ -645,9 +644,7 @@
     </section>
 
     <div id="playerPanel" class="hidden mb-12 player-modern">
-      <div class="embed-container" id="embedContainer">
-        <iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="autoplay; encrypted-media" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"></iframe>
-      </div>
+      <div class="embed-container"><iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="autoplay; encrypted-media"></iframe></div>
       <div class="info-section">
         <div id="tvControls" class="hidden mb-4">
           <div class="control-group flex flex-wrap items-center justify-between gap-3">
@@ -894,8 +891,7 @@
       const trendingMoviesGrid = $('trendingMoviesGrid');
       const trendingTvGrid = $('trendingTvGrid');
       const playerPanel = $('playerPanel');
-      const embedContainer = $('embedContainer');
-      let embedIframe = $('embedIframe');
+      const embedIframe = $('embedIframe');
       const sourceSelect = $('sourceSelect');
       const tvControls = $('tvControls');
       const seasonSelect = $('seasonSelect');
@@ -1266,10 +1262,8 @@
               const res = await fetchWithRetry(
                 `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`);
               const data = await res.json();
-              await showDetails(data, type);
-            } catch (err) {
-              showToast('Failed to load details');
-            }
+              showDetails(data, type);
+            } catch (err) { alert('Failed to load details'); }
           });
         });
       }
@@ -1372,11 +1366,9 @@
                   const res = await fetchWithRetry(
                     `https://api.themoviedb.org/3/${item.media_type}/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
                   const data = await res.json();
-                  await showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
+                  showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
                     .progress_seconds);
-                } catch (err) {
-                  showToast('Failed to load');
-                }
+                } catch (err) { alert('Failed to load'); }
               });
               continueContainer.appendChild(card);
             }
@@ -1435,11 +1427,9 @@
               const res = await fetchWithRetry(
                 `https://api.themoviedb.org/3/${item.media_type}/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
               const data = await res.json();
-              await showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
+              showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
                 .progress_seconds);
-            } catch (err) {
-              showToast('Failed to load');
-            }
+            } catch (err) { alert('Failed to load'); }
           });
           continueContainer.appendChild(card);
         }
@@ -1519,7 +1509,7 @@
           await loadEpisodes(tvId, currentSeason);
           await saveProgress();
           renderContinueWatching();
-          await updateEmbedStream();
+          updateEmbedStream();
           updateEpisodeNav();
         };
 
@@ -1531,7 +1521,7 @@
           loadedResumeTime = 0;
           await saveProgress();
           renderContinueWatching();
-          await updateEmbedStream();
+          updateEmbedStream();
           updateEpisodeNav();
         };
         updateEpisodeNav();
@@ -1578,7 +1568,7 @@
           loadedResumeTime = 0;
           await saveProgress();
           renderContinueWatching();
-          await updateEmbedStream();
+          updateEmbedStream();
           updateEpisodeNav();
         }
       }
@@ -1601,72 +1591,30 @@
           loadedResumeTime = 0;
           await saveProgress();
           renderContinueWatching();
-          await updateEmbedStream();
+          updateEmbedStream();
           updateEpisodeNav();
         }
       }
 
-      // ─── PLAYER – FIXED RELOAD (recreate iframe) ──────────────
+      // ─── PLAYER ──────────────────────────────────────────────────
 
       async function updateEmbedStream() {
-        if (!currentMedia) {
-          embedContainer.innerHTML =
-            '<div style="color:red;padding:2rem;text-align:center;">No media selected</div>';
-          return;
-        }
+        if (!currentMedia) return;
         const srcIdx = parseInt(sourceSelect.value);
         const src = EMBED_SOURCES[srcIdx];
         if (!src || typeof src.url !== 'function') {
-          embedContainer.innerHTML =
-            '<div style="color:red;padding:2rem;text-align:center;">Invalid source</div>';
+          embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid source</div>';
           return;
         }
         let url = '';
-        try {
-          if (src.name === 'Videasy' || src.name === 'VixSrc') {
-            url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
-          } else {
-            url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
-          }
-        } catch (e) {
-          embedContainer.innerHTML =
-            `<div style="color:red;padding:2rem;text-align:center;">Error building URL</div>`;
-          return;
-        }
-        if (src.openInNewTab === true && url) {
-          window.open(url, '_blank');
-          return;
-        }
-
-        if (url) {
-          // Add cache buster
-          const separator = url.includes('?') ? '&' : '?';
-          const finalUrl = url + separator + '_t=' + Date.now();
-
-          // --- RECREATE IFRAME ---
-          const newIframe = document.createElement('iframe');
-          newIframe.id = 'embedIframe';
-          newIframe.allowFullscreen = true;
-          newIframe.referrerPolicy = 'no-referrer';
-          newIframe.allow = 'autoplay; encrypted-media';
-          newIframe.sandbox = 'allow-scripts allow-same-origin allow-forms allow-presentation';
-          newIframe.src = finalUrl;
-          newIframe.style.width = '100%';
-          newIframe.style.height = '100%';
-          newIframe.style.border = 'none';
-          newIframe.style.background = '#000';
-
-          // Replace the old iframe
-          embedContainer.innerHTML = '';
-          embedContainer.appendChild(newIframe);
-          embedIframe = newIframe;
-
-          // Optional: log for debugging
-          console.log('Player loaded:', finalUrl);
+        if (src.name === 'Videasy' || src.name === 'VixSrc') {
+          url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
         } else {
-          embedContainer.innerHTML =
-            '<div style="color:red;padding:2rem;text-align:center;">Invalid URL</div>';
+          url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
         }
+        if (src.openInNewTab === true && url) { window.open(url, '_blank'); return; }
+        if (url) embedIframe.src = url;
+        else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
       }
 
       function nextSource() {
@@ -1679,12 +1627,12 @@
       }
 
       async function copyVideoUrl() {
-        const url = embedIframe ? embedIframe.src : '';
-        if (!url || url === 'about:blank') { showToast('No video URL'); return; }
+        const url = embedIframe.src;
+        if (!url || url === 'about:blank') { alert('No video URL'); return; }
         try {
           await navigator.clipboard.writeText(url);
           showToast('✓ URL copied');
-        } catch (err) { showToast('Could not copy URL'); }
+        } catch (err) { alert('Could not copy URL'); }
       }
 
       // ─── SHOW DETAILS ───────────────────────────────────────────
@@ -1754,8 +1702,6 @@
 
         ignoreAutoSaveUntil = Date.now() + 5000;
         updateSimklUI();
-        // Force player to load after a small delay to ensure panel is visible
-        await new Promise(resolve => setTimeout(resolve, 300));
         await updateEmbedStream();
         playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -1878,7 +1824,6 @@
       });
 
       reloadEmbedBtn.addEventListener('click', updateEmbedStream);
-
       sourceSelect.addEventListener('change', () => {
         saveSelectedSource(parseInt(sourceSelect.value));
         updateEmbedStream();
@@ -1939,14 +1884,14 @@
       doLoginBtn.addEventListener('click', async () => {
         const email = loginEmail.value.trim();
         const pass = loginPassword.value.trim();
-        if (!email || !pass) { showToast('Enter email and password.'); return; }
+        if (!email || !pass) { alert('Enter email and password.'); return; }
         doLoginBtn.disabled = true;
         doLoginBtn.textContent = 'Logging in...';
         try {
           const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-          if (error) { showToast(error.message); } else { loginModal.classList.add('hidden');
+          if (error) { alert(error.message); } else { loginModal.classList.add('hidden');
             await updateAuthUI(); }
-        } catch (err) { showToast('Error: ' + err.message); } finally {
+        } catch (err) { alert('Error: ' + err.message); } finally {
           doLoginBtn.disabled = false;
           doLoginBtn.textContent = 'Login';
         }
