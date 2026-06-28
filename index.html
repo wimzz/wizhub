@@ -1264,7 +1264,9 @@
                 `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`);
               const data = await res.json();
               await showDetails(data, type);
-            } catch (err) { alert('Failed to load details'); }
+            } catch (err) {
+              showToast('Failed to load details');
+            }
           });
         });
       }
@@ -1369,7 +1371,9 @@
                   const data = await res.json();
                   await showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
                     .progress_seconds);
-                } catch (err) { alert('Failed to load'); }
+                } catch (err) {
+                  showToast('Failed to load');
+                }
               });
               continueContainer.appendChild(card);
             }
@@ -1430,7 +1434,9 @@
               const data = await res.json();
               await showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
                 .progress_seconds);
-            } catch (err) { alert('Failed to load'); }
+            } catch (err) {
+              showToast('Failed to load');
+            }
           });
           continueContainer.appendChild(card);
         }
@@ -1618,17 +1624,15 @@
           return;
         }
 
-        // 🔥 FORCE HARD RELOAD – clear iframe, add cache buster
         if (url) {
-          // Add a unique cache-busting parameter
+          // Force a complete reload: clear iframe, then set with cache buster
+          embedIframe.src = 'about:blank';
+          embedIframe.srcdoc = '';
+          // Wait a moment for the browser to clear
+          await new Promise(resolve => setTimeout(resolve, 150));
           const separator = url.includes('?') ? '&' : '?';
           const cacheBuster = `_t=${Date.now()}`;
           const finalUrl = url + separator + cacheBuster;
-
-          // Clear iframe then set new src (forces reload)
-          embedIframe.src = 'about:blank';
-          // Use requestAnimationFrame to ensure the clear takes effect
-          await new Promise(resolve => requestAnimationFrame(resolve));
           embedIframe.src = finalUrl;
         } else {
           embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
@@ -1646,11 +1650,11 @@
 
       async function copyVideoUrl() {
         const url = embedIframe.src;
-        if (!url || url === 'about:blank') { alert('No video URL'); return; }
+        if (!url || url === 'about:blank') { showToast('No video URL'); return; }
         try {
           await navigator.clipboard.writeText(url);
           showToast('✓ URL copied');
-        } catch (err) { alert('Could not copy URL'); }
+        } catch (err) { showToast('Could not copy URL'); }
       }
 
       // ─── SHOW DETAILS ───────────────────────────────────────────
@@ -1720,6 +1724,8 @@
 
         ignoreAutoSaveUntil = Date.now() + 5000;
         updateSimklUI();
+        // Force player to load after a small delay to ensure panel is visible
+        await new Promise(resolve => setTimeout(resolve, 300));
         await updateEmbedStream();
         playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -1841,7 +1847,6 @@
         playerPanel.classList.add('hidden');
       });
 
-      // Fix: reload button uses the same forced-reload function
       reloadEmbedBtn.addEventListener('click', updateEmbedStream);
 
       sourceSelect.addEventListener('change', () => {
@@ -1904,14 +1909,14 @@
       doLoginBtn.addEventListener('click', async () => {
         const email = loginEmail.value.trim();
         const pass = loginPassword.value.trim();
-        if (!email || !pass) { alert('Enter email and password.'); return; }
+        if (!email || !pass) { showToast('Enter email and password.'); return; }
         doLoginBtn.disabled = true;
         doLoginBtn.textContent = 'Logging in...';
         try {
           const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-          if (error) { alert(error.message); } else { loginModal.classList.add('hidden');
+          if (error) { showToast(error.message); } else { loginModal.classList.add('hidden');
             await updateAuthUI(); }
-        } catch (err) { alert('Error: ' + err.message); } finally {
+        } catch (err) { showToast('Error: ' + err.message); } finally {
           doLoginBtn.disabled = false;
           doLoginBtn.textContent = 'Login';
         }
