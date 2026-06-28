@@ -65,6 +65,9 @@
     .nav-btn-disabled { opacity: 0.6; cursor: not-allowed; border-color: gray; color: gray; }
     .nav-btn-disabled:hover { background: transparent; color: gray; }
 
+    /* Hide Simkl nav button by default; shown only when logged in */
+    #simklNavBtn { display: none; }
+
     .avatar-wrapper { position: relative; }
     .user-avatar {
       width: 40px; height: 40px; background: var(--primary); color: #0a0c10;
@@ -262,6 +265,7 @@
     </div>
     <div class="nav-right">
       <a href="oglist.html" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
+      <!-- Simkl nav button – hidden by default, shown after login -->
       <button id="simklNavBtn" class="nav-btn" title="Simkl Integration"><i class="fas fa-sync-alt mr-1"></i> <span id="simklNavLabel">Simkl</span></button>
       <div id="userContainer" class="hidden avatar-wrapper">
         <div class="user-avatar" id="userAvatar">U</div>
@@ -287,7 +291,7 @@
       <div id="continueWatchingContainer" class="horizontal-scroll"><div class="text-gray-400 text-sm">Log in to see your watch history.</div></div>
     </section>
 
-    <!-- Plan to Watch (Simkl) -->
+    <!-- Plan to Watch (Simkl) – hidden by default -->
     <section id="planToWatchSection" class="mb-12 plan-to-watch-hidden">
       <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4">
         <i class="fas fa-list" style="color:var(--primary);"></i> 📋 Plan to Watch (Simkl)
@@ -444,6 +448,8 @@
 
   <script>
     (function() {
+      console.log('WIZHUB starting...');
+
       // ─── SOURCES ────────────────────────────────────────────────
       const SOURCE_DEFINITIONS = [
         { name: 'VixSrc', url: (type, id, s, e, progressSec) => { let base = type === 'movie' ? `https://vixsrc.to/movie/${id}` : `https://vixsrc.to/tv/${id}/${s}/${e}`; return progressSec > 0 ? base + `?startAt=${progressSec}` : base; } },
@@ -565,6 +571,7 @@
       const watchedSection = document.getElementById('watchedSection');
       const planToWatchSection = document.getElementById('planToWatchSection');
       const planToWatchContainer = document.getElementById('planToWatchContainer');
+      const simklNavBtn = document.getElementById('simklNavBtn'); // Now we'll show/hide
 
       // Simkl modal refs
       const simklModal = document.getElementById('simklModal');
@@ -577,7 +584,6 @@
       const simklSaveBtn = document.getElementById('simklSaveBtn');
       const simklDisconnectBtn = document.getElementById('simklDisconnectBtn');
       const closeSimklBtn = document.getElementById('closeSimklBtn');
-      const simklNavBtn = document.getElementById('simklNavBtn');
       const simklNavLabel = document.getElementById('simklNavLabel');
       const simklSyncBtn = document.getElementById('simklSyncBtn');
       const simklIndicator = document.getElementById('simklIndicator');
@@ -954,6 +960,15 @@
         if (simklPollInterval) clearInterval(simklPollInterval);
         updateSimklUI();
         simklModal.style.display = 'flex';
+      }
+
+      // Show Simkl nav button only when logged in
+      function updateNavVisibility() {
+        if (currentUser) {
+          simklNavBtn.style.display = 'inline-block';
+        } else {
+          simklNavBtn.style.display = 'none';
+        }
       }
 
       simklNavBtn.onclick = openSimklModal;
@@ -1356,8 +1371,6 @@
         if (!currentMedia || currentMedia.type !== 'tv') return;
         const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
         if (idx > 0) {
-          // Mark current episode as watched before moving?
-          // Actually we only want to mark when we go next, not previous.
           await saveProgressToDB();
           currentEpisode = currentEpisodesList[idx - 1].episode_number;
           episodeSelect.value = currentEpisode;
@@ -1832,6 +1845,8 @@
           updateContinueVisibility();
           // Show watched section
           watchedSection.classList.remove('watched-section-hidden');
+          // Show Simkl nav button
+          simklNavBtn.style.display = 'inline-block';
         } else {
           document.getElementById('authContainer').classList.remove('hidden');
           document.getElementById('userContainer').classList.add('hidden');
@@ -1842,8 +1857,11 @@
           updateContinueVisibility();
           // Hide watched section
           watchedSection.classList.add('watched-section-hidden');
+          // Hide Simkl nav button
+          simklNavBtn.style.display = 'none';
         }
         updateSimklUI(); // this also handles plan-to-watch visibility
+        updateNavVisibility();
       }
 
       // ─── UI HELPERS ─────────────────────────────────────────────
@@ -1968,6 +1986,7 @@
       // ─── INIT ────────────────────────────────────────────────────
 
       async function init() {
+        console.log('Initializing WIZHUB...');
         EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
         populateSources();
         updateSimklUI();
@@ -1975,6 +1994,7 @@
         fetchTrending();
         sb.auth.onAuthStateChange(() => updateAuthUI());
         updateContinueVisibility();
+        console.log('WIZHUB initialized.');
       }
       init();
 
