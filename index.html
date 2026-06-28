@@ -10,247 +10,570 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
   </script>
   <style>
-    /* ===== CUSTOM VARIABLES ===== */
     :root {
       --primary: #00A65F;
       --primary-dark: #008a4a;
-      --primary-light: #4cbf8a;
       --primary-bg: rgba(0, 166, 95, 0.15);
     }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; }
-
-    /* ===== NAV ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #0a0c10;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
     .glass-nav {
       background: rgba(10, 12, 16, 0.85);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid rgba(0, 166, 95, 0.25);
       position: fixed;
-      top: 0; left: 0; width: 100%; z-index: 50;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 50;
       padding: 0.75rem 1rem;
-      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
     }
-    .brand { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
-    .brand i { font-size: 1.8rem; color: var(--primary); }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+    }
+    .brand i {
+      font-size: 1.8rem;
+      color: var(--primary);
+    }
     .brand span {
-      font-size: 1.5rem; font-weight: 800;
+      font-size: 1.5rem;
+      font-weight: 800;
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      background-clip: text; -webkit-background-clip: text; color: transparent;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
       letter-spacing: 1px;
     }
-
-    .search-wrapper { flex: 1 1 auto; min-width: 200px; position: relative; }
-    .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #9ca3af; pointer-events: none; }
+    .search-wrapper {
+      flex: 1 1 auto;
+      min-width: 200px;
+      position: relative;
+    }
+    .search-icon {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      pointer-events: none;
+    }
     .search-input {
-      width: 100%; background: #1a1d24; border: 1px solid #2d2f3e; border-radius: 2rem;
-      padding: 0.6rem 2.5rem 0.6rem 2.5rem; color: #f0f0f0; font-size: 0.9rem; transition: all 0.2s;
-    }
-    .search-input:focus {
-      outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-bg);
-    }
-    .clear-search {
-      position: absolute; right: 1rem; top: 50%; transform: translateY(-50%);
-      background: none; border: none; color: #9ca3af; cursor: pointer; display: none;
-    }
-    .clear-search:hover { color: var(--primary); }
-
-    .nav-right { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
-    .nav-btn {
-      background: transparent; border: 1px solid var(--primary); color: var(--primary);
-      padding: 0.4rem 1rem; border-radius: 2rem; font-size: 0.85rem; font-weight: 500;
-      transition: all 0.2s; cursor: pointer; white-space: nowrap;
-    }
-    .nav-btn:hover { background: var(--primary); color: #0a0c10; }
-    .nav-btn-disabled { opacity: 0.6; cursor: not-allowed; border-color: gray; color: gray; }
-    .nav-btn-disabled:hover { background: transparent; color: gray; }
-
-    /* Hide Simkl nav button by default; shown only when logged in */
-    #simklNavBtn { display: none; }
-
-    .avatar-wrapper { position: relative; }
-    .user-avatar {
-      width: 40px; height: 40px; background: var(--primary); color: #0a0c10;
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font-weight: bold; font-size: 1.2rem; text-transform: uppercase; cursor: pointer;
-      transition: transform 0.1s;
-    }
-    .user-avatar:hover { transform: scale(1.02); }
-    .avatar-dropdown {
-      position: absolute; top: 48px; right: 0; background: #1e212b;
-      border: 1px solid var(--primary); border-radius: 0.75rem; padding: 0.5rem;
-      min-width: 160px; z-index: 60; display: none; flex-direction: column; gap: 0.25rem;
-      backdrop-filter: blur(8px);
-    }
-    .avatar-dropdown.show { display: flex; }
-    .dropdown-item {
-      background: transparent; color: #e0e0e0; border: none; padding: 0.5rem 0.75rem;
-      border-radius: 0.5rem; text-align: left; cursor: pointer; transition: all 0.2s;
-      font-size: 0.85rem; width: 100%;
-    }
-    .dropdown-item:hover { background: var(--primary); color: #0a0c10; }
-
-    @media (max-width: 768px) { main { padding-top: 8rem !important; } }
-
-    /* ===== CARDS ===== */
-    .movie-card {
-      transition: transform 0.25s ease, box-shadow 0.25s;
-      cursor: pointer; background: #14161f; border-radius: 1rem; overflow: hidden; position: relative;
-    }
-    .movie-card:hover { transform: translateY(-6px); box-shadow: 0 20px 30px -12px rgba(0,0,0,0.6); }
-    .progress-overlay {
-      position: absolute; bottom: 0; left: 0; height: 4px;
-      background: var(--primary); width: 0%; transition: width 0.2s;
-    }
-    .delete-btn {
-      position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7);
-      border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-      color: #ff5555; cursor: pointer; z-index: 20;
-    }
-    .delete-btn:hover { background: #ff5555; color: white; }
-
-    /* ===== PLAYER ===== */
-    .embed-container { background: #000; border-radius: 1rem; overflow: hidden; aspect-ratio: 16/9; box-shadow: 0 8px 20px rgba(0,0,0,0.5); }
-    iframe { width: 100%; height: 100%; border: none; }
-
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #1e1f2c; }
-    ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
-
-    .horizontal-scroll {
-      display: flex; overflow-x: auto; gap: 1rem; scrollbar-width: thin;
-      padding-bottom: 0.5rem; -webkit-overflow-scrolling: touch;
-    }
-    .horizontal-scroll .movie-card { flex: 0 0 140px; }
-    @media (min-width: 768px) { .horizontal-scroll .movie-card { flex: 0 0 160px; } }
-
-    .modal {
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 200;
-    }
-    .modal-content { background: #1e1f2c; border-radius: 1rem; padding: 1.5rem; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; }
-
-    .source-item {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 0.5rem; background: #2a2c38; margin-bottom: 0.5rem; border-radius: 0.5rem;
-    }
-
-    .trending-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;
-    }
-    @media (min-width: 640px) { .trending-grid { grid-template-columns: repeat(3, 1fr); } }
-    @media (min-width: 768px) { .trending-grid { grid-template-columns: repeat(4, 1fr); } }
-    @media (min-width: 1024px) { .trending-grid { grid-template-columns: repeat(5, 1fr); } }
-    @media (min-width: 1280px) { .trending-grid { grid-template-columns: repeat(6, 1fr); } }
-
-    input, select, button { font-size: 16px; }
-
-    .player-modern {
-      background: linear-gradient(145deg, #101218, #0b0d12);
-      border-radius: 1.5rem; border: 1px solid var(--primary-bg);
-      box-shadow: 0 20px 35px -12px rgba(0,0,0,0.5); overflow: hidden;
-    }
-    .info-section { padding: 1.5rem; }
-    .info-row { display: flex; flex-direction: column; gap: 1.5rem; }
-    @media (min-width: 768px) {
-      .info-row { flex-direction: row; align-items: flex-start; }
-      .poster-col { flex: 0 0 140px; }
-      .details-col { flex: 1; }
-    }
-    .poster-wrapper { border-radius: 1rem; overflow: hidden; background: #07090e; box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
-    .poster-wrapper img { width: 100%; height: auto; display: block; }
-
-    .rating-badge {
-      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
-      padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 500;
-      display: inline-flex; align-items: center; gap: 6px;
-    }
-    .type-badge {
-      background: var(--primary-bg); border: 1px solid var(--primary);
-      padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; text-transform: uppercase; font-weight: 500;
-    }
-    .overview-text { color: #b0b8cc; line-height: 1.5; font-size: 0.9rem; }
-
-    .control-group {
-      background: rgba(0,0,0,0.3); border-radius: 1rem; padding: 0.75rem;
-    }
-    .select-modern {
-      background: #1a1d24; border: 1px solid #2d2f3e; border-radius: 2rem;
-      padding: 0.4rem 1rem; font-size: 0.85rem; color: white; transition: all 0.2s;
-    }
-    .select-modern:hover, .select-modern:focus { border-color: var(--primary); outline: none; }
-
-    .btn-icon {
-      background: #1e212b; border: none; border-radius: 2rem;
-      padding: 0.4rem 1rem; font-size: 0.8rem; font-weight: 500;
-      transition: all 0.2s; color: #e0e0e0; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 6px;
-    }
-    .btn-icon:hover { background: #2a2e3a; color: var(--primary); transform: translateY(-1px); }
-
-    .btn-primary {
-      background: var(--primary); color: #0a0c10; border: none;
-      border-radius: 2rem; padding: 0.4rem 1.2rem; font-weight: 600;
+      width: 100%;
+      background: #1a1d24;
+      border: 1px solid #2d2f3e;
+      border-radius: 2rem;
+      padding: 0.6rem 2.5rem 0.6rem 2.5rem;
+      color: #f0f0f0;
+      font-size: 0.9rem;
       transition: all 0.2s;
     }
-    .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 8px var(--primary-bg); }
-
-    .progress-input {
-      background: #1a1d24; border: 1px solid #2d2f3e; border-radius: 2rem;
-      padding: 0.4rem 1rem; width: 90px; text-align: center;
+    .search-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px var(--primary-bg);
     }
-
-    .episode-nav-modern { display: flex; gap: 0.8rem; flex-wrap: wrap; }
-    .episode-nav-modern button {
-      background: #1e212b; border: none; border-radius: 2rem;
-      padding: 0.3rem 1rem; font-size: 0.8rem; transition: all 0.2s;
+    .clear-search {
+      position: absolute;
+      right: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      display: none;
     }
-    .episode-nav-modern button:hover:not(:disabled) { background: var(--primary); color: #0a0c10; }
-    .episode-nav-modern button:disabled { opacity: 0.4; cursor: not-allowed; }
-
+    .clear-search:hover {
+      color: var(--primary);
+    }
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      background: transparent;
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      padding: 0.4rem 1rem;
+      border-radius: 2rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.2s;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .nav-btn:hover {
+      background: var(--primary);
+      color: #0a0c10;
+    }
+    .nav-btn-disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      border-color: gray;
+      color: gray;
+    }
+    .nav-btn-disabled:hover {
+      background: transparent;
+      color: gray;
+    }
+    #simklNavBtn {
+      display: none;
+    }
+    .avatar-wrapper {
+      position: relative;
+    }
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      background: var(--primary);
+      color: #0a0c10;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .user-avatar:hover {
+      transform: scale(1.02);
+    }
+    .avatar-dropdown {
+      position: absolute;
+      top: 48px;
+      right: 0;
+      background: #1e212b;
+      border: 1px solid var(--primary);
+      border-radius: 0.75rem;
+      padding: 0.5rem;
+      min-width: 160px;
+      z-index: 60;
+      display: none;
+      flex-direction: column;
+      gap: 0.25rem;
+      backdrop-filter: blur(8px);
+    }
+    .avatar-dropdown.show {
+      display: flex;
+    }
+    .dropdown-item {
+      background: transparent;
+      color: #e0e0e0;
+      border: none;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.85rem;
+      width: 100%;
+    }
+    .dropdown-item:hover {
+      background: var(--primary);
+      color: #0a0c10;
+    }
     @media (max-width: 768px) {
-      .info-section { padding: 1rem; }
-      .control-group .flex-wrap { justify-content: center; }
+      main {
+        padding-top: 8rem !important;
+      }
     }
-
+    .movie-card {
+      transition: transform 0.25s ease, box-shadow 0.25s;
+      cursor: pointer;
+      background: #14161f;
+      border-radius: 1rem;
+      overflow: hidden;
+      position: relative;
+    }
+    .movie-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.6);
+    }
+    .progress-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 4px;
+      background: var(--primary);
+      width: 0%;
+      transition: width 0.2s;
+    }
+    .delete-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ff5555;
+      cursor: pointer;
+      z-index: 20;
+    }
+    .delete-btn:hover {
+      background: #ff5555;
+      color: white;
+    }
+    .embed-container {
+      background: #000;
+      border-radius: 1rem;
+      overflow: hidden;
+      aspect-ratio: 16/9;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e1f2c;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--primary);
+      border-radius: 10px;
+    }
+    .horizontal-scroll {
+      display: flex;
+      overflow-x: auto;
+      gap: 1rem;
+      scrollbar-width: thin;
+      padding-bottom: 0.5rem;
+      -webkit-overflow-scrolling: touch;
+    }
+    .horizontal-scroll .movie-card {
+      flex: 0 0 140px;
+    }
+    @media (min-width: 768px) {
+      .horizontal-scroll .movie-card {
+        flex: 0 0 160px;
+      }
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .modal-content {
+      background: #1e1f2c;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      width: 90%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .source-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem;
+      background: #2a2c38;
+      margin-bottom: 0.5rem;
+      border-radius: 0.5rem;
+    }
+    .trending-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+    @media (min-width: 640px) {
+      .trending-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    @media (min-width: 768px) {
+      .trending-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+    @media (min-width: 1024px) {
+      .trending-grid {
+        grid-template-columns: repeat(5, 1fr);
+      }
+    }
+    @media (min-width: 1280px) {
+      .trending-grid {
+        grid-template-columns: repeat(6, 1fr);
+      }
+    }
+    input,
+    select,
+    button {
+      font-size: 16px;
+    }
+    .player-modern {
+      background: linear-gradient(145deg, #101218, #0b0d12);
+      border-radius: 1.5rem;
+      border: 1px solid var(--primary-bg);
+      box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+    .info-section {
+      padding: 1.5rem;
+    }
+    .info-row {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    @media (min-width: 768px) {
+      .info-row {
+        flex-direction: row;
+        align-items: flex-start;
+      }
+      .poster-col {
+        flex: 0 0 140px;
+      }
+      .details-col {
+        flex: 1;
+      }
+    }
+    .poster-wrapper {
+      border-radius: 1rem;
+      overflow: hidden;
+      background: #07090e;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+    }
+    .poster-wrapper img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .rating-badge {
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .type-badge {
+      background: var(--primary-bg);
+      border: 1px solid var(--primary);
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .overview-text {
+      color: #b0b8cc;
+      line-height: 1.5;
+      font-size: 0.9rem;
+    }
+    .control-group {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 1rem;
+      padding: 0.75rem;
+    }
+    .select-modern {
+      background: #1a1d24;
+      border: 1px solid #2d2f3e;
+      border-radius: 2rem;
+      padding: 0.4rem 1rem;
+      font-size: 0.85rem;
+      color: white;
+      transition: all 0.2s;
+    }
+    .select-modern:hover,
+    .select-modern:focus {
+      border-color: var(--primary);
+      outline: none;
+    }
+    .btn-icon {
+      background: #1e212b;
+      border: none;
+      border-radius: 2rem;
+      padding: 0.4rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: all 0.2s;
+      color: #e0e0e0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-icon:hover {
+      background: #2a2e3a;
+      color: var(--primary);
+      transform: translateY(-1px);
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #0a0c10;
+      border: none;
+      border-radius: 2rem;
+      padding: 0.4rem 1.2rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px var(--primary-bg);
+    }
+    .progress-input {
+      background: #1a1d24;
+      border: 1px solid #2d2f3e;
+      border-radius: 2rem;
+      padding: 0.4rem 1rem;
+      width: 90px;
+      text-align: center;
+    }
+    .episode-nav-modern {
+      display: flex;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+    }
+    .episode-nav-modern button {
+      background: #1e212b;
+      border: none;
+      border-radius: 2rem;
+      padding: 0.3rem 1rem;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+    .episode-nav-modern button:hover:not(:disabled) {
+      background: var(--primary);
+      color: #0a0c10;
+    }
+    .episode-nav-modern button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    @media (max-width: 768px) {
+      .info-section {
+        padding: 1rem;
+      }
+      .control-group .flex-wrap {
+        justify-content: center;
+      }
+    }
     .copy-title-icon {
-      cursor: pointer; margin-left: 0.5rem; font-size: 0.9rem;
-      color: #9ca3af; transition: color 0.2s;
+      cursor: pointer;
+      margin-left: 0.5rem;
+      font-size: 0.9rem;
+      color: #9ca3af;
+      transition: color 0.2s;
     }
-    .copy-title-icon:hover { color: var(--primary); }
-    .title-wrapper { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
-
-    .continue-section-hidden { display: none !important; }
-    .watched-section-hidden { display: none !important; }
-    .plan-to-watch-hidden { display: none !important; }
-
+    .copy-title-icon:hover {
+      color: var(--primary);
+    }
+    .title-wrapper {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .continue-section-hidden {
+      display: none !important;
+    }
+    .watched-section-hidden {
+      display: none !important;
+    }
+    .plan-to-watch-hidden {
+      display: none !important;
+    }
     .toast-notification {
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-      background: #2a2c38; color: var(--primary); padding: 8px 16px;
-      border-radius: 9999px; font-size: 14px; z-index: 300;
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2a2c38;
+      color: var(--primary);
+      padding: 8px 16px;
+      border-radius: 9999px;
+      font-size: 14px;
+      z-index: 300;
       animation: fadeOut 2s forwards;
     }
     @keyframes fadeOut {
-      0% { opacity: 1; }
-      70% { opacity: 1; }
-      100% { opacity: 0; visibility: hidden; }
+      0% {
+        opacity: 1;
+      }
+      70% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        visibility: hidden;
+      }
     }
-
     .simkl-pin-box {
-      background: #0a0c10; border-radius: 0.5rem; padding: 0.75rem;
-      font-family: monospace; font-size: 1.5rem; font-weight: bold; text-align: center;
-      color: var(--primary); border: 1px solid var(--primary); letter-spacing: 4px;
-      margin: 0.5rem 0; user-select: all;
+      background: #0a0c10;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      font-family: monospace;
+      font-size: 1.5rem;
+      font-weight: bold;
+      text-align: center;
+      color: var(--primary);
+      border: 1px solid var(--primary);
+      letter-spacing: 4px;
+      margin: 0.5rem 0;
+      user-select: all;
     }
-    .simkl-step { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid #2d2f3e33; }
+    .simkl-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #2d2f3e33;
+    }
     .simkl-step-num {
-      background: var(--primary-bg); color: var(--primary); border-radius: 50%;
-      width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
-      font-size: 0.75rem; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+      background: var(--primary-bg);
+      color: var(--primary);
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
     }
   </style>
 </head>
-<body class="text-gray-200">
+<body>
 
   <!-- ===== NAV ===== -->
   <nav class="glass-nav">
@@ -264,8 +587,7 @@
       <button id="clearSearchBtn" class="clear-search" aria-label="Clear search"><i class="fas fa-times-circle"></i></button>
     </div>
     <div class="nav-right">
-      <a href="oglist.html" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
-      <!-- Simkl nav button – hidden by default, shown after login -->
+      <a href="#" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
       <button id="simklNavBtn" class="nav-btn" title="Simkl Integration"><i class="fas fa-sync-alt mr-1"></i> <span id="simklNavLabel">Simkl</span></button>
       <div id="userContainer" class="hidden avatar-wrapper">
         <div class="user-avatar" id="userAvatar">U</div>
@@ -276,14 +598,13 @@
       </div>
       <div id="authContainer" class="flex gap-2">
         <button id="showLoginBtn" class="nav-btn">Login</button>
-        <button id="showSignupBtn" class="nav-btn nav-btn-disabled" disabled style="opacity:0.6; cursor:not-allowed;" title="Registration temporarily closed">Sign up (Closed)</button>
+        <button id="showSignupBtn" class="nav-btn nav-btn-disabled" disabled>Sign up (Closed)</button>
       </div>
     </div>
   </nav>
 
   <!-- ===== MAIN ===== -->
   <main class="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
-    <!-- Continue Watching -->
     <section id="continueWatchingSection" class="mb-12">
       <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4">
         <i class="fas fa-history" style="color:var(--primary);"></i> Continue Watching
@@ -291,15 +612,13 @@
       <div id="continueWatchingContainer" class="horizontal-scroll"><div class="text-gray-400 text-sm">Log in to see your watch history.</div></div>
     </section>
 
-    <!-- Plan to Watch (Simkl) – hidden by default -->
     <section id="planToWatchSection" class="mb-12 plan-to-watch-hidden">
       <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4">
-        <i class="fas fa-list" style="color:var(--primary);"></i> 📋 Plan to Watch (Simkl)
+        <i class="fas fa-list" style="color:var(--primary);"></i> 📋 Plan to Watch
       </h2>
       <div id="planToWatchContainer" class="trending-grid"></div>
     </section>
 
-    <!-- Player Panel -->
     <div id="playerPanel" class="hidden mb-12 player-modern">
       <div class="embed-container"><iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="autoplay; encrypted-media"></iframe></div>
       <div class="info-section">
@@ -323,24 +642,21 @@
               <button id="reloadEmbedBtn" class="btn-icon"><i class="fas fa-sync-alt"></i> Reload</button>
               <button id="nextSourceBtn" class="btn-icon"><i class="fas fa-forward"></i> Next</button>
               <button id="copyUrlBtn" class="btn-icon"><i class="fas fa-copy"></i> Copy URL</button>
-              <button id="orderSourcesBtn" class="btn-icon" title="Reorder sources"><i class="fas fa-arrows-alt"></i> Order</button>
-              <button id="simklSyncBtn" class="btn-icon" title="Mark as watched on Simkl"><i class="fas fa-cloud-upload-alt"></i> Simkl</button>
+              <button id="orderSourcesBtn" class="btn-icon"><i class="fas fa-arrows-alt"></i> Order</button>
+              <button id="simklSyncBtn" class="btn-icon"><i class="fas fa-cloud-upload-alt"></i> Simkl</button>
             </div>
           </div>
-
-          <!-- Watched section – hidden unless logged in -->
           <div id="watchedSection" class="control-group flex flex-wrap items-center gap-4 watched-section-hidden">
             <span class="text-sm"><i class="fas fa-clock" style="color:var(--primary);"></i> Watched (minutes):</span>
             <input type="number" id="progressMinutes" value="0" step="1" min="0" class="progress-input" />
             <button id="saveProgressBtn" class="btn-primary"><i class="fas fa-save"></i> Save Time</button>
           </div>
         </div>
-
         <div class="info-row">
-          <div class="poster-col"><div class="poster-wrapper rounded-xl shadow-lg"><img id="detailPoster" src="https://placehold.co/300x450" alt="poster" /></div></div>
+          <div class="poster-col"><div class="poster-wrapper"><img id="detailPoster" src="https://placehold.co/300x450" alt="poster" /></div></div>
           <div class="details-col">
             <div class="flex justify-between items-start flex-wrap gap-2">
-              <div class="title-wrapper"><h2 id="detailTitle" class="text-xl md:text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent cursor-pointer" title="Click to copy title"></h2><i class="fas fa-copy copy-title-icon" title="Copy title to clipboard"></i></div>
+              <div class="title-wrapper"><h2 id="detailTitle" class="text-xl md:text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent cursor-pointer"></h2><i class="fas fa-copy copy-title-icon"></i></div>
               <button id="closePlayerBtn" class="text-gray-400 hover:text-white text-xl">&times;</button>
             </div>
             <div class="flex flex-wrap items-center gap-3 mt-2">
@@ -355,13 +671,12 @@
       </div>
     </div>
 
-    <!-- Trending -->
     <section class="mb-12"><h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-fire text-orange-500"></i> Trending Movies</h2><div id="trendingMoviesGrid" class="trending-grid"></div></section>
     <section class="mb-12"><h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-5"><i class="fas fa-tv text-purple-400"></i> Trending TV Shows</h2><div id="trendingTvGrid" class="trending-grid"></div></section>
   </main>
 
   <!-- ===== ORDER MODAL ===== -->
-  <div id="orderModal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Reorder Stream Sources</h3><div id="sourceList" class="mb-4" style="max-height: 50vh; overflow-y: auto;"></div><div class="flex gap-2"><button id="saveOrderBtn" class="bg-green-600 px-4 py-2 rounded-full">Save Order</button><button id="closeOrderBtn" class="bg-gray-600 px-4 py-2 rounded-full">Cancel</button></div></div></div>
+  <div id="orderModal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Reorder Sources</h3><div id="sourceList" class="mb-4" style="max-height:50vh;overflow-y:auto;"></div><div class="flex gap-2"><button id="saveOrderBtn" class="bg-green-600 px-4 py-2 rounded-full">Save</button><button id="closeOrderBtn" class="bg-gray-600 px-4 py-2 rounded-full">Cancel</button></div></div></div>
 
   <!-- ===== LOGIN MODAL ===== -->
   <div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
@@ -382,66 +697,46 @@
         <h3 class="text-xl font-bold"><i class="fas fa-cloud" style="color:var(--primary);"></i> Simkl Integration</h3>
         <span id="simklStatusBadge" class="text-xs px-3 py-1 rounded-full bg-red-900/50 text-red-300 border border-red-700/50">Disconnected</span>
       </div>
-      <p class="text-sm text-gray-400 mb-4">Connect your Simkl account to automatically sync your watch history.</p>
-
-      <!-- Client ID -->
+      <p class="text-sm text-gray-400 mb-4">Connect your Simkl account to sync your watch history.</p>
       <label class="text-sm text-gray-300 block mb-1">Client ID <span style="color:var(--primary);">*</span></label>
       <input type="text" id="simklApiKey" placeholder="e.g. 1234567890abcdef" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-white" />
-
-      <!-- Access Token -->
       <label class="text-sm text-gray-300 block mb-1">Access Token <span style="color:var(--primary);">*</span></label>
       <div class="flex gap-2 mb-3">
         <input type="password" id="simklToken" placeholder="Paste your access token here" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg p-2 text-white" />
         <button id="simklGetTokenBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg whitespace-nowrap text-sm"><i class="fas fa-key mr-1"></i> Get Token</button>
       </div>
-
-      <!-- PIN flow area -->
       <div id="simklPinArea" class="hidden mb-4 p-3 bg-gray-800/60 rounded-lg border border-green-500/30">
-        <div class="simkl-step">
-          <div class="simkl-step-num">1</div>
-          <div><p class="text-sm text-gray-300">Copy the PIN below and paste it into the <strong>Simkl website</strong> that opened in a new tab.</p></div>
-        </div>
-        <div class="simkl-step">
-          <div class="simkl-step-num">2</div>
-          <div><p class="text-sm text-gray-300">After you authorize on Simkl, WIZHUB will automatically connect.</p></div>
-        </div>
+        <div class="simkl-step"><div class="simkl-step-num">1</div><div><p class="text-sm text-gray-300">Copy the PIN below and paste it into the <strong>Simkl website</strong> that opened in a new tab.</p></div></div>
+        <div class="simkl-step"><div class="simkl-step-num">2</div><div><p class="text-sm text-gray-300">After you authorize, WIZHUB will automatically connect.</p></div></div>
         <div class="mt-3">
           <p class="text-xs text-gray-400 mb-1">Your PIN:</p>
           <div class="simkl-pin-box" id="simklPinDisplay">------</div>
           <div class="flex gap-2 mt-2">
-            <button id="simklCopyPinBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs"><i class="fas fa-copy mr-1"></i> Copy PIN</button>
+            <button id="simklCopyPinBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs"><i class="fas fa-copy mr-1"></i> Copy</button>
             <button id="simklOpenVerificationBtn" class="bg-blue-700 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs"><i class="fas fa-external-link-alt mr-1"></i> Open Simkl</button>
           </div>
           <p id="simklPinStatus" class="text-xs text-yellow-400 mt-2"></p>
         </div>
         <div class="mt-3 border-t border-gray-700 pt-3">
-          <p class="text-xs text-gray-400">Alternatively, if you already have a token, paste it above and click <strong>Save</strong>.</p>
+          <p class="text-xs text-gray-400">Or enter PIN manually:</p>
           <div class="flex gap-2 mt-2">
-            <input type="text" id="simklPinInput" placeholder="Or enter PIN manually" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg p-2 text-white text-sm" />
+            <input type="text" id="simklPinInput" placeholder="Enter PIN" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg p-2 text-white text-sm" />
             <button id="simklPinAuthorizeBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold text-sm">Authorize</button>
           </div>
           <p id="simklManualPinStatus" class="text-xs text-gray-400 mt-1"></p>
         </div>
       </div>
-
-      <!-- Auto-sync -->
       <div class="flex items-center gap-2 mb-4 bg-gray-800/50 rounded-lg p-3">
         <input type="checkbox" id="simklAutoSync" class="cursor-pointer" />
         <label for="simklAutoSync" class="text-sm text-gray-300 cursor-pointer">Auto-sync when episode ends / movie completes</label>
       </div>
-
-      <!-- Message -->
       <div id="simklMessage" class="text-sm mb-3 hidden p-2 rounded-lg"></div>
-
-      <!-- Buttons -->
       <div class="flex flex-wrap gap-2">
         <button id="simklTestBtn" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-full text-sm"><i class="fas fa-plug mr-1"></i> Test</button>
         <button id="simklSaveBtn" class="bg-green-500 hover:bg-green-400 text-black px-4 py-2 rounded-full text-sm font-semibold"><i class="fas fa-save mr-1"></i> Save</button>
         <button id="simklDisconnectBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full text-sm"><i class="fas fa-trash mr-1"></i> Disconnect</button>
         <button id="closeSimklBtn" class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-full text-sm ml-auto">Close</button>
       </div>
-
-      <!-- Help -->
       <div class="mt-4 p-3 bg-gray-800/30 rounded-lg text-xs text-gray-400">
         <p class="font-semibold text-gray-300 mb-1">📘 How to connect:</p>
         <ol class="list-decimal ml-4 space-y-1">
@@ -449,7 +744,6 @@
           <li>Create a new app (name: WIZHUB, redirect URI: <code class="bg-gray-700 px-1 rounded">https://simkl.com/</code>)</li>
           <li>Copy the <strong>Client ID</strong> and paste it above</li>
           <li>Click <strong>"Get Token"</strong> → a new tab opens. Copy the PIN from WIZHUB, paste it on Simkl, and authorize.</li>
-          <li>WIZHUB will automatically connect. If not, paste the token manually and click <strong>Save</strong>.</li>
         </ol>
       </div>
     </div>
@@ -458,158 +752,191 @@
   <script>
     (function() {
       'use strict';
-      console.log('WIZHUB starting...');
+
+      // ─── CONSTANTS ──────────────────────────────────────────────
+      const SUPABASE_URL = 'https://evhtzfkxolnlqlmjewew.supabase.co';
+      const SUPABASE_ANON_KEY =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHR6Zmt4b2xubHFsbWpld2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTMzOTUsImV4cCI6MjA5NTg2OTM5NX0.42bpsGRyKSZcQ3EUj1k3grsUVuXtZWKsce7OKv8J5YU';
+      const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
+      const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+      const SIMKL_API_BASE = 'https://api.simkl.com';
+
+      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
       // ─── SOURCES ────────────────────────────────────────────────
       const SOURCE_DEFINITIONS = [
-        { name: 'VixSrc', url: (type, id, s, e, progressSec) => { let base = type === 'movie' ? `https://vixsrc.to/movie/${id}` : `https://vixsrc.to/tv/${id}/${s}/${e}`; return progressSec > 0 ? base + `?startAt=${progressSec}` : base; } },
-        { name: 'Videasy', url: (type, id, s, e, progressSec) => { let base = type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}`; return progressSec > 0 ? base + `?progress=${progressSec}` : base; } },
-        { name: 'VidFast', url: (type, id, s, e, progressSec) => { let base = type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true`; return base; } },
-        { name: 'Rivestream', url: (type, id, s, e) => type === 'movie' ? `https://watch.rivestream.app/embed?type=movie&id=${id}` : `https://watch.rivestream.app/embed?type=tv&id=${id}&season=${s}&episode=${e}` },
-        { name: 'ZxcStream', url: (type, id, s, e) => type === 'movie' ? `https://zxcstream.xyz/player/movie/${id}` : `https://zxcstream.xyz/player/tv/${id}/${s}/${e}` },
-        { name: 'Peachify', url: (type, id, s, e) => type === 'movie' ? `https://peachify.top/embed/movie/${id}` : `https://peachify.top/embed/tv/${id}/${s}/${e}` },
-        { name: 'VidSync', url: (type, id, s, e) => type === 'movie' ? `https://vidsync.live/embed/movie/${id}?autoPlay=true` : `https://vidsync.live/embed/tv/${id}/${s}/${e}?autoPlay=true&autoNext=true` },
-        { name: 'Nxsha', url: (type, id, s, e) => type === 'movie' ? `https://web.nxsha.app/embed/movie/${id}` : `https://web.nxsha.app/embed/tv/${id}/${s}/${e}` },
-        { name: 'VAPlayer', url: (type, id, s, e) => type === 'movie' ? `https://vaplayer.ru/embed/movie/${id}` : `https://vaplayer.ru/embed/tv/${id}/${s}/${e}` },
-        { name: 'VidLink', url: (type, id, s, e) => type === 'movie' ? `https://vidlink.pro/movie/${id}` : `https://vidlink.pro/tv/${id}/${s}/${e}` },
-        { name: 'VidUp', url: (type, id, s, e) => type === 'movie' ? `https://vidup.to/movie/${id}` : `https://vidup.to/tv/${id}/${s}/${e}` },
-        { name: 'VidCore', url: (type, id, s, e) => type === 'movie' ? `https://vidcore.net/movie/${id}` : `https://vidcore.net/tv/${id}/${s}/${e}` },
-        { name: '111Movies', url: (type, id, s, e) => type === 'movie' ? `https://111movies.net/movie/${id}` : `https://111movies.net/tv/${id}/${s}/${e}` },
-        { name: 'EmbedMaster', url: (type, id, s, e) => type === 'movie' ? `https://embedmaster.link/movie/${id}` : `https://embedmaster.link/tv/${id}/${s}/${e}` },
-        { name: 'AnyEmbed', url: (type, id, s, e) => type === 'movie' ? `https://anyembed.xyz/embed/tmdb-movie-${id}` : `https://anyembed.xyz/embed/tmdb-tv-${id}-${s}-${e}` },
-        { name: 'NHD API', url: (type, id, s, e) => type === 'movie' ? `https://nhdapi.com/embed/movie/${id}` : `https://nhdapi.com/embed/tv/${id}/${s}/${e}` },
-        { name: 'FilmU', url: (type, id, s, e) => type === 'movie' ? `https://embed.filmu.in/movie/${id}` : `https://embed.filmu.in/tv/${id}/${s}/${e}` },
-        { name: 'Vidsrc', url: (type, id, s, e) => type === 'movie' ? `https://vidsrc.to/embed/movie/${id}` : `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
-        { name: 'VidRock', url: (type, id, s, e) => type === 'movie' ? `https://vidrock.ru/movie/${id}` : `https://vidrock.ru/tv/${id}/${s}/${e}` },
-        { name: 'Vidzee', url: (type, id, s, e) => type === 'movie' ? `https://player.vidzee.wtf/v2/embed/movie/${id}` : `https://player.vidzee.wtf/v2/embed/tv/${id}/${s}/${e}` },
-        { name: 'Cinezo', url: (type, id, s, e) => type === 'movie' ? `https://player.cinezo.live/embed/movie/${id}` : `https://player.cinezo.live/embed/tv/${id}/${s}/${e}` },
-        { name: '1Embed', url: (type, id, s, e) => type === 'movie' ? `https://1embed.cc/embed/movie/${id}` : `https://1embed.cc/embed/tv/${id}/${s}/${e}` },
-        { name: '2Embed', url: (type, id, s, e) => type === 'movie' ? `https://www.2embed.cc/embed/${id}` : `https://www.2embed.cc/embedtv/${id}&s=${s}&e=${e}` },
-        { name: 'NontonGo', url: (type, id, s, e) => type === 'movie' ? `https://www.NontonGo.win/embed/movie/${id}` : `https://www.NontonGo.win/embed/tv/${id}/${s}/${e}` },
-        { name: 'Xpass', url: (type, id, s, e) => type === 'movie' ? `https://play.xpass.top/e/movie/${id}` : `https://play.xpass.top/e/tv/${id}/${s}/${e}` },
-        { name: 'CinemaOS', url: (type, id, s, e) => type === 'movie' ? `https://cinemaos.tech/player/${id}` : `https://cinemaos.tech/player/${id}/${s}/${e}` },
-        { name: 'SpencerDevs', url: (type, id, s, e) => type === 'movie' ? `https://spencerdevs.xyz/movie/${id}` : `https://spencerdevs.xyz/tv/${id}/${s}/${e}` },
+        { name: 'VixSrc', url: (t, id, s, e, p) => { let b = t === 'movie' ? `https://vixsrc.to/movie/${id}` :
+            `https://vixsrc.to/tv/${id}/${s}/${e}`; return p > 0 ? b + `?startAt=${p}` : b; } },
+        { name: 'Videasy', url: (t, id, s, e, p) => { let b = t === 'movie' ? `https://player.videasy.net/movie/${id}` :
+            `https://player.videasy.net/tv/${id}/${s}/${e}`; return p > 0 ? b + `?progress=${p}` : b; } },
+        { name: 'VidFast', url: (t, id, s, e) => t === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` :
+            `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
+        { name: 'Rivestream', url: (t, id, s, e) => t === 'movie' ?
+            `https://watch.rivestream.app/embed?type=movie&id=${id}` :
+            `https://watch.rivestream.app/embed?type=tv&id=${id}&season=${s}&episode=${e}` },
+        { name: 'ZxcStream', url: (t, id, s, e) => t === 'movie' ? `https://zxcstream.xyz/player/movie/${id}` :
+            `https://zxcstream.xyz/player/tv/${id}/${s}/${e}` },
+        { name: 'Peachify', url: (t, id, s, e) => t === 'movie' ? `https://peachify.top/embed/movie/${id}` :
+            `https://peachify.top/embed/tv/${id}/${s}/${e}` },
+        { name: 'VidSync', url: (t, id, s, e) => t === 'movie' ? `https://vidsync.live/embed/movie/${id}?autoPlay=true` :
+            `https://vidsync.live/embed/tv/${id}/${s}/${e}?autoPlay=true&autoNext=true` },
+        { name: 'Nxsha', url: (t, id, s, e) => t === 'movie' ? `https://web.nxsha.app/embed/movie/${id}` :
+            `https://web.nxsha.app/embed/tv/${id}/${s}/${e}` },
+        { name: 'VAPlayer', url: (t, id, s, e) => t === 'movie' ? `https://vaplayer.ru/embed/movie/${id}` :
+            `https://vaplayer.ru/embed/tv/${id}/${s}/${e}` },
+        { name: 'VidLink', url: (t, id, s, e) => t === 'movie' ? `https://vidlink.pro/movie/${id}` :
+            `https://vidlink.pro/tv/${id}/${s}/${e}` },
+        { name: 'VidUp', url: (t, id, s, e) => t === 'movie' ? `https://vidup.to/movie/${id}` :
+            `https://vidup.to/tv/${id}/${s}/${e}` },
+        { name: 'VidCore', url: (t, id, s, e) => t === 'movie' ? `https://vidcore.net/movie/${id}` :
+            `https://vidcore.net/tv/${id}/${s}/${e}` },
+        { name: '111Movies', url: (t, id, s, e) => t === 'movie' ? `https://111movies.net/movie/${id}` :
+            `https://111movies.net/tv/${id}/${s}/${e}` },
+        { name: 'EmbedMaster', url: (t, id, s, e) => t === 'movie' ? `https://embedmaster.link/movie/${id}` :
+            `https://embedmaster.link/tv/${id}/${s}/${e}` },
+        { name: 'AnyEmbed', url: (t, id, s, e) => t === 'movie' ? `https://anyembed.xyz/embed/tmdb-movie-${id}` :
+            `https://anyembed.xyz/embed/tmdb-tv-${id}-${s}-${e}` },
+        { name: 'NHD API', url: (t, id, s, e) => t === 'movie' ? `https://nhdapi.com/embed/movie/${id}` :
+            `https://nhdapi.com/embed/tv/${id}/${s}/${e}` },
+        { name: 'FilmU', url: (t, id, s, e) => t === 'movie' ? `https://embed.filmu.in/movie/${id}` :
+            `https://embed.filmu.in/tv/${id}/${s}/${e}` },
+        { name: 'Vidsrc', url: (t, id, s, e) => t === 'movie' ? `https://vidsrc.to/embed/movie/${id}` :
+            `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
+        { name: 'VidRock', url: (t, id, s, e) => t === 'movie' ? `https://vidrock.ru/movie/${id}` :
+            `https://vidrock.ru/tv/${id}/${s}/${e}` },
+        { name: 'Vidzee', url: (t, id, s, e) => t === 'movie' ? `https://player.vidzee.wtf/v2/embed/movie/${id}` :
+            `https://player.vidzee.wtf/v2/embed/tv/${id}/${s}/${e}` },
+        { name: 'Cinezo', url: (t, id, s, e) => t === 'movie' ? `https://player.cinezo.live/embed/movie/${id}` :
+            `https://player.cinezo.live/embed/tv/${id}/${s}/${e}` },
+        { name: '1Embed', url: (t, id, s, e) => t === 'movie' ? `https://1embed.cc/embed/movie/${id}` :
+            `https://1embed.cc/embed/tv/${id}/${s}/${e}` },
+        { name: '2Embed', url: (t, id, s, e) => t === 'movie' ? `https://www.2embed.cc/embed/${id}` :
+            `https://www.2embed.cc/embedtv/${id}&s=${s}&e=${e}` },
+        { name: 'NontonGo', url: (t, id, s, e) => t === 'movie' ? `https://www.NontonGo.win/embed/movie/${id}` :
+            `https://www.NontonGo.win/embed/tv/${id}/${s}/${e}` },
+        { name: 'Xpass', url: (t, id, s, e) => t === 'movie' ? `https://play.xpass.top/e/movie/${id}` :
+            `https://play.xpass.top/e/tv/${id}/${s}/${e}` },
+        { name: 'CinemaOS', url: (t, id, s, e) => t === 'movie' ? `https://cinemaos.tech/player/${id}` :
+            `https://cinemaos.tech/player/${id}/${s}/${e}` },
+        { name: 'SpencerDevs', url: (t, id, s, e) => t === 'movie' ? `https://spencerdevs.xyz/movie/${id}` :
+            `https://spencerdevs.xyz/tv/${id}/${s}/${e}` },
         { name: 'Netplayz (Site)', url: () => `https://netplayz.live`, openInNewTab: true },
         { name: '🎬 CinemaOS (Site)', url: () => `https://cinemaos.live`, openInNewTab: true },
         { name: '🎌 AnimePahe (Site)', url: () => `https://animepahe.org`, openInNewTab: true }
       ];
 
-      const DEFAULT_ORDER_NAMES = [
+      const DEFAULT_ORDER = [
         "VixSrc", "Videasy", "VidFast", "Rivestream", "ZxcStream", "Peachify", "VidSync", "Nxsha", "VAPlayer",
         "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "NHD API", "FilmU", "Vidsrc",
         "VidRock", "Vidzee", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs",
         "Netplayz (Site)", "🎬 CinemaOS (Site)", "🎌 AnimePahe (Site)"
       ];
 
-      function buildOrderedSources(orderNames) {
-        const ordered = [];
-        for (const name of orderNames) {
+      function buildSources(order) {
+        const result = [];
+        for (const name of order) {
           const found = SOURCE_DEFINITIONS.find(s => s.name === name);
-          if (found) ordered.push(found);
+          if (found) result.push(found);
         }
-        for (const src of SOURCE_DEFINITIONS) {
-          if (!ordered.find(s => s.name === src.name)) ordered.push(src);
+        for (const s of SOURCE_DEFINITIONS) {
+          if (!result.find(r => r.name === s.name)) result.push(s);
         }
-        return ordered;
+        return result;
       }
 
-      let EMBED_SOURCES = [];
+      let EMBED_SOURCES = buildSources(DEFAULT_ORDER);
 
-      // ─── SUPABASE ──────────────────────────────────────────────
-      const SUPABASE_URL = 'https://evhtzfkxolnlqlmjewew.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHR6Zmt4b2xubHFsbWpld2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTMzOTUsImV4cCI6MjA5NTg2OTM5NX0.42bpsGRyKSZcQ3EUj1k3grsUVuXtZWKsce7OKv8J5YU';
-      const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
-      const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
-      const SIMKL_API_BASE = 'https://api.simkl.com';
-      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
+      // ─── STATE ──────────────────────────────────────────────────
       let currentUser = null;
       let currentMedia = null;
-      let currentSeason = 1, currentEpisode = 1;
+      let currentSeason = 1,
+        currentEpisode = 1;
       let currentProgressSeconds = 0;
-      let currentProgressMinutes = 0;
-      let currentTVDetails = null;
       let currentEpisodesList = [];
-      let lastPositionForJump = 0;
-      let lastVidFastSave = 0;
-      let lastVixSrcSaved = 0;
-      let lastSaveTimestamp = 0;
-      let ignoreAutoSaveUntil = 0;
-      let supabaseAvailable = true;
-      let lastSaveTime = 0;
       let loadedResumeTime = 0;
+      let ignoreAutoSaveUntil = 0;
+      let lastSaveTime = 0;
       let currentMediaEnded = false;
-      let hasForcedSeekVidFast = false;
-      let seekCommandSent = false;
-      let forceSeekStartTime = 0;
       let simklSyncedKeys = new Set();
       let simklPollInterval = null;
       let simklCurrentUserCode = null;
 
       // ─── DOM REFS ──────────────────────────────────────────────
-      const continueContainer = document.getElementById('continueWatchingContainer');
-      const trendingMoviesGrid = document.getElementById('trendingMoviesGrid');
-      const trendingTvGrid = document.getElementById('trendingTvGrid');
-      const playerPanel = document.getElementById('playerPanel');
-      const closePlayerBtn = document.getElementById('closePlayerBtn');
-      const sourceSelect = document.getElementById('sourceSelect');
-      const embedIframe = document.getElementById('embedIframe');
-      const tvControlsDiv = document.getElementById('tvControls');
-      const seasonSelect = document.getElementById('seasonSelect');
-      const episodeSelect = document.getElementById('episodeSelect');
-      const prevEpisodeBtn = document.getElementById('prevEpisodeBtn');
-      const nextEpisodeBtn = document.getElementById('nextEpisodeBtn');
-      const progressMinutesInput = document.getElementById('progressMinutes');
-      const saveProgressBtn = document.getElementById('saveProgressBtn');
-      const reloadEmbedBtn = document.getElementById('reloadEmbedBtn');
-      const nextSourceBtn = document.getElementById('nextSourceBtn');
-      const copyUrlBtn = document.getElementById('copyUrlBtn');
-      const globalSearch = document.getElementById('globalSearch');
-      const clearSearchBtn = document.getElementById('clearSearchBtn');
-      const orderModal = document.getElementById('orderModal');
-      const sourceListDiv = document.getElementById('sourceList');
-      const saveOrderBtn = document.getElementById('saveOrderBtn');
-      const closeOrderBtn = document.getElementById('closeOrderBtn');
-      const orderSourcesBtn = document.getElementById('orderSourcesBtn');
-      const detailTitleSpan = document.getElementById('detailTitle');
-      const copyTitleIcon = document.querySelector('.copy-title-icon');
-      const userAvatarDiv = document.getElementById('userAvatar');
-      const avatarDropdown = document.getElementById('avatarDropdown');
-      const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
-      const dropdownSimklBtn = document.getElementById('dropdownSimklBtn');
-      const brandLogo = document.getElementById('brandLogo');
-      const watchedSection = document.getElementById('watchedSection');
-      const planToWatchSection = document.getElementById('planToWatchSection');
-      const planToWatchContainer = document.getElementById('planToWatchContainer');
-      const simklNavBtn = document.getElementById('simklNavBtn');
+      const $ = id => document.getElementById(id);
+      const continueContainer = $('continueWatchingContainer');
+      const trendingMoviesGrid = $('trendingMoviesGrid');
+      const trendingTvGrid = $('trendingTvGrid');
+      const playerPanel = $('playerPanel');
+      const embedIframe = $('embedIframe');
+      const sourceSelect = $('sourceSelect');
+      const tvControls = $('tvControls');
+      const seasonSelect = $('seasonSelect');
+      const episodeSelect = $('episodeSelect');
+      const prevEpisodeBtn = $('prevEpisodeBtn');
+      const nextEpisodeBtn = $('nextEpisodeBtn');
+      const progressMinutesInput = $('progressMinutes');
+      const saveProgressBtn = $('saveProgressBtn');
+      const reloadEmbedBtn = $('reloadEmbedBtn');
+      const nextSourceBtn = $('nextSourceBtn');
+      const copyUrlBtn = $('copyUrlBtn');
+      const orderSourcesBtn = $('orderSourcesBtn');
+      const closePlayerBtn = $('closePlayerBtn');
+      const detailTitle = $('detailTitle');
+      const detailPoster = $('detailPoster');
+      const detailOverview = $('detailOverview');
+      const detailRating = $('detailRating');
+      const detailYear = $('detailYear');
+      const detailType = $('detailType');
+      const simklIndicator = $('simklIndicator');
+      const simklSyncBtn = $('simklSyncBtn');
+      const watchedSection = $('watchedSection');
+      const planToWatchSection = $('planToWatchSection');
+      const planToWatchContainer = $('planToWatchContainer');
+      const simklNavBtn = $('simklNavBtn');
+      const simklNavLabel = $('simklNavLabel');
+      const userAvatar = $('userAvatar');
+      const avatarDropdown = $('avatarDropdown');
+      const dropdownLogoutBtn = $('dropdownLogoutBtn');
+      const dropdownSimklBtn = $('dropdownSimklBtn');
+      const brandLogo = $('brandLogo');
+      const globalSearch = $('globalSearch');
+      const clearSearchBtn = $('clearSearchBtn');
+      const orderModal = $('orderModal');
+      const sourceListDiv = $('sourceList');
+      const saveOrderBtn = $('saveOrderBtn');
+      const closeOrderBtn = $('closeOrderBtn');
 
-      // Simkl modal refs
-      const simklModal = document.getElementById('simklModal');
-      const simklApiKeyInput = document.getElementById('simklApiKey');
-      const simklTokenInput = document.getElementById('simklToken');
-      const simklAutoSyncCheckbox = document.getElementById('simklAutoSync');
-      const simklStatusBadge = document.getElementById('simklStatusBadge');
-      const simklMessage = document.getElementById('simklMessage');
-      const simklTestBtn = document.getElementById('simklTestBtn');
-      const simklSaveBtn = document.getElementById('simklSaveBtn');
-      const simklDisconnectBtn = document.getElementById('simklDisconnectBtn');
-      const closeSimklBtn = document.getElementById('closeSimklBtn');
-      const simklNavLabel = document.getElementById('simklNavLabel');
-      const simklSyncBtn = document.getElementById('simklSyncBtn');
-      const simklIndicator = document.getElementById('simklIndicator');
-      const simklGetTokenBtn = document.getElementById('simklGetTokenBtn');
-      const simklPinArea = document.getElementById('simklPinArea');
-      const simklPinInput = document.getElementById('simklPinInput');
-      const simklPinAuthorizeBtn = document.getElementById('simklPinAuthorizeBtn');
-      const simklPinStatus = document.getElementById('simklPinStatus');
-      const simklPinDisplay = document.getElementById('simklPinDisplay');
-      const simklCopyPinBtn = document.getElementById('simklCopyPinBtn');
-      const simklOpenVerificationBtn = document.getElementById('simklOpenVerificationBtn');
-      const simklManualPinStatus = document.getElementById('simklManualPinStatus');
+      // Simkl modal
+      const simklModal = $('simklModal');
+      const simklApiKeyInput = $('simklApiKey');
+      const simklTokenInput = $('simklToken');
+      const simklAutoSyncCheckbox = $('simklAutoSync');
+      const simklStatusBadge = $('simklStatusBadge');
+      const simklMessage = $('simklMessage');
+      const simklTestBtn = $('simklTestBtn');
+      const simklSaveBtn = $('simklSaveBtn');
+      const simklDisconnectBtn = $('simklDisconnectBtn');
+      const closeSimklBtn = $('closeSimklBtn');
+      const simklGetTokenBtn = $('simklGetTokenBtn');
+      const simklPinArea = $('simklPinArea');
+      const simklPinInput = $('simklPinInput');
+      const simklPinAuthorizeBtn = $('simklPinAuthorizeBtn');
+      const simklPinStatus = $('simklPinStatus');
+      const simklPinDisplay = $('simklPinDisplay');
+      const simklCopyPinBtn = $('simklCopyPinBtn');
+      const simklOpenVerificationBtn = $('simklOpenVerificationBtn');
+      const simklManualPinStatus = $('simklManualPinStatus');
+
+      // Login
+      const loginModal = $('loginModal');
+      const loginEmail = $('loginEmail');
+      const loginPassword = $('loginPassword');
+      const doLoginBtn = $('doLoginBtn');
+      const showLoginBtn = $('showLoginBtn');
 
       // ─── SIMKL HELPERS ──────────────────────────────────────────
 
-      function getSimklCredentials() {
+      function getSimklCreds() {
         try {
           return {
             apiKey: localStorage.getItem('wizhub_simkl_apikey') || '',
@@ -619,13 +946,13 @@
         } catch { return { apiKey: '', token: '', autoSync: false }; }
       }
 
-      function saveSimklCredentials(apiKey, token, autoSync) {
+      function saveSimklCreds(apiKey, token, autoSync) {
         if (apiKey) localStorage.setItem('wizhub_simkl_apikey', apiKey);
         if (token) localStorage.setItem('wizhub_simkl_token', token);
         localStorage.setItem('wizhub_simkl_autosync', autoSync ? 'true' : 'false');
       }
 
-      function clearSimklCredentials() {
+      function clearSimklCreds() {
         localStorage.removeItem('wizhub_simkl_apikey');
         localStorage.removeItem('wizhub_simkl_token');
         localStorage.removeItem('wizhub_simkl_autosync');
@@ -633,13 +960,13 @@
       }
 
       function isSimklConnected() {
-        const { apiKey, token } = getSimklCredentials();
-        return !!(apiKey && token);
+        const c = getSimklCreds();
+        return !!(c.apiKey && c.token);
       }
 
       function updateSimklUI() {
         const connected = isSimklConnected();
-        const { autoSync } = getSimklCredentials();
+        const creds = getSimklCreds();
 
         if (connected) {
           simklStatusBadge.textContent = '✓ Connected';
@@ -655,10 +982,11 @@
           simklNavBtn.style.color = '';
         }
 
-        simklAutoSyncCheckbox.checked = autoSync;
-        if (simklSyncBtn) {
-          simklSyncBtn.classList.toggle('hidden', !connected);
-        }
+        simklAutoSyncCheckbox.checked = creds.autoSync;
+        simklApiKeyInput.value = creds.apiKey;
+        simklTokenInput.value = creds.token;
+
+        if (simklSyncBtn) simklSyncBtn.classList.toggle('hidden', !connected);
         if (simklIndicator) {
           if (connected) {
             simklIndicator.classList.remove('hidden');
@@ -668,35 +996,33 @@
           }
         }
 
-        // Toggle plan-to-watch visibility
+        // Plan to watch
         if (currentUser && connected) {
           planToWatchSection.classList.remove('plan-to-watch-hidden');
-          fetchSimklWatchlist(); // refresh
+          fetchSimklWatchlist();
         } else {
           planToWatchSection.classList.add('plan-to-watch-hidden');
         }
       }
 
-      function showSimklMessage(text, type = 'info') {
-        simklMessage.classList.remove('hidden', 'bg-green-900/50', 'bg-red-900/50', 'bg-blue-900/50', 'text-green-300', 'text-red-300', 'text-blue-300');
+      function showSimklMsg(text, type = 'info') {
+        simklMessage.classList.remove('hidden', 'bg-green-900/50', 'bg-red-900/50', 'bg-blue-900/50', 'text-green-300',
+          'text-red-300', 'text-blue-300');
         if (type === 'success') simklMessage.classList.add('bg-green-900/50', 'text-green-300');
         else if (type === 'error') simklMessage.classList.add('bg-red-900/50', 'text-red-300');
         else simklMessage.classList.add('bg-blue-900/50', 'text-blue-300');
         simklMessage.textContent = text;
-        setTimeout(() => simklMessage.classList.add('hidden'), 6000);
+        setTimeout(() => simklMessage.classList.add('hidden'), 5000);
       }
 
-      // ─── SIMKL OAuth ────────────────────────────────────────────
+      // ─── SIMKL OAUTH ────────────────────────────────────────────
 
       async function startSimklOAuth() {
         const apiKey = simklApiKeyInput.value.trim();
-        if (!apiKey) {
-          showSimklMessage('Please enter your Client ID first', 'error');
-          return;
-        }
+        if (!apiKey) { showSimklMsg('Enter your Client ID first', 'error'); return; }
 
-        const { autoSync } = getSimklCredentials();
-        saveSimklCredentials(apiKey, '', autoSync);
+        const { autoSync } = getSimklCreds();
+        saveSimklCreds(apiKey, '', autoSync);
 
         simklPinArea.classList.remove('hidden');
         simklPinStatus.textContent = '⏳ Contacting Simkl...';
@@ -711,47 +1037,41 @@
           if (data.result === 'OK' && data.verification_url && data.user_code) {
             simklCurrentUserCode = data.user_code;
             simklPinDisplay.textContent = data.user_code;
-
             window.open(data.verification_url, '_blank');
 
-            simklPinStatus.textContent = `🔑 Paste this PIN on the Simkl page that opened. Waiting for authorization...`;
+            simklPinStatus.textContent = '🔑 Paste this PIN on Simkl. Waiting for authorization...';
             simklPinStatus.className = 'text-xs text-yellow-400 mt-2';
 
             if (simklPollInterval) clearInterval(simklPollInterval);
-
             let attempts = 0;
             simklPollInterval = setInterval(async () => {
               attempts++;
               if (attempts > 120) {
                 clearInterval(simklPollInterval);
-                simklPinStatus.textContent = '⏰ Timeout. Please try again or enter token manually.';
+                simklPinStatus.textContent = '⏰ Timeout. Try again or enter token manually.';
                 simklPinStatus.className = 'text-xs text-red-400 mt-2';
                 return;
               }
-
               try {
-                const pollRes = await fetch(`${SIMKL_API_BASE}/oauth/pin/${simklCurrentUserCode}?client_id=${apiKey}`);
+                const pollRes = await fetch(
+                  `${SIMKL_API_BASE}/oauth/pin/${simklCurrentUserCode}?client_id=${apiKey}`);
                 const pollData = await pollRes.json();
-
                 if (pollData.result === 'OK' && pollData.access_token) {
                   clearInterval(simklPollInterval);
-                  saveSimklCredentials(apiKey, pollData.access_token, simklAutoSyncCheckbox.checked);
-                  simklPinStatus.textContent = '✅ Connected successfully!';
+                  saveSimklCreds(apiKey, pollData.access_token, simklAutoSyncCheckbox.checked);
+                  simklPinStatus.textContent = '✅ Connected!';
                   simklPinStatus.className = 'text-xs text-green-400 mt-2';
                   simklTokenInput.value = pollData.access_token;
                   simklPinArea.classList.add('hidden');
                   updateSimklUI();
-                  showSimklMessage('✓ Simkl connected successfully!', 'success');
+                  showSimklMsg('✓ Simkl connected!', 'success');
                 } else if (pollData.message && pollData.message !== 'authorization_pending') {
                   clearInterval(simklPollInterval);
                   simklPinStatus.textContent = `❌ ${pollData.message}`;
                   simklPinStatus.className = 'text-xs text-red-400 mt-2';
                 }
-              } catch (e) {
-                // silent
-              }
+              } catch (e) { /* silent */ }
             }, 5000);
-
           } else {
             simklPinStatus.textContent = `❌ Failed: ${data.message || 'Unknown error'}`;
             simklPinStatus.className = 'text-xs text-red-400 mt-2';
@@ -770,23 +1090,20 @@
           simklManualPinStatus.className = 'text-xs text-yellow-400 mt-1';
           return;
         }
-
         simklManualPinStatus.textContent = '⏳ Verifying...';
         simklManualPinStatus.className = 'text-xs text-yellow-400 mt-1';
-
         try {
           const res = await fetch(`${SIMKL_API_BASE}/oauth/pin/${pin}?client_id=${apiKey}`);
           const data = await res.json();
-
           if (data.result === 'OK' && data.access_token) {
             if (simklPollInterval) clearInterval(simklPollInterval);
-            saveSimklCredentials(apiKey, data.access_token, simklAutoSyncCheckbox.checked);
+            saveSimklCreds(apiKey, data.access_token, simklAutoSyncCheckbox.checked);
             simklManualPinStatus.textContent = '✅ Connected!';
             simklManualPinStatus.className = 'text-xs text-green-400 mt-1';
             simklTokenInput.value = data.access_token;
             simklPinArea.classList.add('hidden');
             updateSimklUI();
-            showSimklMessage('✓ Simkl connected successfully!', 'success');
+            showSimklMsg('✓ Simkl connected!', 'success');
           } else {
             simklManualPinStatus.textContent = `❌ Invalid PIN: ${data.message || 'Try again'}`;
             simklManualPinStatus.className = 'text-xs text-red-400 mt-1';
@@ -797,132 +1114,105 @@
         }
       }
 
-      // ─── SIMKL API CALLS ────────────────────────────────────────
+      // ─── SIMKL API ──────────────────────────────────────────────
 
-      async function testSimklConnection() {
-        const { apiKey, token } = getSimklCredentials();
-        if (!apiKey || !token) {
-          showSimklMessage('Please connect your account first', 'error');
-          return false;
-        }
-        showSimklMessage('Testing connection...', 'info');
+      async function testSimkl() {
+        const { apiKey, token } = getSimklCreds();
+        if (!apiKey || !token) { showSimklMsg('Connect your account first', 'error'); return false; }
+        showSimklMsg('Testing...', 'info');
         try {
           const res = await fetch(`${SIMKL_API_BASE}/users/settings`, {
             headers: { 'Authorization': `Bearer ${token}`, 'simkl-api-key': apiKey }
           });
           if (res.ok) {
             const data = await res.json();
-            showSimklMessage(`✓ Connected as: ${data?.account?.name || 'User'}`, 'success');
+            showSimklMsg(`✓ Connected as: ${data?.account?.name || 'User'}`, 'success');
             return true;
           } else {
-            const errText = await res.text();
-            showSimklMessage(`✗ Failed: ${res.status} ${errText}`, 'error');
+            showSimklMsg(`✗ Failed: ${res.status}`, 'error');
             return false;
           }
         } catch (err) {
-          showSimklMessage(`✗ Error: ${err.message}`, 'error');
+          showSimklMsg(`✗ Error: ${err.message}`, 'error');
           return false;
         }
       }
 
       async function syncToSimkl(media, season = null, episode = null) {
-        const { apiKey, token } = getSimklCredentials();
+        const { apiKey, token } = getSimklCreds();
         if (!apiKey || !token || !media) return { success: false, error: 'Not configured' };
-
         const syncKey = `${media.type}_${media.id}_${season || 0}_${episode || 0}`;
         if (simklSyncedKeys.has(syncKey)) return { success: true, error: 'Already synced' };
-
         try {
           let body = {};
           const watchedAt = new Date().toISOString();
-
           if (media.type === 'movie') {
-            body = {
-              movies: [{
-                title: media.title,
-                ids: { tmdb: String(media.id) },
-                watched_at: watchedAt
-              }]
-            };
+            body = { movies: [{ title: media.title, ids: { tmdb: String(media.id) }, watched_at: watchedAt }] };
           } else if (media.type === 'tv' && season !== null && episode !== null) {
-            body = {
-              shows: [{
-                title: media.title,
-                ids: { tmdb: String(media.id) },
-                seasons: [{
-                  number: parseInt(season),
+            body = { shows: [{ title: media.title, ids: { tmdb: String(media.id) }, seasons: [{ number: parseInt(season),
                   episodes: [{ number: parseInt(episode), watched_at: watchedAt }]
-                }]
-              }]
-            };
+                }] }] };
           } else {
             return { success: false, error: 'Invalid media data' };
           }
-
           const res = await fetch(`${SIMKL_API_BASE}/sync/history`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-              'simkl-api-key': apiKey
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`,
+            'simkl-api-key': apiKey },
             body: JSON.stringify(body)
           });
-
-          if (res.ok) {
-            simklSyncedKeys.add(syncKey);
-            return { success: true };
-          } else {
+          if (res.ok) { simklSyncedKeys.add(syncKey); return { success: true }; } else {
             const err = await res.text();
             return { success: false, error: `HTTP ${res.status}: ${err}` };
           }
-        } catch (err) {
-          return { success: false, error: err.message };
-        }
+        } catch (err) { return { success: false, error: err.message }; }
       }
 
-      // ─── FETCH PLAN TO WATCH ──────────────────────────────────
+      async function markCurrentWatched() {
+        if (!currentMedia) { showToast('No media selected'); return; }
+        if (!isSimklConnected()) { showToast('Connect Simkl first'); openSimklModal(); return; }
+        const season = currentMedia.type === 'tv' ? currentSeason : null;
+        const episode = currentMedia.type === 'tv' ? currentEpisode : null;
+        showToast('Syncing...');
+        const result = await syncToSimkl(currentMedia, season, episode);
+        showToast(result.success ? `✓ Synced: ${currentMedia.title}` : `✗ Failed: ${result.error}`);
+      }
+
+      // ─── SIMKL WATCHLIST ────────────────────────────────────────
 
       async function fetchSimklWatchlist() {
-        const { apiKey, token } = getSimklCredentials();
+        const { apiKey, token } = getSimklCreds();
         if (!apiKey || !token || !currentUser) {
-          planToWatchContainer.innerHTML = '<div class="col-span-full text-gray-400 text-sm">Connect Simkl to see your watchlist.</div>';
+          planToWatchContainer.innerHTML =
+          '<div class="col-span-full text-gray-400 text-sm">Connect Simkl to see your watchlist.</div>';
           return;
         }
-
-        planToWatchContainer.innerHTML = '<div class="col-span-full flex justify-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i> Loading...</div>';
-
+        planToWatchContainer.innerHTML =
+          '<div class="col-span-full flex justify-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i> Loading...</div>';
         try {
-          // First get the watchlist ID (default list)
           const listsRes = await fetch(`${SIMKL_API_BASE}/users/lists`, {
             headers: { 'Authorization': `Bearer ${token}`, 'simkl-api-key': apiKey }
           });
           if (!listsRes.ok) throw new Error('Failed to fetch lists');
           const lists = await listsRes.json();
-          // Find the default watchlist (type: 'watchlist')
           const watchlist = lists.find(l => l.type === 'watchlist');
           if (!watchlist) {
-            planToWatchContainer.innerHTML = '<div class="col-span-full text-gray-400 text-sm">No watchlist found.</div>';
+            planToWatchContainer.innerHTML =
+            '<div class="col-span-full text-gray-400 text-sm">No watchlist found.</div>';
             return;
           }
-
-          // Fetch items from that list
           const itemsRes = await fetch(`${SIMKL_API_BASE}/users/lists/${watchlist.ids.slug}/items`, {
             headers: { 'Authorization': `Bearer ${token}`, 'simkl-api-key': apiKey }
           });
           if (!itemsRes.ok) throw new Error('Failed to fetch list items');
           const items = await itemsRes.json();
-
-          // Items have 'movie' or 'show' with TMDB ids
           const movies = items.filter(item => item.type === 'movie').slice(0, 12);
           const shows = items.filter(item => item.type === 'show').slice(0, 12);
-
           if (movies.length === 0 && shows.length === 0) {
-            planToWatchContainer.innerHTML = '<div class="col-span-full text-gray-400 text-sm">Your watchlist is empty.</div>';
+            planToWatchContainer.innerHTML =
+            '<div class="col-span-full text-gray-400 text-sm">Your watchlist is empty.</div>';
             return;
           }
-
-          // Render movies and shows combined (or separate? we'll combine in one grid)
           const allItems = [...movies, ...shows];
           planToWatchContainer.innerHTML = allItems.map(item => {
             const isMovie = item.type === 'movie';
@@ -935,111 +1225,28 @@
             const mediaType = isMovie ? 'movie' : 'tv';
             return `<div class="movie-card" data-id="${tmdbId}" data-type="${mediaType}">
               <img src="${posterUrl}" class="w-full h-64 object-cover" loading="lazy">
-              <div class="p-2"><div class="font-semibold text-sm truncate">${title}</div>
+              <div class="p-2"><div class="font-semibold text-sm truncate">${title || 'Untitled'}</div>
               <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${year || '—'}</span><span>⭐ ${rating || '—'}</span></div></div>
             </div>`;
           }).join('');
-
-          // Add click listeners
           planToWatchContainer.querySelectorAll('.movie-card').forEach(card => {
             card.addEventListener('click', async () => {
-              const id = card.dataset.id, type = card.dataset.type;
+              const id = card.dataset.id,
+                type = card.dataset.type;
               if (!id) return;
-              const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`;
-              try { const res = await fetchWithRetry(url); const data = await res.json(); showDetails(data, type); } catch (err) { alert("Failed to load details. Please try again."); }
+              try {
+                const res = await fetchWithRetry(
+                  `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`);
+                const data = await res.json();
+                showDetails(data, type);
+              } catch (err) { alert('Failed to load details'); }
             });
           });
-
         } catch (err) {
-          planToWatchContainer.innerHTML = `<div class="col-span-full text-red-400 text-sm">Failed to load watchlist: ${err.message}</div>`;
+          planToWatchContainer.innerHTML =
+            `<div class="col-span-full text-red-400 text-sm">Failed: ${err.message}</div>`;
         }
       }
-
-      // ─── SIMKL MODAL CONTROLS ──────────────────────────────────
-
-      function openSimklModal() {
-        const creds = getSimklCredentials();
-        simklApiKeyInput.value = creds.apiKey || '';
-        simklTokenInput.value = creds.token || '';
-        simklAutoSyncCheckbox.checked = creds.autoSync;
-        simklMessage.classList.add('hidden');
-        simklPinArea.classList.add('hidden');
-        simklPinStatus.textContent = '';
-        simklManualPinStatus.textContent = '';
-        simklPinDisplay.textContent = '------';
-        if (simklPollInterval) clearInterval(simklPollInterval);
-        updateSimklUI();
-        simklModal.style.display = 'flex';
-      }
-
-      // Show Simkl nav button only when logged in
-      function updateNavVisibility() {
-        if (currentUser) {
-          simklNavBtn.style.display = 'inline-block';
-        } else {
-          simklNavBtn.style.display = 'none';
-        }
-      }
-
-      simklNavBtn.onclick = openSimklModal;
-      dropdownSimklBtn.onclick = () => { closeDropdown(); openSimklModal(); };
-      closeSimklBtn.onclick = () => { simklModal.style.display = 'none'; };
-
-      simklGetTokenBtn.onclick = startSimklOAuth;
-      simklPinAuthorizeBtn.onclick = authorizeWithPin;
-
-      simklCopyPinBtn.onclick = () => {
-        const pin = simklPinDisplay.textContent;
-        if (pin && pin !== '------') {
-          navigator.clipboard.writeText(pin).then(() => showToast('✓ PIN copied')).catch(() => {});
-        }
-      };
-      simklOpenVerificationBtn.onclick = () => {
-        const apiKey = simklApiKeyInput.value.trim();
-        if (apiKey && simklCurrentUserCode) {
-          window.open(`https://simkl.com/oauth/authorize?response_type=code&client_id=${apiKey}&redirect_uri=https://simkl.com/&state=${simklCurrentUserCode}`, '_blank');
-        }
-      };
-
-      simklSaveBtn.onclick = () => {
-        const apiKey = simklApiKeyInput.value.trim();
-        const token = simklTokenInput.value.trim();
-        if (!apiKey || !token) {
-          showSimklMessage('Please enter both Client ID and Access Token', 'error');
-          return;
-        }
-        saveSimklCredentials(apiKey, token, simklAutoSyncCheckbox.checked);
-        updateSimklUI();
-        showSimklMessage('✓ Credentials saved!', 'success');
-      };
-
-      simklTestBtn.onclick = async () => {
-        const apiKey = simklApiKeyInput.value.trim();
-        const token = simklTokenInput.value.trim();
-        if (apiKey && token) {
-          saveSimklCredentials(apiKey, token, simklAutoSyncCheckbox.checked);
-          updateSimklUI();
-        }
-        await testSimklConnection();
-      };
-
-      simklDisconnectBtn.onclick = () => {
-        if (confirm('Disconnect from Simkl? Your local WIZHUB progress will remain.')) {
-          clearSimklCredentials();
-          simklApiKeyInput.value = '';
-          simklTokenInput.value = '';
-          simklAutoSyncCheckbox.checked = false;
-          simklSyncedKeys.clear();
-          updateSimklUI();
-          showSimklMessage('Simkl disconnected', 'info');
-        }
-      };
-
-      simklSyncBtn.onclick = markCurrentAsWatchedOnSimkl;
-
-      simklModal.addEventListener('click', (e) => {
-        if (e.target === simklModal) simklModal.style.display = 'none';
-      });
 
       // ─── TOAST ──────────────────────────────────────────────────
 
@@ -1051,7 +1258,7 @@
         setTimeout(() => toast.remove(), 2500);
       }
 
-      // ─── SOURCE ORDER ──────────────────────────────────────────
+      // ─── SOURCES UI ─────────────────────────────────────────────
 
       function populateSources() {
         if (!sourceSelect) return;
@@ -1069,87 +1276,173 @@
         }
       }
 
-      function saveSelectedSourceIndex(index) { localStorage.setItem('wizhub_selected_source', index); }
+      function saveSelectedSource(idx) { localStorage.setItem('wizhub_selected_source', idx); }
 
-      async function loadUserSourceOrder() {
-        if (!currentUser) return;
-        try {
-          const { data, error } = await sb.from('user_settings').select('source_order').eq('id', currentUser.id).maybeSingle();
-          if (!error && data && data.source_order && Array.isArray(data.source_order)) {
-            const ordered = buildOrderedSources(data.source_order);
-            if (ordered.length === SOURCE_DEFINITIONS.length) {
-              EMBED_SOURCES = ordered;
-              populateSources();
-              return;
-            }
-          }
-          EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
-        } catch (err) {
-          EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
+      // ─── FETCH ──────────────────────────────────────────────────
+
+      async function fetchWithRetry(url, retries = 3, delay = 1000) {
+        for (let i = 0; i < retries; i++) {
+          try {
+            const res = await fetch(url);
+            if (res.ok) return res;
+            if (res.status === 429) await new Promise(r => setTimeout(r, delay * Math.pow(2, i)));
+            else throw new Error(`HTTP ${res.status}`);
+          } catch (err) { if (i === retries - 1) throw err;
+            await new Promise(r => setTimeout(r, delay)); }
         }
-        populateSources();
       }
 
-      async function saveUserSourceOrder() {
-        if (!currentUser) return;
-        const namesOnly = EMBED_SOURCES.map(s => s.name);
-        await sb.from('user_settings').upsert({ id: currentUser.id, source_order: namesOnly, updated_at: new Date().toISOString() });
+      // ─── RENDER CARDS ───────────────────────────────────────────
+
+      function renderCards(container, items, mediaType) {
+        if (!items || !items.length) {
+          container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>';
+          return;
+        }
+        container.innerHTML = items.map(item => {
+          const title = item.title || item.name || 'Untitled';
+          const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
+          const year = (item.release_date || item.first_air_date || '').slice(0, 4);
+          const rating = item.vote_average?.toFixed(1) || '';
+          return `<div class="movie-card" data-id="${item.id}" data-type="${mediaType}">
+            <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
+            <div class="p-2"><div class="font-semibold text-sm truncate">${title}</div>
+            <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${year || '—'}</span><span>⭐ ${rating}</span></div></div>
+          </div>`;
+        }).join('');
+        container.querySelectorAll('.movie-card').forEach(card => {
+          card.addEventListener('click', async () => {
+            const id = card.dataset.id,
+              type = card.dataset.type;
+            try {
+              const res = await fetchWithRetry(
+                `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`);
+              const data = await res.json();
+              showDetails(data, type);
+            } catch (err) { alert('Failed to load details'); }
+          });
+        });
       }
 
-      // ─── LOCAL STORAGE HELPERS ─────────────────────────────────
+      let cachedTrending = null;
 
-      function getLocalStorageKey() {
-        if (!currentUser) return 'wizhub_guest_progress';
-        return `wizhub_${currentUser.id}_progress`;
+      async function fetchTrending() {
+        if (cachedTrending) {
+          renderCards(trendingMoviesGrid, cachedTrending.movies, 'movie');
+          renderCards(trendingTvGrid, cachedTrending.tv, 'tv');
+          return;
+        }
+        trendingMoviesGrid.innerHTML =
+          '<div class="col-span-full flex justify-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i> Loading...</div>';
+        trendingTvGrid.innerHTML =
+          '<div class="col-span-full flex justify-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i> Loading...</div>';
+        try {
+          const [moviesRes, tvRes] = await Promise.all([
+            fetchWithRetry(`https://api.themoviedb.org/3/trending/movie/week?api_key=${TMDB_API_KEY}`),
+            fetchWithRetry(`https://api.themoviedb.org/3/trending/tv/week?api_key=${TMDB_API_KEY}`)
+          ]);
+          const moviesData = await moviesRes.json();
+          const tvData = await tvRes.json();
+          cachedTrending = { movies: moviesData.results.slice(0, 18), tv: tvData.results.slice(0, 18) };
+          renderCards(trendingMoviesGrid, cachedTrending.movies, 'movie');
+          renderCards(trendingTvGrid, cachedTrending.tv, 'tv');
+        } catch (err) {
+          trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Failed to load trending.</div>';
+          trendingTvGrid.innerHTML = '<div class="col-span-full text-red-400">Failed to load trending.</div>';
+        }
       }
 
-      function saveProgressToLocal(record) {
-        const key = getLocalStorageKey();
-        let all = localStorage.getItem(key);
-        let data = all ? JSON.parse(all) : {};
-        const itemKey = `${record.media_type}_${record.tmdb_id}`;
-        data[itemKey] = {
-          media_type: record.media_type,
-          tmdb_id: record.tmdb_id,
-          title: record.title,
-          poster_path: record.poster_path,
-          media_year: record.media_year,
-          rating: record.rating,
-          progress_seconds: record.progress_seconds,
-          season_number: record.season_number,
-          episode_number: record.episode_number,
-          last_watched: Date.now()
-        };
-        localStorage.setItem(key, JSON.stringify(data));
-      }
-
-      function loadProgressFromLocal() {
-        if (!currentUser || !currentMedia) return null;
-        const key = getLocalStorageKey();
-        const all = localStorage.getItem(key);
-        if (!all) return null;
-        const data = JSON.parse(all);
-        const itemKey = `${currentMedia.type}_${currentMedia.id}`;
-        return data[itemKey] || null;
+      async function search(query) {
+        if (!query.trim()) { fetchTrending(); return; }
+        trendingMoviesGrid.innerHTML =
+          '<div class="col-span-full flex justify-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i> Searching...</div>';
+        trendingTvGrid.innerHTML =
+          '<div class="col-span-full flex justify-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i> Searching...</div>';
+        try {
+          const res = await fetchWithRetry(
+            `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
+          const data = await res.json();
+          const movies = data.results.filter(r => r.media_type === 'movie').slice(0, 12);
+          const tv = data.results.filter(r => r.media_type === 'tv').slice(0, 12);
+          renderCards(trendingMoviesGrid, movies, 'movie');
+          renderCards(trendingTvGrid, tv, 'tv');
+        } catch (err) {
+          trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Search failed.</div>';
+          trendingTvGrid.innerHTML = '<div class="col-span-full text-red-400">Search failed.</div>';
+        }
       }
 
       // ─── CONTINUE WATCHING ──────────────────────────────────────
 
-      function renderContinueWatchingFromLocal() {
+      function getLocalKey() {
+        if (!currentUser) return 'wizhub_guest_progress';
+        return `wizhub_${currentUser.id}_progress`;
+      }
+
+      async function renderContinueWatching() {
         if (!currentUser) {
-          continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🔒 Log in to see your continue watching list.</div>';
+          continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🔒 Log in to see your watch history.</div>';
           return;
         }
-        const key = getLocalStorageKey();
+        try {
+          const { data, error } = await sb.from('watch_history').select('*').eq('user_id', currentUser.id).order(
+            'last_watched', { ascending: false });
+          if (!error && data && data.length > 0) {
+            continueContainer.innerHTML = '';
+            for (const item of data) {
+              const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
+              const card = document.createElement('div');
+              card.className = 'movie-card relative';
+              card.style.flex = '0 0 140px';
+              const progressPercent = Math.min(((item.progress_seconds || 0) / 7200) * 100, 100);
+              const label = item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie';
+              const minutes = Math.floor((item.progress_seconds || 0) / 60);
+              card.innerHTML = `
+                <div class="delete-btn" data-media-type="${item.media_type}" data-tmdb="${item.tmdb_id}">
+                  <i class="fas fa-trash-alt text-xs"></i>
+                </div>
+                <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
+                <div class="p-2">
+                  <div class="font-semibold text-sm truncate">${item.title}</div>
+                  <div class="text-xs text-gray-400">${label} • ${minutes} min</div>
+                </div>
+                <div class="progress-overlay" style="width: ${progressPercent}%;"></div>
+              `;
+              const del = card.querySelector('.delete-btn');
+              del.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm(`Delete "${item.title}"?`)) {
+                  await sb.from('watch_history').delete().eq('user_id', currentUser.id).eq('media_type', item
+                    .media_type).eq('tmdb_id', item.tmdb_id);
+                  renderContinueWatching();
+                }
+              });
+              card.addEventListener('click', async () => {
+                try {
+                  const res = await fetchWithRetry(
+                    `https://api.themoviedb.org/3/${item.media_type}/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
+                  const data = await res.json();
+                  showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
+                    .progress_seconds);
+                } catch (err) { alert('Failed to load'); }
+              });
+              continueContainer.appendChild(card);
+            }
+            return;
+          }
+        } catch (err) { /* fall through to local */ }
+
+        // Fallback: local storage
+        const key = getLocalKey();
         const all = localStorage.getItem(key);
         if (!all) {
-          continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet. Start watching!</div>';
+          continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet.</div>';
           return;
         }
         const data = JSON.parse(all);
         const items = Object.values(data).sort((a, b) => b.last_watched - a.last_watched);
-        if (items.length === 0) {
-          continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet. Start watching!</div>';
+        if (!items.length) {
+          continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet.</div>';
           return;
         }
         continueContainer.innerHTML = '';
@@ -1159,8 +1452,8 @@
           card.className = 'movie-card relative';
           card.style.flex = '0 0 140px';
           const progressPercent = Math.min(((item.progress_seconds || 0) / 7200) * 100, 100);
-          let label = item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie';
-          const minutesDisplay = Math.floor((item.progress_seconds || 0) / 60);
+          const label = item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie';
+          const minutes = Math.floor((item.progress_seconds || 0) / 60);
           card.innerHTML = `
             <div class="delete-btn" data-media-type="${item.media_type}" data-tmdb="${item.tmdb_id}">
               <i class="fas fa-trash-alt text-xs"></i>
@@ -1168,119 +1461,39 @@
             <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
             <div class="p-2">
               <div class="font-semibold text-sm truncate">${item.title}</div>
-              <div class="text-xs text-gray-400">${label} • ${minutesDisplay} min</div>
+              <div class="text-xs text-gray-400">${label} • ${minutes} min</div>
             </div>
             <div class="progress-overlay" style="width: ${progressPercent}%;"></div>
           `;
-          const deleteBtn = card.querySelector('.delete-btn');
-          deleteBtn.addEventListener('click', async (e) => {
+          const del = card.querySelector('.delete-btn');
+          del.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (confirm(`Delete "${item.title}" from Continue Watching?`)) {
-              const keyLocal = getLocalStorageKey();
-              const allLocal = localStorage.getItem(keyLocal);
-              if (allLocal) {
-                const parsed = JSON.parse(allLocal);
+            if (confirm(`Delete "${item.title}"?`)) {
+              const all2 = localStorage.getItem(key);
+              if (all2) {
+                const parsed = JSON.parse(all2);
                 delete parsed[`${item.media_type}_${item.tmdb_id}`];
-                localStorage.setItem(keyLocal, JSON.stringify(parsed));
-                renderContinueWatchingFromLocal();
+                localStorage.setItem(key, JSON.stringify(parsed));
+                renderContinueWatching();
               }
             }
           });
-          card.addEventListener('click', async (e) => {
-            if (e.target.closest('.delete-btn')) return;
-            if (item.media_type === 'movie') {
-              const res = await fetchWithRetry(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
-              const movie = await res.json();
-              await showDetails(movie, 'movie', null, null, null, item.progress_seconds);
-            } else {
-              const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
-              const tv = await res.json();
-              await showDetails(tv, 'tv', null, item.season_number, item.episode_number, item.progress_seconds);
-            }
+          card.addEventListener('click', async () => {
+            try {
+              const res = await fetchWithRetry(
+                `https://api.themoviedb.org/3/${item.media_type}/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
+              const data = await res.json();
+              showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
+                .progress_seconds);
+            } catch (err) { alert('Failed to load'); }
           });
           continueContainer.appendChild(card);
         }
       }
 
-      async function renderContinueWatching() {
-        if (!currentUser) {
-          continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🔒 Log in to see your continue watching list.</div>';
-          return;
-        }
-        if (supabaseAvailable) {
-          try {
-            const { data, error } = await sb.from('watch_history').select('*').eq('user_id', currentUser.id).order('last_watched', { ascending: false });
-            if (!error && data && data.length > 0) {
-              continueContainer.innerHTML = '';
-              for (const item of data) {
-                const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
-                const card = document.createElement('div');
-                card.className = 'movie-card relative';
-                card.style.flex = '0 0 140px';
-                const progressPercent = Math.min(((item.progress_seconds || 0) / 7200) * 100, 100);
-                let label = item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie';
-                const minutesDisplay = Math.floor((item.progress_seconds || 0) / 60);
-                card.innerHTML = `
-                  <div class="delete-btn" data-media-type="${item.media_type}" data-tmdb="${item.tmdb_id}">
-                    <i class="fas fa-trash-alt text-xs"></i>
-                  </div>
-                  <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
-                  <div class="p-2">
-                    <div class="font-semibold text-sm truncate">${item.title}</div>
-                    <div class="text-xs text-gray-400">${label} • ${minutesDisplay} min</div>
-                  </div>
-                  <div class="progress-overlay" style="width: ${progressPercent}%;"></div>
-                `;
-                const deleteBtn = card.querySelector('.delete-btn');
-                deleteBtn.addEventListener('click', async (e) => {
-                  e.stopPropagation();
-                  if (confirm(`Delete "${item.title}" from Continue Watching?`)) {
-                    await deleteHistoryEntry(item.media_type, item.tmdb_id);
-                  }
-                });
-                card.addEventListener('click', async (e) => {
-                  if (e.target.closest('.delete-btn')) return;
-                  if (item.media_type === 'movie') {
-                    const res = await fetchWithRetry(`https://api.themoviedb.org/3/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
-                    const movie = await res.json();
-                    await showDetails(movie, 'movie', null, null, null, item.progress_seconds);
-                  } else {
-                    const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${item.tmdb_id}?api_key=${TMDB_API_KEY}`);
-                    const tv = await res.json();
-                    await showDetails(tv, 'tv', null, item.season_number, item.episode_number, item.progress_seconds);
-                  }
-                });
-                continueContainer.appendChild(card);
-              }
-              return;
-            }
-          } catch (err) {
-            supabaseAvailable = false;
-          }
-        }
-        renderContinueWatchingFromLocal();
-      }
-
-      async function deleteHistoryEntry(mediaType, tmdbId) {
-        if (!currentUser) return;
-        if (supabaseAvailable) {
-          try {
-            await sb.from('watch_history').delete().eq('user_id', currentUser.id).eq('media_type', mediaType).eq('tmdb_id', tmdbId);
-          } catch (e) {}
-        }
-        const key = getLocalStorageKey();
-        const all = localStorage.getItem(key);
-        if (all) {
-          const data = JSON.parse(all);
-          delete data[`${mediaType}_${tmdbId}`];
-          localStorage.setItem(key, JSON.stringify(data));
-        }
-        await renderContinueWatching();
-      }
-
       // ─── SAVE PROGRESS ──────────────────────────────────────────
 
-      async function saveProgressToDB() {
+      async function saveProgress() {
         if (!currentUser || !currentMedia) return;
         const season = currentMedia.type === 'tv' ? currentSeason : 0;
         const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
@@ -1300,17 +1513,34 @@
           updated_at: new Date().toISOString()
         };
         try {
-          const { error } = await sb.from('watch_history').upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
-          if (error) { supabaseAvailable = false; saveProgressToLocal(record); await renderContinueWatching(); } else { supabaseAvailable = true; await renderContinueWatching(); saveProgressToLocal(record); }
-        } catch (err) { supabaseAvailable = false; saveProgressToLocal(record); await renderContinueWatching(); }
+          await sb.from('watch_history').upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
+        } catch (err) {
+          // fallback to local
+          const key = getLocalKey();
+          let all = localStorage.getItem(key);
+          let data = all ? JSON.parse(all) : {};
+          data[`${record.media_type}_${record.tmdb_id}`] = {
+            media_type: record.media_type,
+            tmdb_id: record.tmdb_id,
+            title: record.title,
+            poster_path: record.poster_path,
+            media_year: record.media_year,
+            rating: record.rating,
+            progress_seconds: record.progress_seconds,
+            season_number: record.season_number,
+            episode_number: record.episode_number,
+            last_watched: Date.now()
+          };
+          localStorage.setItem(key, JSON.stringify(data));
+        }
+        renderContinueWatching();
       }
 
       // ─── TV HELPERS ─────────────────────────────────────────────
 
-      async function loadTVSeasons(tvId, preserveEpisode = false, forcedSeason = null, forcedEpisode = null) {
+      async function loadTVSeasons(tvId, forcedSeason = null, forcedEpisode = null) {
         const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
         const data = await res.json();
-        currentTVDetails = data;
         const seasons = (data.seasons || []).filter(s => s.season_number > 0);
         if (!seasons.length) return;
         seasonSelect.innerHTML = '';
@@ -1321,36 +1551,41 @@
           seasonSelect.appendChild(opt);
         });
         if (forcedSeason !== null) currentSeason = forcedSeason;
-        else if (!preserveEpisode) currentSeason = seasons[0]?.season_number || 1;
+        else currentSeason = seasons[0]?.season_number || 1;
         seasonSelect.value = currentSeason;
         await loadEpisodes(tvId, currentSeason, forcedEpisode);
 
         seasonSelect.onchange = async () => {
-          await saveProgressToDB();
+          await saveProgress();
           currentSeason = parseInt(seasonSelect.value);
           currentEpisode = 1;
-          resetPlayerStateForNewMedia();
+          currentProgressSeconds = 0;
+          progressMinutesInput.value = 0;
+          loadedResumeTime = 0;
           await loadEpisodes(tvId, currentSeason);
-          await saveProgressToDB();
-          await renderContinueWatching();
+          await saveProgress();
+          renderContinueWatching();
           updateEmbedStream();
-          updateEpisodeNavigation();
+          updateEpisodeNav();
         };
 
         episodeSelect.onchange = async () => {
-          await saveProgressToDB();
+          await saveProgress();
           currentEpisode = parseInt(episodeSelect.value);
-          resetPlayerStateForNewMedia();
-          await saveProgressToDB();
-          await renderContinueWatching();
+          currentProgressSeconds = 0;
+          progressMinutesInput.value = 0;
+          loadedResumeTime = 0;
+          await saveProgress();
+          renderContinueWatching();
           updateEmbedStream();
-          updateEpisodeNavigation();
+          updateEpisodeNav();
         };
-        updateEpisodeNavigation();
+        updateEpisodeNav();
       }
 
       async function loadEpisodes(tvId, seasonNum, forcedEpisode = null) {
-        const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNum}?api_key=${TMDB_API_KEY}`);
+        const res = await fetchWithRetry(
+          `https://api.themoviedb.org/3/tv/${tvId}/season/${seasonNum}?api_key=${TMDB_API_KEY}`);
         const data = await res.json();
         currentEpisodesList = data.episodes || [];
         episodeSelect.innerHTML = '';
@@ -1363,32 +1598,34 @@
         if (currentEpisodesList.length === 0) episodeSelect.innerHTML = '<option value="1">Episode 1</option>';
         if (forcedEpisode !== null) currentEpisode = forcedEpisode;
         episodeSelect.value = currentEpisode;
-        updateEpisodeNavigation();
+        updateEpisodeNav();
       }
 
-      function updateEpisodeNavigation() {
+      function updateEpisodeNav() {
         if (!currentMedia || currentMedia.type !== 'tv' || !currentEpisodesList.length) {
-          prevEpisodeBtn.disabled = true; nextEpisodeBtn.disabled = true; return;
+          prevEpisodeBtn.disabled = true;
+          nextEpisodeBtn.disabled = true;
+          return;
         }
         const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
         prevEpisodeBtn.disabled = (idx <= 0);
         nextEpisodeBtn.disabled = (idx >= currentEpisodesList.length - 1);
       }
 
-      // ─── GO TO NEXT EPISODE (with auto-sync) ──────────────────
-
-      async function goToPreviousEpisode() {
+      async function goToPrevEpisode() {
         if (!currentMedia || currentMedia.type !== 'tv') return;
         const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
         if (idx > 0) {
-          await saveProgressToDB();
+          await saveProgress();
           currentEpisode = currentEpisodesList[idx - 1].episode_number;
           episodeSelect.value = currentEpisode;
-          resetPlayerStateForNewMedia();
-          await saveProgressToDB();
-          await renderContinueWatching();
+          currentProgressSeconds = 0;
+          progressMinutesInput.value = 0;
+          loadedResumeTime = 0;
+          await saveProgress();
+          renderContinueWatching();
           updateEmbedStream();
-          updateEpisodeNavigation();
+          updateEpisodeNav();
         }
       }
 
@@ -1396,41 +1633,26 @@
         if (!currentMedia || currentMedia.type !== 'tv') return;
         const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
         if (idx < currentEpisodesList.length - 1) {
-          // Mark current episode as watched on Simkl (if connected and autoSync enabled)
-          const { autoSync } = getSimklCredentials();
+          // Auto-sync current episode to Simkl
+          const { autoSync } = getSimklCreds();
           if (autoSync && isSimklConnected()) {
             const result = await syncToSimkl(currentMedia, currentSeason, currentEpisode);
             if (result.success) showToast(`✓ Synced episode ${currentEpisode} to Simkl`);
           }
-          await saveProgressToDB();
+          await saveProgress();
           currentEpisode = currentEpisodesList[idx + 1].episode_number;
           episodeSelect.value = currentEpisode;
-          resetPlayerStateForNewMedia();
-          await saveProgressToDB();
-          await renderContinueWatching();
+          currentProgressSeconds = 0;
+          progressMinutesInput.value = 0;
+          loadedResumeTime = 0;
+          await saveProgress();
+          renderContinueWatching();
           updateEmbedStream();
-          updateEpisodeNavigation();
+          updateEpisodeNav();
         }
       }
 
       // ─── PLAYER ──────────────────────────────────────────────────
-
-      function resetPlayerStateForNewMedia() {
-        currentProgressSeconds = 0;
-        currentProgressMinutes = 0;
-        progressMinutesInput.value = 0;
-        loadedResumeTime = 0;
-        hasForcedSeekVidFast = false;
-        seekCommandSent = false;
-        forceSeekStartTime = Date.now();
-        currentMediaEnded = false;
-        ignoreAutoSaveUntil = Date.now() + 5000;
-        lastPositionForJump = 0;
-        lastVidFastSave = 0;
-        lastVixSrcSaved = 0;
-        lastSaveTimestamp = 0;
-        lastSaveTime = Date.now();
-      }
 
       async function updateEmbedStream() {
         if (!currentMedia) return;
@@ -1446,18 +1668,7 @@
         } else {
           url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
         }
-
-        if (url && typeof url.then === 'function') {
-          embedIframe.srcdoc = '<div class="text-center py-20 text-gray-400"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
-          try { url = await url; } catch (err) { embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to load</div>'; return; }
-        }
         if (src.openInNewTab === true && url) { window.open(url, '_blank'); return; }
-
-        hasForcedSeekVidFast = false;
-        seekCommandSent = false;
-        forceSeekStartTime = Date.now();
-        currentMediaEnded = false;
-
         if (url) embedIframe.src = url;
         else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
       }
@@ -1467,200 +1678,47 @@
         let newIdx = parseInt(sourceSelect.value) + 1;
         if (newIdx >= sourceSelect.options.length) newIdx = 0;
         sourceSelect.value = newIdx;
-        saveSelectedSourceIndex(newIdx);
+        saveSelectedSource(newIdx);
         updateEmbedStream();
       }
 
       async function copyVideoUrl() {
         const url = embedIframe.src;
-        if (!url || url === 'about:blank') { alert('No video URL to copy'); return; }
+        if (!url || url === 'about:blank') { alert('No video URL'); return; }
         try {
           await navigator.clipboard.writeText(url);
-          showToast('✓ URL copied to clipboard');
+          showToast('✓ URL copied');
         } catch (err) { alert('Could not copy URL'); }
       }
 
-      let autoSaveTimer = null;
-
-      function autoSaveProgress(seconds, sourceName) {
-        if (!currentUser || !currentMedia) return;
-        const now = Date.now();
-        if (now < ignoreAutoSaveUntil) return;
-        if (seconds <= 0) return;
-        if (Math.abs(seconds - currentProgressSeconds) < 1) return;
-
-        currentProgressSeconds = seconds;
-        currentProgressMinutes = Math.floor(seconds / 60);
-        progressMinutesInput.value = currentProgressMinutes;
-
-        if (autoSaveTimer) clearTimeout(autoSaveTimer);
-        autoSaveTimer = setTimeout(() => { saveProgressToDB(); }, 300);
-      }
-
-      function saveProgressImmediately(seconds, sourceName) {
-        if (!currentUser || !currentMedia) return;
-        const now = Date.now();
-        if (now < ignoreAutoSaveUntil) return;
-        if (seconds <= 0) return;
-
-        currentProgressSeconds = seconds;
-        currentProgressMinutes = Math.floor(seconds / 60);
-        progressMinutesInput.value = currentProgressMinutes;
-        saveProgressToDB();
-      }
-
-      async function handleMediaEnded(sourceName) {
-        if (!currentMedia || currentMediaEnded) return;
-        currentMediaEnded = true;
-
-        const { autoSync } = getSimklCredentials();
-        if (autoSync && isSimklConnected()) {
-          const season = currentMedia.type === 'tv' ? currentSeason : null;
-          const episode = currentMedia.type === 'tv' ? currentEpisode : null;
-          const result = await syncToSimkl(currentMedia, season, episode);
-          if (result.success) showToast(`✓ Synced ${currentMedia.title} to Simkl`);
-        }
-      }
-
-      // ─── MESSAGE HANDLING ──────────────────────────────────────
-
-      function handleVideasyMessage(rawData) {
-        let parsed;
-        try { parsed = typeof rawData === 'string' ? JSON.parse(rawData) : rawData; } catch { return; }
-        if (!parsed) return;
-        let seconds = parsed?.timestamp ?? parsed?.data?.timestamp ?? parsed?.currentTime ?? parsed?.data?.currentTime ?? null;
-        let eventType = parsed?.event ?? parsed?.data?.event ?? null;
-        if (typeof seconds !== 'number' || seconds <= 0) return;
-        seconds = Math.floor(seconds);
-        if (eventType === 'ended') handleMediaEnded('Videasy');
-        if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
-          saveProgressImmediately(seconds, `Videasy(${eventType})`);
-        } else {
-          autoSaveProgress(seconds, 'Videasy');
-        }
-      }
-
-      const vidfastOrigins = [
-        'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
-        'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
-      ];
-
-      function handleVidFastMessage(data, origin) {
-        if (!vidfastOrigins.includes(origin)) return;
-        if (!data) return;
-        if (data.type === 'PLAYER_EVENT' && data.data) {
-          const { event, currentTime, duration } = data.data;
-          if (!hasForcedSeekVidFast && loadedResumeTime > 0 && !seekCommandSent) {
-            if (event === 'ready' || event === 'loaded' || event === 'canplay' || event === 'play' || event === 'playing' || event === 'timeupdate') {
-              embedIframe.contentWindow.postMessage({ command: 'seek', time: loadedResumeTime }, '*');
-              seekCommandSent = true;
-            }
-          }
-          if (event === 'ended') handleMediaEnded('VidFast');
-          if (typeof currentTime === 'number' && currentTime > 0) {
-            if (!hasForcedSeekVidFast && loadedResumeTime > 0 && currentTime < loadedResumeTime - 5 && (Date.now() - forceSeekStartTime < 15000)) return;
-            if (loadedResumeTime > 0 && Math.abs(currentTime - loadedResumeTime) <= 5) hasForcedSeekVidFast = true;
-            const seconds = Math.floor(currentTime);
-            if (event === 'seeked' || event === 'pause' || event === 'ended') saveProgressImmediately(seconds, `VidFast(${event})`);
-            if (event === 'timeupdate' && (seconds - lastVidFastSave) >= 15) {
-              lastVidFastSave = seconds;
-              autoSaveProgress(seconds, 'VidFast(timeupdate)');
-            }
-          }
-          return;
-        }
-      }
-
-      function handleVixSrcMessage(data, origin) {
-        if (!origin.includes('vixsrc') && !origin.includes('vixcloud')) return;
-        if (data?.type !== "PLAYER_EVENT") return;
-        let eventName = data.data?.event;
-        let currentTime = Math.floor(data.data?.currentTime || 0);
-        if (!eventName && data.event?.event) {
-          eventName = data.event.event;
-          currentTime = Math.floor(data.event.currentTime || 0);
-        }
-        if (eventName === 'ended') handleMediaEnded('VixSrc');
-        if (currentTime > 0) {
-          if (eventName === 'seeked' || eventName === 'pause' || eventName === 'ended') saveProgressImmediately(currentTime, `VixSrc(${eventName})`);
-          if (eventName === 'timeupdate' && (currentTime - lastVixSrcSaved) >= 15) {
-            lastVixSrcSaved = currentTime;
-            autoSaveProgress(currentTime, 'VixSrc(timeupdate)');
-          }
-        }
-      }
-
-      window.addEventListener("message", (event) => {
-        const { origin, data } = event;
-        if (!data) return;
-        if (origin.includes('videasy')) { handleVideasyMessage(data); return; }
-        if (vidfastOrigins.some(o => origin === o)) { handleVidFastMessage(data, origin); return; }
-        if (origin.includes('vixsrc') || origin.includes('vixcloud')) { handleVixSrcMessage(data, origin); return; }
-      });
-
-      // ─── PERIODIC SAVES ─────────────────────────────────────────
-
-      setInterval(async () => {
-        if (!currentUser || !currentMedia) return;
-        if (Date.now() < ignoreAutoSaveUntil) return;
-        const current = currentProgressSeconds;
-        const now = Date.now();
-        if (current > 0 && (current - lastSaveTimestamp >= 5 || (now - lastSaveTime) > 15000)) {
-          lastSaveTimestamp = current;
-          lastSaveTime = now;
-          await saveProgressToDB();
-        }
-      }, 15000);
-
-      setInterval(async () => {
-        if (!currentUser || !currentMedia) return;
-        if (Date.now() < ignoreAutoSaveUntil) return;
-        const diff = Math.abs(currentProgressSeconds - lastPositionForJump);
-        if (diff > 60) {
-          lastPositionForJump = currentProgressSeconds;
-          await saveProgressToDB();
-        }
-      }, 2000);
-
-      function emergencySave() {
-        if (currentUser && currentMedia && currentProgressSeconds > 0) {
-          const emergencyData = { mediaId: currentMedia.id, mediaType: currentMedia.type, season: currentSeason, episode: currentEpisode, seconds: currentProgressSeconds, time: Date.now() };
-          localStorage.setItem('wizhub_emergency_progress', JSON.stringify(emergencyData));
-          saveProgressToDB();
-        }
-      }
-
-      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') emergencySave(); });
-      window.addEventListener('beforeunload', () => emergencySave());
-
       // ─── SHOW DETAILS ───────────────────────────────────────────
 
-      async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null, savedSeconds = null) {
+      async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null, savedSeconds =
+        null) {
         playerPanel.classList.remove('hidden');
-        const title = item.title || item.name;
+        const title = item.title || item.name || 'Untitled';
         const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
         const overview = item.overview || 'No overview available.';
         const rating = item.vote_average ? item.vote_average.toFixed(1) : '—';
-        const year = type === 'movie' ? (item.release_date?.split('-')[0] || 'N/A') : (item.first_air_date?.split('-')[0] || 'N/A');
-        document.getElementById('detailPoster').src = poster;
-        document.getElementById('detailTitle').innerText = title;
-        document.getElementById('detailOverview').innerText = overview;
-        document.getElementById('detailRating').innerText = rating;
-        document.getElementById('detailYear').innerText = year;
-        document.getElementById('detailType').innerHTML = type === 'movie' ? 'Movie' : 'TV Series';
+        const year = type === 'movie' ? (item.release_date?.split('-')[0] || 'N/A') : (item.first_air_date?.split('-')[0] ||
+          'N/A');
+        detailPoster.src = poster;
+        detailTitle.textContent = title;
+        detailOverview.textContent = overview;
+        detailRating.textContent = rating;
+        detailYear.textContent = year;
+        detailType.textContent = type === 'movie' ? 'Movie' : 'TV Series';
         currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
-
-        hasForcedSeekVidFast = false;
-        seekCommandSent = false;
-        forceSeekStartTime = Date.now();
         currentMediaEnded = false;
 
         if (type === 'tv') {
-          tvControlsDiv.classList.remove('hidden');
-          if (savedSeason !== null && savedEpisode !== null) { currentSeason = savedSeason; currentEpisode = savedEpisode; } else { currentSeason = 1; currentEpisode = 1; }
-          await loadTVSeasons(item.id, true, currentSeason, currentEpisode);
+          tvControls.classList.remove('hidden');
+          if (savedSeason !== null && savedEpisode !== null) { currentSeason = savedSeason;
+            currentEpisode = savedEpisode; } else { currentSeason = 1;
+            currentEpisode = 1; }
+          await loadTVSeasons(item.id, currentSeason, currentEpisode);
         } else {
-          tvControlsDiv.classList.add('hidden');
+          tvControls.classList.add('hidden');
         }
 
         if (savedSeconds !== null) {
@@ -1674,171 +1732,34 @@
           progressMinutesInput.value = savedProgress;
           loadedResumeTime = currentProgressSeconds;
         } else {
-          await loadProgress();
-        }
-
-        ignoreAutoSaveUntil = Date.now() + 5000;
-        lastPositionForJump = currentProgressSeconds;
-        lastVidFastSave = currentProgressSeconds;
-        lastVixSrcSaved = currentProgressSeconds;
-        lastSaveTimestamp = currentProgressSeconds;
-        lastSaveTime = Date.now();
-
-        updateSimklUI();
-        await updateEmbedStream();
-        playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-
-      // ─── LOAD PROGRESS ──────────────────────────────────────────
-
-      async function loadProgress() {
-        if (!currentUser || !currentMedia) return;
-        const emergency = loadEmergencyProgress();
-        if (emergency && emergency.mediaId === currentMedia.id && emergency.mediaType === currentMedia.type) {
-          currentProgressSeconds = emergency.seconds;
-          currentProgressMinutes = Math.floor(emergency.seconds / 60);
-          progressMinutesInput.value = currentProgressMinutes;
-          loadedResumeTime = currentProgressSeconds;
-          clearEmergencyProgress();
-        }
-
-        if (supabaseAvailable) {
-          try {
-            const { data, error } = await sb.from('watch_history')
-              .select('progress_minutes, progress_seconds, season_number, episode_number')
-              .eq('user_id', currentUser.id)
-              .eq('media_type', currentMedia.type)
-              .eq('tmdb_id', currentMedia.id)
-              .maybeSingle();
-            if (!error && data) {
-              const dbSeconds = data.progress_seconds || 0;
-              if (dbSeconds > currentProgressSeconds) {
-                currentProgressSeconds = dbSeconds;
-                currentProgressMinutes = Math.floor(dbSeconds / 60);
-                progressMinutesInput.value = currentProgressMinutes;
-              }
-              if (currentMedia.type === 'tv') {
-                if (data.season_number) currentSeason = data.season_number;
-                if (data.episode_number) currentEpisode = data.episode_number;
-              }
-              loadedResumeTime = currentProgressSeconds;
-              return;
-            }
-          } catch (err) { supabaseAvailable = false; }
-        }
-
-        const localData = loadProgressFromLocal();
-        if (localData) {
-          const localSeconds = localData.progress_seconds || 0;
-          if (localSeconds > currentProgressSeconds) {
-            currentProgressSeconds = localSeconds;
-            currentProgressMinutes = Math.floor(localSeconds / 60);
-            progressMinutesInput.value = currentProgressMinutes;
-          }
-          if (currentMedia.type === 'tv') {
-            if (localData.season_number) currentSeason = localData.season_number;
-            if (localData.episode_number) currentEpisode = localData.episode_number;
-          }
-          loadedResumeTime = currentProgressSeconds;
-        } else {
           currentProgressSeconds = 0;
           currentProgressMinutes = 0;
           progressMinutesInput.value = 0;
           loadedResumeTime = 0;
+          // Try to load from DB
+          if (currentUser) {
+            try {
+              const { data } = await sb.from('watch_history').select('progress_seconds, season_number, episode_number')
+                .eq('user_id', currentUser.id).eq('media_type', type).eq('tmdb_id', item.id).maybeSingle();
+              if (data) {
+                currentProgressSeconds = data.progress_seconds || 0;
+                currentProgressMinutes = Math.floor(currentProgressSeconds / 60);
+                progressMinutesInput.value = currentProgressMinutes;
+                loadedResumeTime = currentProgressSeconds;
+                if (type === 'tv') {
+                  if (data.season_number) currentSeason = data.season_number;
+                  if (data.episode_number) currentEpisode = data.episode_number;
+                  await loadTVSeasons(item.id, currentSeason, currentEpisode);
+                }
+              }
+            } catch (err) {}
+          }
         }
-      }
 
-      function loadEmergencyProgress() {
-        try {
-          const raw = localStorage.getItem('wizhub_emergency_progress');
-          if (!raw) return null;
-          const data = JSON.parse(raw);
-          if (Date.now() - data.time > 30000) { localStorage.removeItem('wizhub_emergency_progress'); return null; }
-          return data;
-        } catch { return null; }
-      }
-
-      function clearEmergencyProgress() { localStorage.removeItem('wizhub_emergency_progress'); }
-
-      // ─── FETCH ──────────────────────────────────────────────────
-
-      async function fetchWithRetry(url, retries = 3, delay = 1000) {
-        for (let i = 0; i < retries; i++) {
-          try {
-            const res = await fetch(url);
-            if (res.ok) return res;
-            if (res.status === 429) await new Promise(r => setTimeout(r, delay * Math.pow(2, i)));
-            else throw new Error(`HTTP ${res.status}`);
-          } catch (err) { if (i === retries - 1) throw err; await new Promise(r => setTimeout(r, delay)); }
-        }
-      }
-
-      // ─── RENDER CARDS ───────────────────────────────────────────
-
-      function renderCards(container, items, mediaType) {
-        if (!items.length) { container.innerHTML = '<div class="col-span-full text-center text-gray-400">No results</div>'; return; }
-        container.innerHTML = items.map(item => {
-          const title = item.title || item.name;
-          const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
-          const year = (item.release_date || item.first_air_date || '').slice(0, 4);
-          const rating = item.vote_average?.toFixed(1) || '';
-          return `<div class="movie-card" data-id="${item.id}" data-type="${mediaType}">
-            <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
-            <div class="p-2"><div class="font-semibold text-sm truncate">${title}</div>
-            <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${year || '—'}</span><span>⭐ ${rating}</span></div></div>
-          </div>`;
-        }).join('');
-        container.querySelectorAll('.movie-card').forEach(card => {
-          card.addEventListener('click', async () => {
-            const id = card.dataset.id, type = card.dataset.type;
-            const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`;
-            try { const res = await fetchWithRetry(url); const data = await res.json(); showDetails(data, type); } catch (err) { alert("Failed to load details. Please try again."); }
-          });
-        });
-      }
-
-      let cachedTrending = null;
-
-      async function fetchTrending() {
-        if (cachedTrending) {
-          renderCards(trendingMoviesGrid, cachedTrending.movies, 'movie');
-          renderCards(trendingTvGrid, cachedTrending.tv, 'tv');
-          return;
-        }
-        showLoading(trendingMoviesGrid);
-        showLoading(trendingTvGrid);
-        try {
-          const [moviesRes, tvRes] = await Promise.all([
-            fetchWithRetry(`https://api.themoviedb.org/3/trending/movie/week?api_key=${TMDB_API_KEY}`),
-            fetchWithRetry(`https://api.themoviedb.org/3/trending/tv/week?api_key=${TMDB_API_KEY}`)
-          ]);
-          const moviesData = await moviesRes.json();
-          const tvData = await tvRes.json();
-          cachedTrending = { movies: moviesData.results.slice(0, 18), tv: tvData.results.slice(0, 18) };
-          renderCards(trendingMoviesGrid, cachedTrending.movies, 'movie');
-          renderCards(trendingTvGrid, cachedTrending.tv, 'tv');
-        } catch (err) {
-          trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Failed to load trending.</div>';
-          trendingTvGrid.innerHTML = '<div class="col-span-full text-red-400">Failed to load trending.</div>';
-        }
-      }
-
-      async function search(query) {
-        if (!query.trim()) { fetchTrending(); return; }
-        showLoading(trendingMoviesGrid);
-        showLoading(trendingTvGrid);
-        try {
-          const res = await fetchWithRetry(`https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
-          const data = await res.json();
-          const movies = data.results.filter(r => r.media_type === 'movie').slice(0, 12);
-          const tv = data.results.filter(r => r.media_type === 'tv').slice(0, 12);
-          renderCards(trendingMoviesGrid, movies, 'movie');
-          renderCards(trendingTvGrid, tv, 'tv');
-        } catch (err) { trendingMoviesGrid.innerHTML = '<div class="col-span-full text-red-400">Search failed.</div>'; }
-      }
-
-      function showLoading(container) {
-        container.innerHTML = '<div class="col-span-full flex justify-center py-10"><div class="loading-spinner"></div><span class="ml-2">Loading...</span></div>';
+        ignoreAutoSaveUntil = Date.now() + 5000;
+        updateSimklUI();
+        await updateEmbedStream();
+        playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
 
       // ─── AUTH ────────────────────────────────────────────────────
@@ -1849,65 +1770,18 @@
         if (user) {
           document.getElementById('authContainer').classList.add('hidden');
           document.getElementById('userContainer').classList.remove('hidden');
-          userAvatarDiv.innerText = user.email ? user.email.charAt(0).toUpperCase() : 'U';
-          await loadUserSourceOrder();
-          await renderContinueWatching();
-          updateContinueVisibility();
-          // Show watched section
+          userAvatar.textContent = user.email ? user.email.charAt(0).toUpperCase() : 'U';
           watchedSection.classList.remove('watched-section-hidden');
-          // Show Simkl nav button
           simklNavBtn.style.display = 'inline-block';
+          renderContinueWatching();
         } else {
           document.getElementById('authContainer').classList.remove('hidden');
           document.getElementById('userContainer').classList.add('hidden');
-          EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
-          populateSources();
-          renderContinueWatching();
-          playerPanel.classList.add('hidden');
-          updateContinueVisibility();
-          // Hide watched section
           watchedSection.classList.add('watched-section-hidden');
-          // Hide Simkl nav button
           simklNavBtn.style.display = 'none';
+          renderContinueWatching();
         }
-        updateSimklUI(); // this also handles plan-to-watch visibility
-        updateNavVisibility();
-      }
-
-      // ─── UI HELPERS ─────────────────────────────────────────────
-
-      function updateContinueVisibility() {
-        const query = globalSearch.value.trim();
-        const continueSection = document.getElementById('continueWatchingSection');
-        if (query !== '') continueSection.classList.add('continue-section-hidden');
-        else continueSection.classList.remove('continue-section-hidden');
-        clearSearchBtn.style.display = query !== '' ? 'block' : 'none';
-      }
-
-      function clearSearch() {
-        globalSearch.value = '';
-        updateContinueVisibility();
-        search(globalSearch.value);
-        globalSearch.focus();
-      }
-
-      let searchTimeout;
-
-      function handleSearchInput(e) {
-        updateContinueVisibility();
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => search(e.target.value), 500);
-      }
-
-      function toggleDropdown(e) { e.stopPropagation(); avatarDropdown.classList.toggle('show'); }
-
-      function closeDropdown() { avatarDropdown.classList.remove('show'); }
-      document.addEventListener('click', (event) => { if (!event.target.closest('.avatar-wrapper')) closeDropdown(); });
-
-      function copyTitleToClipboard() {
-        const title = detailTitleSpan.innerText;
-        if (!title) return;
-        navigator.clipboard.writeText(title).then(() => showToast('✓ Title copied')).catch(err => {});
+        updateSimklUI();
       }
 
       // ─── ORDER MODAL ────────────────────────────────────────────
@@ -1917,121 +1791,367 @@
         EMBED_SOURCES.forEach((src, idx) => {
           const div = document.createElement('div');
           div.className = 'source-item';
-          div.innerHTML = `<span>${src.name}</span><div><button class="move-up text-green-400 mr-2" data-idx="${idx}"><i class="fas fa-arrow-up"></i></button><button class="move-down text-green-400" data-idx="${idx}"><i class="fas fa-arrow-down"></i></button></div>`;
+          div.innerHTML =
+            `<span>${src.name}</span><div><button class="move-up text-green-400 mr-2" data-idx="${idx}"><i class="fas fa-arrow-up"></i></button><button class="move-down text-green-400" data-idx="${idx}"><i class="fas fa-arrow-down"></i></button></div>`;
           sourceListDiv.appendChild(div);
         });
-        document.querySelectorAll('.move-up').forEach(btn => btn.addEventListener('click', (e) => {
-          const idx = parseInt(btn.dataset.idx);
-          if (idx > 0) { [EMBED_SOURCES[idx-1], EMBED_SOURCES[idx]] = [EMBED_SOURCES[idx], EMBED_SOURCES[idx-1]]; openOrderModal(); }
-        }));
-        document.querySelectorAll('.move-down').forEach(btn => btn.addEventListener('click', (e) => {
-          const idx = parseInt(btn.dataset.idx);
-          if (idx < EMBED_SOURCES.length - 1) { [EMBED_SOURCES[idx], EMBED_SOURCES[idx+1]] = [EMBED_SOURCES[idx+1], EMBED_SOURCES[idx]]; openOrderModal(); }
-        }));
+        sourceListDiv.querySelectorAll('.move-up').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.idx);
+            if (idx > 0) { [EMBED_SOURCES[idx - 1], EMBED_SOURCES[idx]] = [EMBED_SOURCES[idx], EMBED_SOURCES[
+              idx - 1]];
+              openOrderModal(); }
+          });
+        });
+        sourceListDiv.querySelectorAll('.move-down').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.idx);
+            if (idx < EMBED_SOURCES.length - 1) { [EMBED_SOURCES[idx], EMBED_SOURCES[idx + 1]] = [
+                EMBED_SOURCES[idx + 1], EMBED_SOURCES[idx]
+              ];
+              openOrderModal(); }
+          });
+        });
         orderModal.style.display = 'flex';
       }
 
-      saveOrderBtn.onclick = async () => {
-        await saveUserSourceOrder();
-        populateSources();
+      // ─── UI HELPERS ─────────────────────────────────────────────
+
+      function updateContinueVisibility() {
+        const query = globalSearch.value.trim();
+        const section = document.getElementById('continueWatchingSection');
+        if (query) section.classList.add('continue-section-hidden');
+        else section.classList.remove('continue-section-hidden');
+        clearSearchBtn.style.display = query ? 'block' : 'none';
+      }
+
+      function clearSearch() {
+        globalSearch.value = '';
+        updateContinueVisibility();
+        search('');
+        globalSearch.focus();
+      }
+
+      let searchTimeout;
+
+      function handleSearch(e) {
+        updateContinueVisibility();
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => search(e.target.value), 500);
+      }
+
+      function toggleDropdown(e) { e.stopPropagation();
+        avatarDropdown.classList.toggle('show'); }
+
+      function closeDropdown() { avatarDropdown.classList.remove('show'); }
+
+      function copyTitle() {
+        const title = detailTitle.textContent;
+        if (!title) return;
+        navigator.clipboard.writeText(title).then(() => showToast('✓ Title copied')).catch(() => {});
+      }
+
+      // ─── SIMKL MODAL OPEN ───────────────────────────────────────
+
+      function openSimklModal() {
+        const creds = getSimklCreds();
+        simklApiKeyInput.value = creds.apiKey || '';
+        simklTokenInput.value = creds.token || '';
+        simklAutoSyncCheckbox.checked = creds.autoSync;
+        simklMessage.classList.add('hidden');
+        simklPinArea.classList.add('hidden');
+        simklPinStatus.textContent = '';
+        simklManualPinStatus.textContent = '';
+        simklPinDisplay.textContent = '------';
+        if (simklPollInterval) clearInterval(simklPollInterval);
+        updateSimklUI();
+        simklModal.style.display = 'flex';
+      }
+
+      // ─── EVENT BINDINGS ─────────────────────────────────────────
+
+      document.addEventListener('click', (e) => { if (!e.target.closest('.avatar-wrapper')) closeDropdown(); });
+
+      brandLogo.addEventListener('click', () => window.location.reload());
+
+      closePlayerBtn.addEventListener('click', async () => {
+        await saveProgress();
+        playerPanel.classList.add('hidden');
+      });
+
+      reloadEmbedBtn.addEventListener('click', updateEmbedStream);
+      sourceSelect.addEventListener('change', () => {
+        saveSelectedSource(parseInt(sourceSelect.value));
+        updateEmbedStream();
+      });
+      nextSourceBtn.addEventListener('click', nextSource);
+      copyUrlBtn.addEventListener('click', copyVideoUrl);
+      orderSourcesBtn.addEventListener('click', openOrderModal);
+
+      saveOrderBtn.addEventListener('click', async () => {
         orderModal.style.display = 'none';
-        if (sourceSelect.options.length) { const oldIdx = parseInt(sourceSelect.value); if (oldIdx >= EMBED_SOURCES.length) sourceSelect.value = 0; updateEmbedStream(); }
-      };
-      closeOrderBtn.onclick = () => orderModal.style.display = 'none';
-      orderSourcesBtn.onclick = openOrderModal;
-
-      // ─── LOGIN / LOGOUT EVENTS ─────────────────────────────────
-
-      const loginModal = document.getElementById('loginModal');
-      document.getElementById('showLoginBtn').onclick = () => loginModal.classList.remove('hidden');
-      document.querySelectorAll('.closeModal').forEach(btn => btn.onclick = () => { loginModal.classList.add('hidden'); orderModal.style.display = 'none'; });
-
-      // Login button
-      document.getElementById('doLoginBtn').onclick = async () => {
-        const email = document.getElementById('loginEmail').value;
-        const pass = document.getElementById('loginPassword').value;
-        if (!email || !pass) {
-          alert('Please enter both email and password.');
-          return;
+        populateSources();
+        if (sourceSelect.options.length) {
+          const old = parseInt(sourceSelect.value);
+          if (old >= EMBED_SOURCES.length) sourceSelect.value = 0;
+          updateEmbedStream();
         }
-        const btn = document.getElementById('doLoginBtn');
-        btn.disabled = true;
-        btn.textContent = 'Logging in...';
-        try {
-          const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-          if (error) {
-            alert(error.message);
-          } else {
-            loginModal.classList.add('hidden');
-            await updateAuthUI();
-          }
-        } catch (err) {
-          alert('Login error: ' + err.message);
-        } finally {
-          btn.disabled = false;
-          btn.textContent = 'Login';
-        }
-      };
+      });
+      closeOrderBtn.addEventListener('click', () => { orderModal.style.display = 'none'; });
 
-      // Logout
-      dropdownLogoutBtn.onclick = async () => {
+      saveProgressBtn.addEventListener('click', async () => {
+        currentProgressMinutes = parseInt(progressMinutesInput.value) || 0;
+        currentProgressSeconds = currentProgressMinutes * 60;
+        loadedResumeTime = currentProgressSeconds;
+        await saveProgress();
+        renderContinueWatching();
+      });
+
+      prevEpisodeBtn.addEventListener('click', goToPrevEpisode);
+      nextEpisodeBtn.addEventListener('click', goToNextEpisode);
+
+      userAvatar.addEventListener('click', toggleDropdown);
+      dropdownLogoutBtn.addEventListener('click', async () => {
         await sb.auth.signOut();
         await updateAuthUI();
         playerPanel.classList.add('hidden');
         closeDropdown();
-      };
+      });
+      dropdownSimklBtn.addEventListener('click', () => { closeDropdown();
+        openSimklModal(); });
 
-      // ─── OTHER EVENT BINDINGS ─────────────────────────────────
+      detailTitle.addEventListener('click', copyTitle);
+      document.querySelector('.copy-title-icon').addEventListener('click', copyTitle);
 
-      brandLogo.addEventListener('click', () => window.location.reload());
-
-      closePlayerBtn.onclick = async () => {
-        await saveProgressToDB();
-        playerPanel.classList.add('hidden');
-      };
-      reloadEmbedBtn.onclick = () => updateEmbedStream();
-      sourceSelect.onchange = () => { saveSelectedSourceIndex(parseInt(sourceSelect.value)); updateEmbedStream(); };
-      nextSourceBtn.onclick = nextSource;
-      copyUrlBtn.onclick = copyVideoUrl;
-      saveProgressBtn.onclick = async () => {
-        currentProgressMinutes = parseInt(progressMinutesInput.value) || 0;
-        currentProgressSeconds = currentProgressMinutes * 60;
-        lastPositionForJump = currentProgressSeconds;
-        lastVidFastSave = currentProgressSeconds;
-        lastVixSrcSaved = currentProgressSeconds;
-        lastSaveTimestamp = currentProgressSeconds;
-        lastSaveTime = Date.now();
-        loadedResumeTime = currentProgressSeconds;
-        await saveProgressToDB();
-        await renderContinueWatching();
-      };
-      prevEpisodeBtn.onclick = goToPreviousEpisode;
-      nextEpisodeBtn.onclick = goToNextEpisode;
-      userAvatarDiv.addEventListener('click', toggleDropdown);
-      detailTitleSpan.addEventListener('click', copyTitleToClipboard);
-      copyTitleIcon.addEventListener('click', copyTitleToClipboard);
-      globalSearch.addEventListener('input', handleSearchInput);
+      globalSearch.addEventListener('input', handleSearch);
       clearSearchBtn.addEventListener('click', clearSearch);
       globalSearch.addEventListener('focus', updateContinueVisibility);
-      globalSearch.addEventListener('blur', () => { setTimeout(() => { if (!globalSearch.value.trim()) updateContinueVisibility(); }, 200); });
+      globalSearch.addEventListener('blur', () => {
+        setTimeout(() => { if (!globalSearch.value.trim()) updateContinueVisibility(); }, 200);
+      });
+
+      // Login
+      showLoginBtn.addEventListener('click', () => loginModal.classList.remove('hidden'));
+      document.querySelectorAll('.closeModal').forEach(btn => {
+        btn.addEventListener('click', () => { loginModal.classList.add('hidden');
+          orderModal.style.display = 'none'; });
+      });
+
+      doLoginBtn.addEventListener('click', async () => {
+        const email = loginEmail.value.trim();
+        const pass = loginPassword.value.trim();
+        if (!email || !pass) { alert('Enter email and password.'); return; }
+        doLoginBtn.disabled = true;
+        doLoginBtn.textContent = 'Logging in...';
+        try {
+          const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+          if (error) { alert(error.message); } else { loginModal.classList.add('hidden');
+            await updateAuthUI(); }
+        } catch (err) { alert('Error: ' + err.message); } finally {
+          doLoginBtn.disabled = false;
+          doLoginBtn.textContent = 'Login';
+        }
+      });
+
+      // Simkl modal events
+      simklNavBtn.addEventListener('click', openSimklModal);
+      closeSimklBtn.addEventListener('click', () => { simklModal.style.display = 'none'; });
+      simklGetTokenBtn.addEventListener('click', startSimklOAuth);
+      simklPinAuthorizeBtn.addEventListener('click', authorizeWithPin);
+
+      simklCopyPinBtn.addEventListener('click', () => {
+        const pin = simklPinDisplay.textContent;
+        if (pin && pin !== '------') {
+          navigator.clipboard.writeText(pin).then(() => showToast('✓ PIN copied')).catch(() => {});
+        }
+      });
+
+      simklOpenVerificationBtn.addEventListener('click', () => {
+        const apiKey = simklApiKeyInput.value.trim();
+        if (apiKey && simklCurrentUserCode) {
+          window.open(
+            `https://simkl.com/oauth/authorize?response_type=code&client_id=${apiKey}&redirect_uri=https://simkl.com/&state=${simklCurrentUserCode}`,
+            '_blank');
+        }
+      });
+
+      simklSaveBtn.addEventListener('click', () => {
+        const apiKey = simklApiKeyInput.value.trim();
+        const token = simklTokenInput.value.trim();
+        if (!apiKey || !token) { showSimklMsg('Enter both Client ID and Access Token', 'error'); return; }
+        saveSimklCreds(apiKey, token, simklAutoSyncCheckbox.checked);
+        updateSimklUI();
+        showSimklMsg('✓ Credentials saved!', 'success');
+      });
+
+      simklTestBtn.addEventListener('click', async () => {
+        const apiKey = simklApiKeyInput.value.trim();
+        const token = simklTokenInput.value.trim();
+        if (apiKey && token) { saveSimklCreds(apiKey, token, simklAutoSyncCheckbox.checked);
+          updateSimklUI(); }
+        await testSimkl();
+      });
+
+      simklDisconnectBtn.addEventListener('click', () => {
+        if (confirm('Disconnect Simkl?')) {
+          clearSimklCreds();
+          simklApiKeyInput.value = '';
+          simklTokenInput.value = '';
+          simklAutoSyncCheckbox.checked = false;
+          simklSyncedKeys.clear();
+          updateSimklUI();
+          showSimklMsg('Simkl disconnected', 'info');
+        }
+      });
+
+      simklSyncBtn.addEventListener('click', markCurrentWatched);
+
+      simklModal.addEventListener('click', (e) => { if (e.target === simklModal) simklModal.style.display = 'none'; });
+
+      // ─── MESSAGE HANDLING ──────────────────────────────────────
+
+      window.addEventListener('message', (event) => {
+        const { origin, data } = event;
+        if (!data) return;
+        // Videasy
+        if (origin.includes('videasy')) {
+          let parsed;
+          try { parsed = typeof data === 'string' ? JSON.parse(data) : data; } catch { return; }
+          let seconds = parsed?.timestamp ?? parsed?.data?.timestamp ?? parsed?.currentTime ?? parsed?.data?.currentTime ??
+            null;
+          let eventType = parsed?.event ?? parsed?.data?.event ?? null;
+          if (typeof seconds === 'number' && seconds > 0) {
+            seconds = Math.floor(seconds);
+            if (eventType === 'ended') {
+              currentMediaEnded = true;
+              const { autoSync } = getSimklCreds();
+              if (autoSync && isSimklConnected()) {
+                const season = currentMedia?.type === 'tv' ? currentSeason : null;
+                const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
+                syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
+              }
+            }
+            if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
+              if (currentUser && currentMedia) {
+                currentProgressSeconds = seconds;
+                currentProgressMinutes = Math.floor(seconds / 60);
+                progressMinutesInput.value = currentProgressMinutes;
+                saveProgress();
+              }
+            } else {
+              if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil) {
+                currentProgressSeconds = seconds;
+                currentProgressMinutes = Math.floor(seconds / 60);
+                progressMinutesInput.value = currentProgressMinutes;
+                clearTimeout(window._autoSaveTimer);
+                window._autoSaveTimer = setTimeout(saveProgress, 500);
+              }
+            }
+          }
+          return;
+        }
+        // VidFast
+        const vidfastOrigins = [
+          'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
+          'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
+        ];
+        if (vidfastOrigins.some(o => origin === o)) {
+          if (data?.type === 'PLAYER_EVENT' && data.data) {
+            const { event, currentTime } = data.data;
+            if (event === 'ended') {
+              currentMediaEnded = true;
+              const { autoSync } = getSimklCreds();
+              if (autoSync && isSimklConnected()) {
+                const season = currentMedia?.type === 'tv' ? currentSeason : null;
+                const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
+                syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
+              }
+            }
+            if (typeof currentTime === 'number' && currentTime > 0) {
+              const secs = Math.floor(currentTime);
+              if (event === 'seeked' || event === 'pause' || event === 'ended') {
+                if (currentUser && currentMedia) {
+                  currentProgressSeconds = secs;
+                  currentProgressMinutes = Math.floor(secs / 60);
+                  progressMinutesInput.value = currentProgressMinutes;
+                  saveProgress();
+                }
+              } else if (event === 'timeupdate') {
+                if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil) {
+                  currentProgressSeconds = secs;
+                  currentProgressMinutes = Math.floor(secs / 60);
+                  progressMinutesInput.value = currentProgressMinutes;
+                  clearTimeout(window._autoSaveTimer);
+                  window._autoSaveTimer = setTimeout(saveProgress, 500);
+                }
+              }
+            }
+          }
+          return;
+        }
+        // VixSrc
+        if (origin.includes('vixsrc') || origin.includes('vixcloud')) {
+          if (data?.type === 'PLAYER_EVENT') {
+            let eventName = data.data?.event;
+            let currentTime = Math.floor(data.data?.currentTime || 0);
+            if (!eventName && data.event?.event) {
+              eventName = data.event.event;
+              currentTime = Math.floor(data.event.currentTime || 0);
+            }
+            if (eventName === 'ended') {
+              currentMediaEnded = true;
+              const { autoSync } = getSimklCreds();
+              if (autoSync && isSimklConnected()) {
+                const season = currentMedia?.type === 'tv' ? currentSeason : null;
+                const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
+                syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
+              }
+            }
+            if (currentTime > 0) {
+              if (eventName === 'seeked' || eventName === 'pause' || eventName === 'ended') {
+                if (currentUser && currentMedia) {
+                  currentProgressSeconds = currentTime;
+                  currentProgressMinutes = Math.floor(currentTime / 60);
+                  progressMinutesInput.value = currentProgressMinutes;
+                  saveProgress();
+                }
+              } else if (eventName === 'timeupdate') {
+                if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil) {
+                  currentProgressSeconds = currentTime;
+                  currentProgressMinutes = Math.floor(currentTime / 60);
+                  progressMinutesInput.value = currentProgressMinutes;
+                  clearTimeout(window._autoSaveTimer);
+                  window._autoSaveTimer = setTimeout(saveProgress, 500);
+                }
+              }
+            }
+          }
+          return;
+        }
+      });
+
+      // ─── PERIODIC SAVES ─────────────────────────────────────────
+
+      setInterval(() => {
+        if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && currentProgressSeconds > 0) {
+          saveProgress();
+        }
+      }, 30000);
 
       // ─── INIT ────────────────────────────────────────────────────
 
       async function init() {
-        console.log('Initializing WIZHUB...');
-        EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
+        console.log('WIZHUB initializing...');
         populateSources();
         updateSimklUI();
         await updateAuthUI();
         fetchTrending();
         sb.auth.onAuthStateChange(() => updateAuthUI());
         updateContinueVisibility();
-        console.log('WIZHUB initialized.');
+        console.log('WIZHUB ready.');
       }
-      init();
 
-      // Expose for debugging/refresh
-      window.fetchSimklWatchlist = fetchSimklWatchlist;
+      init();
 
     })();
   </script>
