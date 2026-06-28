@@ -218,6 +218,8 @@
     .title-wrapper { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 
     .continue-section-hidden { display: none !important; }
+    .watched-section-hidden { display: none !important; }
+    .plan-to-watch-hidden { display: none !important; }
 
     .toast-notification {
       position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -231,7 +233,6 @@
       100% { opacity: 0; visibility: hidden; }
     }
 
-    /* Simkl modal PIN box */
     .simkl-pin-box {
       background: #0a0c10; border-radius: 0.5rem; padding: 0.75rem;
       font-family: monospace; font-size: 1.5rem; font-weight: bold; text-align: center;
@@ -244,9 +245,6 @@
       width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
       font-size: 0.75rem; font-weight: 700; flex-shrink: 0; margin-top: 2px;
     }
-
-    /* hide watched section when not logged in */
-    .watched-section-hidden { display: none !important; }
   </style>
 </head>
 <body class="text-gray-200">
@@ -287,6 +285,14 @@
         <i class="fas fa-history" style="color:var(--primary);"></i> Continue Watching
       </h2>
       <div id="continueWatchingContainer" class="horizontal-scroll"><div class="text-gray-400 text-sm">Log in to see your watch history.</div></div>
+    </section>
+
+    <!-- Plan to Watch (Simkl) -->
+    <section id="planToWatchSection" class="mb-12 plan-to-watch-hidden">
+      <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4">
+        <i class="fas fa-list" style="color:var(--primary);"></i> 📋 Plan to Watch (Simkl)
+      </h2>
+      <div id="planToWatchContainer" class="trending-grid"></div>
     </section>
 
     <!-- Player Panel -->
@@ -557,6 +563,8 @@
       const dropdownSimklBtn = document.getElementById('dropdownSimklBtn');
       const brandLogo = document.getElementById('brandLogo');
       const watchedSection = document.getElementById('watchedSection');
+      const planToWatchSection = document.getElementById('planToWatchSection');
+      const planToWatchContainer = document.getElementById('planToWatchContainer');
 
       // Simkl modal refs
       const simklModal = document.getElementById('simklModal');
@@ -642,6 +650,14 @@
           } else {
             simklIndicator.classList.add('hidden');
           }
+        }
+
+        // Toggle plan-to-watch visibility
+        if (currentUser && connected) {
+          planToWatchSection.classList.remove('plan-to-watch-hidden');
+          fetchSimklWatchlist(); // refresh
+        } else {
+          planToWatchSection.classList.add('plan-to-watch-hidden');
         }
       }
 
@@ -849,17 +865,78 @@
         }
       }
 
-      async function markCurrentAsWatchedOnSimkl() {
-        if (!currentMedia) { showToast('No media selected'); return; }
-        if (!isSimklConnected()) { showToast('Connect Simkl first'); openSimklModal(); return; }
+      // ─── FETCH PLAN TO WATCH ──────────────────────────────────
 
-        const season = currentMedia.type === 'tv' ? currentSeason : null;
-        const episode = currentMedia.type === 'tv' ? currentEpisode : null;
+      async function fetchSimklWatchlist() {
+        const { apiKey, token } = getSimklCredentials();
+        if (!apiKey || !token || !currentUser) {
+          planToWatchContainer.innerHTML = '<div class="col-span-full text-gray-400 text-sm">Connect Simkl to see your watchlist.</div>';
+          return;
+        }
 
-        showToast('Syncing to Simkl...');
-        const result = await syncToSimkl(currentMedia, season, episode);
-        if (result.success) showToast(`✓ Synced: ${currentMedia.title}`);
-        else showToast(`✗ Failed: ${result.error}`);
+        planToWatchContainer.innerHTML = '<div class="col-span-full flex justify-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i> Loading...</div>';
+
+        try {
+          // First get the watchlist ID (default list)
+          const listsRes = await fetch(`${SIMKL_API_BASE}/users/lists`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'simkl-api-key': apiKey }
+          });
+          if (!listsRes.ok) throw new Error('Failed to fetch lists');
+          const lists = await listsRes.json();
+          // Find the default watchlist (type: 'watchlist')
+          const watchlist = lists.find(l => l.type === 'watchlist');
+          if (!watchlist) {
+            planToWatchContainer.innerHTML = '<div class="col-span-full text-gray-400 text-sm">No watchlist found.</div>';
+            return;
+          }
+
+          // Fetch items from that list
+          const itemsRes = await fetch(`${SIMKL_API_BASE}/users/lists/${watchlist.ids.slug}/items`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'simkl-api-key': apiKey }
+          });
+          if (!itemsRes.ok) throw new Error('Failed to fetch list items');
+          const items = await itemsRes.json();
+
+          // Items have 'movie' or 'show' with TMDB ids
+          const movies = items.filter(item => item.type === 'movie').slice(0, 12);
+          const shows = items.filter(item => item.type === 'show').slice(0, 12);
+
+          if (movies.length === 0 && shows.length === 0) {
+            planToWatchContainer.innerHTML = '<div class="col-span-full text-gray-400 text-sm">Your watchlist is empty.</div>';
+            return;
+          }
+
+          // Render movies and shows combined (or separate? we'll combine in one grid)
+          const allItems = [...movies, ...shows];
+          planToWatchContainer.innerHTML = allItems.map(item => {
+            const isMovie = item.type === 'movie';
+            const title = isMovie ? item.movie?.title : item.show?.title;
+            const poster = isMovie ? item.movie?.poster : item.show?.poster;
+            const year = isMovie ? item.movie?.year : item.show?.year;
+            const rating = isMovie ? item.movie?.rating : item.show?.rating;
+            const tmdbId = isMovie ? item.movie?.ids?.tmdb : item.show?.ids?.tmdb;
+            const posterUrl = poster ? `https://image.tmdb.org/t/p/w500${poster}` : 'https://placehold.co/300x450';
+            const mediaType = isMovie ? 'movie' : 'tv';
+            return `<div class="movie-card" data-id="${tmdbId}" data-type="${mediaType}">
+              <img src="${posterUrl}" class="w-full h-64 object-cover" loading="lazy">
+              <div class="p-2"><div class="font-semibold text-sm truncate">${title}</div>
+              <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${year || '—'}</span><span>⭐ ${rating || '—'}</span></div></div>
+            </div>`;
+          }).join('');
+
+          // Add click listeners
+          planToWatchContainer.querySelectorAll('.movie-card').forEach(card => {
+            card.addEventListener('click', async () => {
+              const id = card.dataset.id, type = card.dataset.type;
+              if (!id) return;
+              const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`;
+              try { const res = await fetchWithRetry(url); const data = await res.json(); showDetails(data, type); } catch (err) { alert("Failed to load details. Please try again."); }
+            });
+          });
+
+        } catch (err) {
+          planToWatchContainer.innerHTML = `<div class="col-span-full text-red-400 text-sm">Failed to load watchlist: ${err.message}</div>`;
+        }
       }
 
       // ─── SIMKL MODAL CONTROLS ──────────────────────────────────
@@ -1273,10 +1350,14 @@
         nextEpisodeBtn.disabled = (idx >= currentEpisodesList.length - 1);
       }
 
+      // ─── GO TO NEXT EPISODE (with auto-sync) ──────────────────
+
       async function goToPreviousEpisode() {
         if (!currentMedia || currentMedia.type !== 'tv') return;
         const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
         if (idx > 0) {
+          // Mark current episode as watched before moving?
+          // Actually we only want to mark when we go next, not previous.
           await saveProgressToDB();
           currentEpisode = currentEpisodesList[idx - 1].episode_number;
           episodeSelect.value = currentEpisode;
@@ -1292,6 +1373,12 @@
         if (!currentMedia || currentMedia.type !== 'tv') return;
         const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
         if (idx < currentEpisodesList.length - 1) {
+          // Mark current episode as watched on Simkl (if connected and autoSync enabled)
+          const { autoSync } = getSimklCredentials();
+          if (autoSync && isSimklConnected()) {
+            const result = await syncToSimkl(currentMedia, currentSeason, currentEpisode);
+            if (result.success) showToast(`✓ Synced episode ${currentEpisode} to Simkl`);
+          }
           await saveProgressToDB();
           currentEpisode = currentEpisodesList[idx + 1].episode_number;
           episodeSelect.value = currentEpisode;
@@ -1408,7 +1495,7 @@
           const season = currentMedia.type === 'tv' ? currentSeason : null;
           const episode = currentMedia.type === 'tv' ? currentEpisode : null;
           const result = await syncToSimkl(currentMedia, season, episode);
-          if (result.success) showToast(`✓ Synced to Simkl: ${currentMedia.title}`);
+          if (result.success) showToast(`✓ Synced ${currentMedia.title} to Simkl`);
         }
       }
 
@@ -1756,7 +1843,7 @@
           // Hide watched section
           watchedSection.classList.add('watched-section-hidden');
         }
-        updateSimklUI();
+        updateSimklUI(); // this also handles plan-to-watch visibility
       }
 
       // ─── UI HELPERS ─────────────────────────────────────────────
@@ -1890,6 +1977,9 @@
         updateContinueVisibility();
       }
       init();
+
+      // Expose fetchSimklWatchlist so it can be called after Simkl connect
+      window.fetchSimklWatchlist = fetchSimklWatchlist;
 
     })();
   </script>
