@@ -7,8 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300A65F'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --primary: #00A65F;
@@ -23,6 +22,7 @@
     body {
       background: #0a0c10;
       font-family: 'Inter', system-ui, sans-serif;
+      color: #e5e7eb;
     }
     .glass-nav {
       background: rgba(10, 12, 16, 0.85);
@@ -207,6 +207,15 @@
       transform: translateY(-6px);
       box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.6);
     }
+    .movie-card .p-2 {
+      color: #f0f0f0;
+    }
+    .movie-card .font-semibold {
+      color: #ffffff;
+    }
+    .movie-card .text-xs {
+      color: #b0b8cc;
+    }
     .progress-overlay {
       position: absolute;
       bottom: 0;
@@ -294,6 +303,7 @@
       max-width: 500px;
       max-height: 80vh;
       overflow-y: auto;
+      color: #e5e7eb;
     }
     .source-item {
       display: flex;
@@ -303,6 +313,7 @@
       background: #2a2c38;
       margin-bottom: 0.5rem;
       border-radius: 0.5rem;
+      color: #f0f0f0;
     }
     .trending-grid {
       display: grid;
@@ -340,6 +351,7 @@
       border: 1px solid var(--primary-bg);
       box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.5);
       overflow: hidden;
+      color: #e5e7eb;
     }
     .info-section {
       padding: 1.5rem;
@@ -382,6 +394,7 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      color: #f0f0f0;
     }
     .type-badge {
       background: var(--primary-bg);
@@ -391,6 +404,7 @@
       font-size: 0.7rem;
       text-transform: uppercase;
       font-weight: 500;
+      color: #f0f0f0;
     }
     .overview-text {
       color: #b0b8cc;
@@ -456,6 +470,7 @@
       padding: 0.4rem 1rem;
       width: 90px;
       text-align: center;
+      color: white;
     }
     .episode-nav-modern {
       display: flex;
@@ -469,6 +484,7 @@
       padding: 0.3rem 1rem;
       font-size: 0.8rem;
       transition: all 0.2s;
+      color: #e0e0e0;
     }
     .episode-nav-modern button:hover:not(:disabled) {
       background: var(--primary);
@@ -506,9 +522,6 @@
       display: none !important;
     }
     .watched-section-hidden {
-      display: none !important;
-    }
-    .plan-to-watch-hidden {
       display: none !important;
     }
     .toast-notification {
@@ -571,6 +584,24 @@
       flex-shrink: 0;
       margin-top: 2px;
     }
+    h2 {
+      color: #f0f0f0;
+    }
+    .text-gray-400 {
+      color: #b0b8cc;
+    }
+    .text-gray-300 {
+      color: #d1d5db;
+    }
+    .text-sm {
+      color: #d1d5db;
+    }
+    .text-xs {
+      color: #9ca3af;
+    }
+    .text-white {
+      color: #ffffff;
+    }
   </style>
 </head>
 <body>
@@ -610,13 +641,6 @@
         <i class="fas fa-history" style="color:var(--primary);"></i> Continue Watching
       </h2>
       <div id="continueWatchingContainer" class="horizontal-scroll"><div class="text-gray-400 text-sm">Log in to see your watch history.</div></div>
-    </section>
-
-    <section id="planToWatchSection" class="mb-12 plan-to-watch-hidden">
-      <h2 class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4">
-        <i class="fas fa-list" style="color:var(--primary);"></i> 📋 Plan to Watch
-      </h2>
-      <div id="planToWatchContainer" class="trending-grid"></div>
     </section>
 
     <div id="playerPanel" class="hidden mb-12 player-modern">
@@ -681,9 +705,9 @@
   <!-- ===== LOGIN MODAL ===== -->
   <div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
     <div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-green-500/30 relative">
-      <h3 class="text-xl font-bold mb-4">Login</h3>
-      <input type="email" id="loginEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3" />
-      <input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4" />
+      <h3 class="text-xl font-bold mb-4 text-white">Login</h3>
+      <input type="email" id="loginEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-white" />
+      <input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4 text-white" />
       <button id="doLoginBtn" class="w-full bg-green-500 text-black py-2 rounded-lg font-semibold">Login</button>
       <p class="text-sm text-center mt-3 text-gray-400">New registrations are currently closed.</p>
       <button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button>
@@ -890,8 +914,6 @@
       const simklIndicator = $('simklIndicator');
       const simklSyncBtn = $('simklSyncBtn');
       const watchedSection = $('watchedSection');
-      const planToWatchSection = $('planToWatchSection');
-      const planToWatchContainer = $('planToWatchContainer');
       const simklNavBtn = $('simklNavBtn');
       const simklNavLabel = $('simklNavLabel');
       const userAvatar = $('userAvatar');
@@ -994,14 +1016,6 @@
           } else {
             simklIndicator.classList.add('hidden');
           }
-        }
-
-        // Plan to watch
-        if (currentUser && connected) {
-          planToWatchSection.classList.remove('plan-to-watch-hidden');
-          fetchSimklWatchlist();
-        } else {
-          planToWatchSection.classList.add('plan-to-watch-hidden');
         }
       }
 
@@ -1178,76 +1192,6 @@
         showToast(result.success ? `✓ Synced: ${currentMedia.title}` : `✗ Failed: ${result.error}`);
       }
 
-      // ─── SIMKL WATCHLIST ────────────────────────────────────────
-
-      async function fetchSimklWatchlist() {
-        const { apiKey, token } = getSimklCreds();
-        if (!apiKey || !token || !currentUser) {
-          planToWatchContainer.innerHTML =
-          '<div class="col-span-full text-gray-400 text-sm">Connect Simkl to see your watchlist.</div>';
-          return;
-        }
-        planToWatchContainer.innerHTML =
-          '<div class="col-span-full flex justify-center py-10"><i class="fas fa-spinner fa-spin mr-2"></i> Loading...</div>';
-        try {
-          const listsRes = await fetch(`${SIMKL_API_BASE}/users/lists`, {
-            headers: { 'Authorization': `Bearer ${token}`, 'simkl-api-key': apiKey }
-          });
-          if (!listsRes.ok) throw new Error('Failed to fetch lists');
-          const lists = await listsRes.json();
-          const watchlist = lists.find(l => l.type === 'watchlist');
-          if (!watchlist) {
-            planToWatchContainer.innerHTML =
-            '<div class="col-span-full text-gray-400 text-sm">No watchlist found.</div>';
-            return;
-          }
-          const itemsRes = await fetch(`${SIMKL_API_BASE}/users/lists/${watchlist.ids.slug}/items`, {
-            headers: { 'Authorization': `Bearer ${token}`, 'simkl-api-key': apiKey }
-          });
-          if (!itemsRes.ok) throw new Error('Failed to fetch list items');
-          const items = await itemsRes.json();
-          const movies = items.filter(item => item.type === 'movie').slice(0, 12);
-          const shows = items.filter(item => item.type === 'show').slice(0, 12);
-          if (movies.length === 0 && shows.length === 0) {
-            planToWatchContainer.innerHTML =
-            '<div class="col-span-full text-gray-400 text-sm">Your watchlist is empty.</div>';
-            return;
-          }
-          const allItems = [...movies, ...shows];
-          planToWatchContainer.innerHTML = allItems.map(item => {
-            const isMovie = item.type === 'movie';
-            const title = isMovie ? item.movie?.title : item.show?.title;
-            const poster = isMovie ? item.movie?.poster : item.show?.poster;
-            const year = isMovie ? item.movie?.year : item.show?.year;
-            const rating = isMovie ? item.movie?.rating : item.show?.rating;
-            const tmdbId = isMovie ? item.movie?.ids?.tmdb : item.show?.ids?.tmdb;
-            const posterUrl = poster ? `https://image.tmdb.org/t/p/w500${poster}` : 'https://placehold.co/300x450';
-            const mediaType = isMovie ? 'movie' : 'tv';
-            return `<div class="movie-card" data-id="${tmdbId}" data-type="${mediaType}">
-              <img src="${posterUrl}" class="w-full h-64 object-cover" loading="lazy">
-              <div class="p-2"><div class="font-semibold text-sm truncate">${title || 'Untitled'}</div>
-              <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${year || '—'}</span><span>⭐ ${rating || '—'}</span></div></div>
-            </div>`;
-          }).join('');
-          planToWatchContainer.querySelectorAll('.movie-card').forEach(card => {
-            card.addEventListener('click', async () => {
-              const id = card.dataset.id,
-                type = card.dataset.type;
-              if (!id) return;
-              try {
-                const res = await fetchWithRetry(
-                  `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}`);
-                const data = await res.json();
-                showDetails(data, type);
-              } catch (err) { alert('Failed to load details'); }
-            });
-          });
-        } catch (err) {
-          planToWatchContainer.innerHTML =
-            `<div class="col-span-full text-red-400 text-sm">Failed: ${err.message}</div>`;
-        }
-      }
-
       // ─── TOAST ──────────────────────────────────────────────────
 
       function showToast(text) {
@@ -1306,7 +1250,7 @@
           const rating = item.vote_average?.toFixed(1) || '';
           return `<div class="movie-card" data-id="${item.id}" data-type="${mediaType}">
             <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
-            <div class="p-2"><div class="font-semibold text-sm truncate">${title}</div>
+            <div class="p-2"><div class="font-semibold text-sm truncate text-white">${title}</div>
             <div class="flex justify-between text-xs text-gray-400 mt-1"><span>${year || '—'}</span><span>⭐ ${rating}</span></div></div>
           </div>`;
         }).join('');
@@ -1403,7 +1347,7 @@
                 </div>
                 <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
                 <div class="p-2">
-                  <div class="font-semibold text-sm truncate">${item.title}</div>
+                  <div class="font-semibold text-sm truncate text-white">${item.title}</div>
                   <div class="text-xs text-gray-400">${label} • ${minutes} min</div>
                 </div>
                 <div class="progress-overlay" style="width: ${progressPercent}%;"></div>
@@ -1460,7 +1404,7 @@
             </div>
             <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
             <div class="p-2">
-              <div class="font-semibold text-sm truncate">${item.title}</div>
+              <div class="font-semibold text-sm truncate text-white">${item.title}</div>
               <div class="text-xs text-gray-400">${label} • ${minutes} min</div>
             </div>
             <div class="progress-overlay" style="width: ${progressPercent}%;"></div>
