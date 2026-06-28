@@ -135,7 +135,7 @@
       border: 1px solid #facc15;
       border-radius: 0.75rem;
       padding: 0.5rem;
-      min-width: 130px;
+      min-width: 160px;
       z-index: 60;
       display: none;
       flex-direction: column;
@@ -339,6 +339,7 @@
       gap: 6px;
     }
     .btn-icon:hover { background: #2a2e3a; color: #facc15; transform: translateY(-1px); }
+    .btn-icon.active { background: #facc15; color: #0a0c10; }
     .btn-primary {
       background: #facc15;
       color: #0a0c10;
@@ -411,6 +412,15 @@
       70% { opacity: 1; }
       100% { opacity: 0; visibility: hidden; }
     }
+    .simkl-status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .simkl-status-dot.connected { background: #4ade80; }
+    .simkl-status-dot.disconnected { background: #ef4444; }
   </style>
 </head>
 <body class="text-gray-200">
@@ -427,9 +437,13 @@
   </div>
   <div class="nav-right">
     <a href="oglist.html" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
+    <button id="simklNavBtn" class="nav-btn" title="Simkl Integration"><i class="fas fa-sync-alt mr-1"></i> <span id="simklNavLabel">Simkl</span></button>
     <div id="userContainer" class="hidden avatar-wrapper">
       <div class="user-avatar" id="userAvatar">U</div>
-      <div id="avatarDropdown" class="avatar-dropdown"><button id="dropdownLogoutBtn" class="dropdown-item">Logout</button></div>
+      <div id="avatarDropdown" class="avatar-dropdown">
+        <button id="dropdownSimklBtn" class="dropdown-item"><i class="fas fa-cloud mr-2"></i> Simkl Settings</button>
+        <button id="dropdownLogoutBtn" class="dropdown-item"><i class="fas fa-sign-out-alt mr-2"></i> Logout</button>
+      </div>
     </div>
     <div id="authContainer" class="flex gap-2">
       <button id="showLoginBtn" class="nav-btn">Login</button>
@@ -468,6 +482,7 @@
             <button id="nextSourceBtn" class="btn-icon"><i class="fas fa-forward"></i> Next</button>
             <button id="copyUrlBtn" class="btn-icon"><i class="fas fa-copy"></i> Copy URL</button>
             <button id="orderSourcesBtn" class="btn-icon" title="Reorder sources"><i class="fas fa-arrows-alt"></i> Order</button>
+            <button id="simklSyncBtn" class="btn-icon" title="Mark as watched on Simkl"><i class="fas fa-cloud-upload-alt"></i> Simkl</button>
           </div>
         </div>
         <div class="control-group flex flex-wrap items-center gap-4">
@@ -487,6 +502,7 @@
             <div class="rating-badge"><i class="fas fa-star text-yellow-400 text-xs"></i><span id="detailRating">—</span><span class="text-gray-400 text-xs">/10</span></div>
             <span class="text-sm"><i class="fas fa-calendar-alt text-gray-400 mr-1"></i><span id="detailYear">—</span></span>
             <span class="type-badge" id="detailType">—</span>
+            <span id="simklIndicator" class="text-xs text-gray-500 hidden"><i class="fas fa-cloud"></i> <span></span></span>
           </div>
           <p id="detailOverview" class="overview-text mt-3 text-sm md:text-base leading-relaxed"></p>
         </div>
@@ -501,6 +517,48 @@
 <div id="orderModal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Reorder Stream Sources</h3><div id="sourceList" class="mb-4" style="max-height: 50vh; overflow-y: auto;"></div><div class="flex gap-2"><button id="saveOrderBtn" class="bg-green-600 px-4 py-2 rounded-full">Save Order</button><button id="closeOrderBtn" class="bg-gray-600 px-4 py-2 rounded-full">Cancel</button></div></div></div>
 <div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden"><div class="bg-gray-900 rounded-2xl p-6 w-11/12 max-w-md border border-yellow-500/30 relative"><h3 class="text-xl font-bold mb-4">Login</h3><input type="email" id="loginEmail" placeholder="Email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3"><input type="password" id="loginPassword" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-4"><button id="doLoginBtn" class="w-full bg-yellow-500 text-black py-2 rounded-lg font-semibold">Login</button><p class="text-sm text-center mt-3 text-gray-400">New registrations are currently closed.</p><button class="closeModal absolute top-2 right-4 text-gray-400 text-2xl">&times;</button></div></div>
 
+<div id="simklModal" class="modal">
+  <div class="modal-content">
+    <h3 class="text-xl font-bold mb-2"><i class="fas fa-cloud text-yellow-400 mr-2"></i> Simkl Integration</h3>
+    <p class="text-sm text-gray-400 mb-4">Connect your Simkl account to automatically sync your watch history. What you watch here will be marked as watched on Simkl.</p>
+    
+    <div class="bg-gray-800/50 rounded-lg p-3 mb-4">
+      <div class="text-xs text-gray-400 mb-2 font-semibold">Status: <span id="simklStatusText" class="text-red-400">Not Connected</span></div>
+      <div class="text-xs text-gray-500">Auto-sync: <span id="simklAutoSyncText">Disabled</span></div>
+    </div>
+    
+    <label class="text-sm text-gray-300 block mb-1">Simkl API Key (Client ID)</label>
+    <input type="text" id="simklApiKey" placeholder="Enter your Simkl API Key" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-white">
+    
+    <label class="text-sm text-gray-300 block mb-1">Simkl Access Token</label>
+    <input type="password" id="simklToken" placeholder="Enter your Simkl Access Token" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-white">
+    
+    <div class="flex items-center gap-2 mb-4 bg-gray-800/50 rounded-lg p-3">
+      <input type="checkbox" id="simklAutoSync" class="cursor-pointer">
+      <label for="simklAutoSync" class="text-sm text-gray-300 cursor-pointer">Auto-sync when episode ends / movie completes</label>
+    </div>
+    
+    <div id="simklMessage" class="text-sm mb-3 hidden p-2 rounded-lg"></div>
+    
+    <div class="flex flex-wrap gap-2">
+      <button id="saveSimklBtn" class="bg-yellow-500 text-black px-4 py-2 rounded-full font-semibold"><i class="fas fa-save mr-1"></i> Save</button>
+      <button id="testSimklBtn" class="bg-gray-600 text-white px-4 py-2 rounded-full"><i class="fas fa-plug mr-1"></i> Test</button>
+      <button id="clearSimklBtn" class="bg-red-600 text-white px-4 py-2 rounded-full"><i class="fas fa-trash mr-1"></i> Disconnect</button>
+      <button id="closeSimklBtn" class="bg-gray-600 text-white px-4 py-2 rounded-full ml-auto">Close</button>
+    </div>
+    
+    <div class="mt-4 p-3 bg-gray-800/30 rounded-lg text-xs text-gray-400">
+      <p class="font-semibold text-gray-300 mb-1">How to get your Simkl credentials:</p>
+      <ol class="list-decimal ml-4 space-y-1">
+        <li>Go to <a href="https://simkl.com/settings/apps/" target="_blank" class="text-yellow-400 underline">Simkl Settings → Apps</a></li>
+        <li>Register a new application</li>
+        <li>Use the OAuth flow to get your Access Token, OR generate a personal token</li>
+        <li>Copy the Client ID (API Key) and Access Token here</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   // ================= SOURCE DEFINITIONS =================
@@ -512,12 +570,10 @@
     },
     { name: 'Videasy', url: (type, id, s, e, progressSec) => {
         let base = type === 'movie' ? `https://player.videasy.net/movie/${id}` : `https://player.videasy.net/tv/${id}/${s}/${e}`;
-        // Official Docs: Use ?progress=SEC for start time
         return progressSec > 0 ? base + `?progress=${progressSec}` : base;
       }
     },
     { name: 'VidFast', url: (type, id, s, e, progressSec) => {
-        // Official Docs: Use postMessage API for seeking, not URL params
         let base = type === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` : `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true`;
         return base;
       }
@@ -525,6 +581,7 @@
     { name: 'VidUp', url: (type, id, s, e) => type === 'movie' ? `https://vidup.to/movie/${id}` : `https://vidup.to/tv/${id}/${s}/${e}` },
     { name: 'VidCore', url: (type, id, s, e) => type === 'movie' ? `https://vidcore.net/movie/${id}` : `https://vidcore.net/tv/${id}/${s}/${e}` },
     { name: 'VidLink', url: (type, id, s, e) => type === 'movie' ? `https://vidlink.pro/movie/${id}` : `https://vidlink.pro/tv/${id}/${s}/${e}` },
+    { name: 'VidSync', url: (type, id, s, e) => type === 'movie' ? `https://vidsync.live/embed/movie/${id}?autoPlay=true` : `https://vidsync.live/embed/tv/${id}/${s}/${e}?autoPlay=true&autoNext=true` },
     { name: '111Movies', url: (type, id, s, e) => type === 'movie' ? `https://111movies.net/movie/${id}` : `https://111movies.net/tv/${id}/${s}/${e}` },
     { name: 'EmbedMaster', url: (type, id, s, e) => type === 'movie' ? `https://embedmaster.link/movie/${id}` : `https://embedmaster.link/tv/${id}/${s}/${e}` },
     { name: 'ZxcStream', url: (type, id, s, e) => type === 'movie' ? `https://zxcstream.xyz/player/movie/${id}` : `https://zxcstream.xyz/player/tv/${id}/${s}/${e}` },
@@ -560,23 +617,26 @@
     { name: '🎌 AnimePahe (Site)', url: () => `https://animepahe.org`, openInNewTab: true }
   ];
 
+  // NEW DEFAULT ORDER (with VidSync included)
   const DEFAULT_ORDER_NAMES = [
     "VixSrc",
     "Videasy",
     "VidFast",
+    "Rivestream",
+    "ZxcStream",
+    "Peachify",
+    "VidSync",
+    "Nxsha",
+    "VAPlayer",
+    "VidLink",
     "VidUp",
     "VidCore",
-    "VidLink",
     "111Movies",
     "EmbedMaster",
-    "ZxcStream",
     "AnyEmbed",
-    "Peachify",
-    "FilmU",
-    "Nxsha",
     "NHD API",
+    "FilmU",
     "Vidsrc",
-    "VAPlayer",
     "VidRock",
     "Vidzee",
     "Cinezo",
@@ -586,7 +646,6 @@
     "Xpass",
     "CinemaOS",
     "SpencerDevs",
-    "Rivestream",
     "Netplayz (Site)",
     "🎬 CinemaOS (Site)",
     "🎌 AnimePahe (Site)"
@@ -610,6 +669,7 @@
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHR6Zmt4b2xubHFsbWpld2V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyOTMzOTUsImV4cCI6MjA5NTg2OTM5NX0.42bpsGRyKSZcQ3EUj1k3grsUVuXtZWKsce7OKv8J5YU';
   const TMDB_API_KEY = 'cf3fd5ed845e76f7c6786a61e521006c';
   const IMG_BASE = 'https://image.tmdb.org/t/p/w500';
+  const SIMKL_API_BASE = 'https://api.simkl.com';
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let currentUser = null;
   let currentMedia = null;
@@ -626,11 +686,15 @@
   let supabaseAvailable = true;
   let lastSaveTime = 0;
   let loadedResumeTime = 0;
+  let currentMediaEnded = false;
 
   // Force seek state variables for VidFast postMessage API
   let hasForcedSeekVidFast = false;
   let seekCommandSent = false;
   let forceSeekStartTime = 0;
+
+  // Track which episodes have already been synced to Simkl in this session
+  let simklSyncedKeys = new Set();
 
   // DOM elements
   const continueContainer = document.getElementById('continueWatchingContainer');
@@ -662,11 +726,282 @@
   const userAvatarDiv = document.getElementById('userAvatar');
   const avatarDropdown = document.getElementById('avatarDropdown');
   const dropdownLogoutBtn = document.getElementById('dropdownLogoutBtn');
+  const dropdownSimklBtn = document.getElementById('dropdownSimklBtn');
   const brandLogo = document.getElementById('brandLogo');
+
+  // Simkl DOM elements
+  const simklModal = document.getElementById('simklModal');
+  const simklApiKeyInput = document.getElementById('simklApiKey');
+  const simklTokenInput = document.getElementById('simklToken');
+  const simklAutoSyncCheckbox = document.getElementById('simklAutoSync');
+  const simklStatusText = document.getElementById('simklStatusText');
+  const simklAutoSyncText = document.getElementById('simklAutoSyncText');
+  const simklMessage = document.getElementById('simklMessage');
+  const saveSimklBtn = document.getElementById('saveSimklBtn');
+  const testSimklBtn = document.getElementById('testSimklBtn');
+  const clearSimklBtn = document.getElementById('clearSimklBtn');
+  const closeSimklBtn = document.getElementById('closeSimklBtn');
+  const simklNavBtn = document.getElementById('simklNavBtn');
+  const simklNavLabel = document.getElementById('simklNavLabel');
+  const simklSyncBtn = document.getElementById('simklSyncBtn');
+  const simklIndicator = document.getElementById('simklIndicator');
 
   brandLogo.addEventListener('click', () => window.location.reload());
 
+  // ================= SIMKL INTEGRATION =================
+  function getSimklCredentials() {
+    try {
+      return {
+        apiKey: localStorage.getItem('wizhub_simkl_apikey'),
+        token: localStorage.getItem('wizhub_simkl_token'),
+        autoSync: localStorage.getItem('wizhub_simkl_autosync') === 'true'
+      };
+    } catch { return { apiKey: null, token: null, autoSync: false }; }
+  }
+
+  function saveSimklCredentials(apiKey, token, autoSync) {
+    localStorage.setItem('wizhub_simkl_apikey', apiKey || '');
+    localStorage.setItem('wizhub_simkl_token', token || '');
+    localStorage.setItem('wizhub_simkl_autosync', autoSync ? 'true' : 'false');
+  }
+
+  function clearSimklCredentials() {
+    localStorage.removeItem('wizhub_simkl_apikey');
+    localStorage.removeItem('wizhub_simkl_token');
+    localStorage.removeItem('wizhub_simkl_autosync');
+  }
+
+  function isSimklConnected() {
+    const { apiKey, token } = getSimklCredentials();
+    return !!(apiKey && token);
+  }
+
+  function showSimklMessage(text, type = 'info') {
+    simklMessage.classList.remove('hidden', 'bg-green-900/50', 'bg-red-900/50', 'bg-blue-900/50', 'text-green-300', 'text-red-300', 'text-blue-300');
+    if (type === 'success') simklMessage.classList.add('bg-green-900/50', 'text-green-300');
+    else if (type === 'error') simklMessage.classList.add('bg-red-900/50', 'text-red-300');
+    else simklMessage.classList.add('bg-blue-900/50', 'text-blue-300');
+    simklMessage.textContent = text;
+    setTimeout(() => simklMessage.classList.add('hidden'), 4000);
+  }
+
+  function updateSimklUI() {
+    const creds = getSimklCredentials();
+    if (creds.apiKey && creds.token) {
+      simklStatusText.textContent = 'Connected';
+      simklStatusText.classList.remove('text-red-400');
+      simklStatusText.classList.add('text-green-400');
+      simklNavLabel.textContent = 'Simkl ✓';
+      simklNavBtn.style.borderColor = '#4ade80';
+      simklNavBtn.style.color = '#4ade80';
+      simklApiKeyInput.value = creds.apiKey;
+      simklTokenInput.value = creds.token;
+    } else {
+      simklStatusText.textContent = 'Not Connected';
+      simklStatusText.classList.remove('text-green-400');
+      simklStatusText.classList.add('text-red-400');
+      simklNavLabel.textContent = 'Simkl';
+      simklNavBtn.style.borderColor = '';
+      simklNavBtn.style.color = '';
+    }
+    simklAutoSyncCheckbox.checked = creds.autoSync;
+    simklAutoSyncText.textContent = creds.autoSync ? 'Enabled' : 'Disabled';
+    
+    if (simklSyncBtn) {
+      if (isSimklConnected()) {
+        simklSyncBtn.classList.remove('hidden');
+      } else {
+        simklSyncBtn.classList.add('hidden');
+      }
+    }
+    
+    if (simklIndicator) {
+      if (isSimklConnected()) {
+        simklIndicator.classList.remove('hidden');
+        simklIndicator.querySelector('span').textContent = 'Synced to Simkl';
+      } else {
+        simklIndicator.classList.add('hidden');
+      }
+    }
+  }
+
+  async function syncToSimkl(media, season = null, episode = null) {
+    const { apiKey, token } = getSimklCredentials();
+    if (!apiKey || !token || !media) return { success: false, error: 'Not configured' };
+    
+    // Build a unique key for this sync to prevent duplicates in same session
+    const syncKey = `${media.type}_${media.id}_${season || 0}_${episode || 0}`;
+    if (simklSyncedKeys.has(syncKey)) {
+      return { success: true, error: 'Already synced this session' };
+    }
+    
+    try {
+      let body = {};
+      const watchedAt = new Date().toISOString();
+      
+      if (media.type === 'movie') {
+        body = {
+          movies: [{
+            title: media.title,
+            ids: { tmdb: String(media.id) },
+            watched_at: watchedAt
+          }]
+        };
+      } else if (media.type === 'tv' && season !== null && episode !== null) {
+        body = {
+          shows: [{
+            title: media.title,
+            ids: { tmdb: String(media.id) },
+            seasons: [{
+              number: parseInt(season),
+              episodes: [{ number: parseInt(episode), watched_at: watchedAt }]
+            }]
+          }]
+        };
+      } else {
+        return { success: false, error: 'Invalid media data' };
+      }
+      
+      const res = await fetch(`${SIMKL_API_BASE}/sync/history`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'simkl-api-key': apiKey
+        },
+        body: JSON.stringify(body)
+      });
+      
+      if (res.ok) {
+        simklSyncedKeys.add(syncKey);
+        console.log('Synced to Simkl:', media.title, 'S' + season + 'E' + episode);
+        return { success: true };
+      } else {
+        const errText = await res.text();
+        console.error('Simkl sync failed:', res.status, errText);
+        return { success: false, error: `HTTP ${res.status}: ${errText}` };
+      }
+    } catch (err) {
+      console.error('Simkl sync error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  async function testSimklConnection() {
+    const { apiKey, token } = getSimklCredentials();
+    if (!apiKey || !token) {
+      showSimklMessage('Please enter both API Key and Token first', 'error');
+      return false;
+    }
+    
+    showSimklMessage('Testing connection...', 'info');
+    
+    try {
+      const res = await fetch(`${SIMKL_API_BASE}/users/settings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'simkl-api-key': apiKey
+        }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        const name = data?.account?.name || 'Connected';
+        showSimklMessage(`✓ Connected as: ${name}`, 'success');
+        return true;
+      } else {
+        showSimklMessage(`✗ Failed: HTTP ${res.status}`, 'error');
+        return false;
+      }
+    } catch (err) {
+      showSimklMessage(`✗ Error: ${err.message}`, 'error');
+      return false;
+    }
+  }
+
+  async function markCurrentAsWatchedOnSimkl() {
+    if (!currentMedia) {
+      alert('No media selected');
+      return;
+    }
+    if (!isSimklConnected()) {
+      showToast('Connect Simkl first in Settings');
+      openSimklModal();
+      return;
+    }
+    
+    const season = currentMedia.type === 'tv' ? currentSeason : null;
+    const episode = currentMedia.type === 'tv' ? currentEpisode : null;
+    
+    showToast('Syncing to Simkl...');
+    const result = await syncToSimkl(currentMedia, season, episode);
+    
+    if (result.success) {
+      showToast(`✓ Synced to Simkl: ${currentMedia.title}`);
+    } else {
+      showToast(`✗ Simkl sync failed: ${result.error || 'Unknown error'}`);
+    }
+  }
+
+  function openSimklModal() {
+    const creds = getSimklCredentials();
+    simklApiKeyInput.value = creds.apiKey || '';
+    simklTokenInput.value = creds.token || '';
+    simklAutoSyncCheckbox.checked = creds.autoSync;
+    simklMessage.classList.add('hidden');
+    updateSimklUI();
+    simklModal.style.display = 'flex';
+  }
+
+  // Simkl event listeners
+  simklNavBtn.onclick = openSimklModal;
+  dropdownSimklBtn.onclick = () => { closeDropdown(); openSimklModal(); };
+  closeSimklBtn.onclick = () => simklModal.style.display = 'none';
+  
+  saveSimklBtn.onclick = () => {
+    const apiKey = simklApiKeyInput.value.trim();
+    const token = simklTokenInput.value.trim();
+    const autoSync = simklAutoSyncCheckbox.checked;
+    saveSimklCredentials(apiKey, token, autoSync);
+    updateSimklUI();
+    showSimklMessage('✓ Simkl settings saved', 'success');
+  };
+  
+  testSimklBtn.onclick = async () => {
+    const apiKey = simklApiKeyInput.value.trim();
+    const token = simklTokenInput.value.trim();
+    if (!apiKey || !token) {
+      showSimklMessage('Please enter both API Key and Token', 'error');
+      return;
+    }
+    saveSimklCredentials(apiKey, token, simklAutoSyncCheckbox.checked);
+    await testSimklConnection();
+    updateSimklUI();
+  };
+  
+  clearSimklBtn.onclick = () => {
+    if (confirm('Disconnect from Simkl? Your local WIZHUB progress will remain.')) {
+      clearSimklCredentials();
+      simklApiKeyInput.value = '';
+      simklTokenInput.value = '';
+      simklAutoSyncCheckbox.checked = false;
+      simklSyncedKeys.clear();
+      updateSimklUI();
+      showSimklMessage('Simkl disconnected', 'info');
+    }
+  };
+  
+  simklSyncBtn.onclick = markCurrentAsWatchedOnSimkl;
+
   // Helper functions
+  function showToast(text) {
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.textContent = text;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+  }
+
   function updateContinueVisibility() {
     const query = globalSearch.value.trim();
     const continueSection = document.getElementById('continueWatchingSection');
@@ -887,7 +1222,6 @@
     }
   }
 
-  // Emergency load (localStorage)
   function loadEmergencyProgress() {
     try {
       const raw = localStorage.getItem('wizhub_emergency_progress');
@@ -910,7 +1244,6 @@
   async function loadProgress() {
     if (!currentUser || !currentMedia) return;
 
-    // 1) Emergency progress
     const emergency = loadEmergencyProgress();
     if (emergency && emergency.mediaId === currentMedia.id && emergency.mediaType === currentMedia.type) {
       currentProgressSeconds = emergency.seconds;
@@ -921,7 +1254,6 @@
       clearEmergencyProgress();
     }
 
-    // 2) Supabase
     if (supabaseAvailable) {
       try {
         const { data, error } = await sb.from('watch_history')
@@ -952,7 +1284,6 @@
       }
     }
 
-    // 3) localStorage fallback
     const localData = loadProgressFromLocal();
     if (localData) {
       const localSeconds = localData.progress_seconds || 0;
@@ -1060,7 +1391,6 @@
     nextEpisodeBtn.disabled = (idx >= currentEpisodesList.length - 1);
   }
 
-  // CRITICAL FIX: Function to reset progress state when changing episodes
   function resetPlayerStateForNewMedia() {
     currentProgressSeconds = 0;
     currentProgressMinutes = 0;
@@ -1069,10 +1399,8 @@
     hasForcedSeekVidFast = false;
     seekCommandSent = false;
     forceSeekStartTime = Date.now();
-    
-    // CRITICAL FIX: Block incoming messages from the old iframe so they don't overwrite the 0s progress
+    currentMediaEnded = false;
     ignoreAutoSaveUntil = Date.now() + 5000;
-    
     lastPositionForJump = 0;
     lastVidFastSave = 0;
     lastVixSrcSaved = 0;
@@ -1084,17 +1412,10 @@
     if (!currentMedia || currentMedia.type !== 'tv') return;
     const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
     if (idx > 0) {
-      // 1. Save progress for the current episode BEFORE changing it
       await saveProgressToDB();
-      
-      // 2. Update to new episode
       currentEpisode = currentEpisodesList[idx - 1].episode_number;
       episodeSelect.value = currentEpisode;
-      
-      // 3. Reset clock for the new episode
       resetPlayerStateForNewMedia();
-      
-      // 4. Save the new state (0 seconds for new episode) so DB is accurate
       await saveProgressToDB();
       await renderContinueWatching();
       updateEmbedStream();
@@ -1106,17 +1427,10 @@
     if (!currentMedia || currentMedia.type !== 'tv') return;
     const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
     if (idx < currentEpisodesList.length - 1) {
-      // 1. Save progress for the current episode BEFORE changing it
       await saveProgressToDB();
-      
-      // 2. Update to new episode
       currentEpisode = currentEpisodesList[idx + 1].episode_number;
       episodeSelect.value = currentEpisode;
-      
-      // 3. Reset clock for the new episode
       resetPlayerStateForNewMedia();
-      
-      // 4. Save the new state (0 seconds for new episode) so DB is accurate
       await saveProgressToDB();
       await renderContinueWatching();
       updateEmbedStream();
@@ -1143,34 +1457,22 @@
     await loadEpisodes(tvId, currentSeason, forcedEpisode);
     
     seasonSelect.onchange = async () => {
-      // 1. Save current episode progress
       await saveProgressToDB();
-      
-      // 2. Change season and reset episode to 1
       currentSeason = parseInt(seasonSelect.value);
       currentEpisode = 1;
-      
-      // 3. Reset clock for new season/episode
       resetPlayerStateForNewMedia();
-      
       await loadEpisodes(tvId, currentSeason);
-      await saveProgressToDB(); // Save new ep 0 progress
+      await saveProgressToDB();
       await renderContinueWatching();
       updateEmbedStream();
       updateEpisodeNavigation();
     };
     
     episodeSelect.onchange = async () => {
-      // 1. Save current episode progress
       await saveProgressToDB();
-      
-      // 2. Change episode
       currentEpisode = parseInt(episodeSelect.value);
-      
-      // 3. Reset clock for new episode
       resetPlayerStateForNewMedia();
-      
-      await saveProgressToDB(); // Save new ep 0 progress
+      await saveProgressToDB();
       await renderContinueWatching();
       updateEmbedStream();
       updateEpisodeNavigation();
@@ -1216,7 +1518,6 @@
       return;
     }
     let url = '';
-    // Videasy & VixSrc handle resume time natively via URL params
     if (src.name === 'Videasy' || src.name === 'VixSrc') {
       url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
     } else {
@@ -1231,10 +1532,10 @@
     console.log("RESUME TIME (seconds)", currentProgressSeconds);
     console.log("FINAL URL", url);
     
-    // Reset VidFast seek flags when the source changes/reloads
     hasForcedSeekVidFast = false;
     seekCommandSent = false;
     forceSeekStartTime = Date.now();
+    currentMediaEnded = false;
     
     if (url) embedIframe.src = url;
     else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
@@ -1269,7 +1570,6 @@
     if (!currentUser || !currentMedia) return;
     const now = Date.now();
     
-    // Ignore saves during the initial load protection window (prevents player initialization junk from overwriting DB)
     if (now < ignoreAutoSaveUntil) {
       console.log(`Auto-save IGNORED (protection window): ${sourceName} ${seconds}s`);
       return;
@@ -1292,7 +1592,6 @@
     if (!currentUser || !currentMedia) return;
     const now = Date.now();
     
-    // Ignore saves during the initial load protection window
     if (now < ignoreAutoSaveUntil) {
       console.log(`Immediate save IGNORED (protection window): ${sourceName} ${seconds}s`);
       return;
@@ -1307,6 +1606,25 @@
     console.log(`Immediate save from ${sourceName}: ${seconds}s`);
   }
 
+  // Handle 'ended' event - sync to Simkl if enabled
+  async function handleMediaEnded(sourceName) {
+    if (!currentMedia || currentMediaEnded) return;
+    currentMediaEnded = true;
+    console.log(`Media ended event from ${sourceName}`);
+    
+    const { autoSync } = getSimklCredentials();
+    if (autoSync && isSimklConnected()) {
+      const season = currentMedia.type === 'tv' ? currentSeason : null;
+      const episode = currentMedia.type === 'tv' ? currentEpisode : null;
+      const result = await syncToSimkl(currentMedia, season, episode);
+      if (result.success) {
+        showToast(`✓ Synced to Simkl: ${currentMedia.title}`);
+      } else {
+        console.warn('Simkl auto-sync failed:', result.error);
+      }
+    }
+  }
+
   // ========== VIDEASY HANDLER ==========
   function handleVideasyMessage(rawData) {
     let parsed;
@@ -1317,7 +1635,6 @@
     }
     if (!parsed) return;
 
-    // Per Docs: The player sends progress updates containing: id, type, progress, timestamp, duration, season, episode
     let seconds = parsed?.timestamp ?? parsed?.data?.timestamp ?? parsed?.currentTime ?? parsed?.data?.currentTime ?? null;
     let eventType = parsed?.event ?? parsed?.data?.event ?? null;
 
@@ -1327,7 +1644,9 @@
 
     seconds = Math.floor(seconds);
 
-    // Pass to the save functions which handle the protection window check
+    if (eventType === 'ended') {
+      handleMediaEnded('Videasy');
+    }
     if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
       saveProgressImmediately(seconds, `Videasy(${eventType})`);
     } else {
@@ -1348,7 +1667,6 @@
     if (data.type === 'PLAYER_EVENT' && data.data) {
       const { event, currentTime, duration } = data.data;
       
-      // FORCE SEEK HANDSHAKE for VidFast
       if (!hasForcedSeekVidFast && loadedResumeTime > 0 && !seekCommandSent) {
         if (event === 'ready' || event === 'loaded' || event === 'canplay' || event === 'play' || event === 'playing' || event === 'timeupdate') {
           console.log(`VidFast: Sending seek command to ${loadedResumeTime}`);
@@ -1357,13 +1675,15 @@
         }
       }
 
+      if (event === 'ended') {
+        handleMediaEnded('VidFast');
+      }
+
       if (typeof currentTime === 'number' && currentTime > 0) {
-        // Block saving if player is stuck at a low timestamp while seek is applying
         if (!hasForcedSeekVidFast && loadedResumeTime > 0 && currentTime < loadedResumeTime - 5 && (Date.now() - forceSeekStartTime < 15000)) {
           return;
         }
         
-        // Mark as successfully seeked if we reach the target
         if (loadedResumeTime > 0 && Math.abs(currentTime - loadedResumeTime) <= 5) {
           hasForcedSeekVidFast = true;
         }
@@ -1393,6 +1713,10 @@
       currentTime = Math.floor(data.event.currentTime || 0);
     }
     
+    if (eventName === 'ended') {
+      handleMediaEnded('VixSrc');
+    }
+    
     if (currentTime > 0) {
       if (eventName === 'seeked' || eventName === 'pause' || eventName === 'ended') {
         saveProgressImmediately(currentTime, `VixSrc(${eventName})`);
@@ -1420,12 +1744,13 @@
       handleVixSrcMessage(data, origin);
       return;
     }
+    // VidSync doesn't send postMessage events but autoNext handles progression
   });
 
   // ========== HEARTBEAT & FALLBACK ==========
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
-    if (Date.now() < ignoreAutoSaveUntil) return; // Skip during load protection
+    if (Date.now() < ignoreAutoSaveUntil) return;
     
     const current = currentProgressSeconds;
     const now = Date.now();
@@ -1439,7 +1764,7 @@
 
   setInterval(async () => {
     if (!currentUser || !currentMedia) return;
-    if (Date.now() < ignoreAutoSaveUntil) return; // Skip during load protection
+    if (Date.now() < ignoreAutoSaveUntil) return;
     
     const diff = Math.abs(currentProgressSeconds - lastPositionForJump);
     if (diff > 60) {
@@ -1487,10 +1812,10 @@
     document.getElementById('detailType').innerHTML = type === 'movie' ? 'Movie' : 'TV Series';
     currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
     
-    // Reset force seek state for the new media item
     hasForcedSeekVidFast = false;
     seekCommandSent = false;
     forceSeekStartTime = Date.now();
+    currentMediaEnded = false;
 
     if (type === 'tv') {
       tvControlsDiv.classList.remove('hidden');
@@ -1517,8 +1842,6 @@
       await loadProgress();
     }
 
-    // Protection window (5 seconds) — prevents stale events from overwriting during load
-    // Allows seeking backward after 5 seconds without breaking the resume functionality
     ignoreAutoSaveUntil = Date.now() + 5000;
     lastPositionForJump = currentProgressSeconds;
     lastVidFastSave = currentProgressSeconds;
@@ -1526,6 +1849,7 @@
     lastSaveTimestamp = currentProgressSeconds;
     lastSaveTime = Date.now();
 
+    updateSimklUI();
     await updateEmbedStream();
     playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -1614,6 +1938,7 @@
       playerPanel.classList.add('hidden');
       updateContinueVisibility();
     }
+    updateSimklUI();
   }
 
   // ========== SOURCE ORDER MODAL ==========
@@ -1704,10 +2029,16 @@
     else { loginModal.classList.add('hidden'); updateAuthUI(); }
   };
 
+  // Close Simkl modal when clicking outside
+  simklModal.addEventListener('click', (e) => {
+    if (e.target === simklModal) simklModal.style.display = 'none';
+  });
+
   // ========== INITIALIZE ==========
   async function init() {
     EMBED_SOURCES = buildOrderedSources(DEFAULT_ORDER_NAMES);
     populateSources();
+    updateSimklUI();
     await updateAuthUI();
     fetchTrending();
     sb.auth.onAuthStateChange(() => updateAuthUI());
