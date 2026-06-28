@@ -645,7 +645,7 @@
     </section>
 
     <div id="playerPanel" class="hidden mb-12 player-modern">
-      <div class="embed-container">
+      <div class="embed-container" id="embedContainer">
         <iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="autoplay; encrypted-media" sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"></iframe>
       </div>
       <div class="info-section">
@@ -894,7 +894,8 @@
       const trendingMoviesGrid = $('trendingMoviesGrid');
       const trendingTvGrid = $('trendingTvGrid');
       const playerPanel = $('playerPanel');
-      const embedIframe = $('embedIframe');
+      const embedContainer = $('embedContainer');
+      let embedIframe = $('embedIframe');
       const sourceSelect = $('sourceSelect');
       const tvControls = $('tvControls');
       const seasonSelect = $('seasonSelect');
@@ -1605,17 +1606,19 @@
         }
       }
 
-      // ─── PLAYER – FIXED RELOAD ──────────────────────────────────
+      // ─── PLAYER – FIXED RELOAD (recreate iframe) ──────────────
 
       async function updateEmbedStream() {
         if (!currentMedia) {
-          embedIframe.srcdoc = '<div style="color:red;padding:2rem">No media selected</div>';
+          embedContainer.innerHTML =
+            '<div style="color:red;padding:2rem;text-align:center;">No media selected</div>';
           return;
         }
         const srcIdx = parseInt(sourceSelect.value);
         const src = EMBED_SOURCES[srcIdx];
         if (!src || typeof src.url !== 'function') {
-          embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid source</div>';
+          embedContainer.innerHTML =
+            '<div style="color:red;padding:2rem;text-align:center;">Invalid source</div>';
           return;
         }
         let url = '';
@@ -1626,7 +1629,8 @@
             url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
           }
         } catch (e) {
-          embedIframe.srcdoc = `<div style="color:red;padding:2rem">Error building URL</div>`;
+          embedContainer.innerHTML =
+            `<div style="color:red;padding:2rem;text-align:center;">Error building URL</div>`;
           return;
         }
         if (src.openInNewTab === true && url) {
@@ -1635,21 +1639,33 @@
         }
 
         if (url) {
-          // Force a complete reload: clear iframe, then set with cache buster
-          embedIframe.src = 'about:blank';
-          embedIframe.srcdoc = '';
-          // Wait for browser to clear
-          await new Promise(resolve => setTimeout(resolve, 200));
+          // Add cache buster
           const separator = url.includes('?') ? '&' : '?';
-          const cacheBuster = `_t=${Date.now()}`;
-          const finalUrl = url + separator + cacheBuster;
-          embedIframe.src = finalUrl;
-          // Also add a fallback if the iframe fails to load
-          embedIframe.onerror = function() {
-            showToast('Failed to load video. Try another source.');
-          };
+          const finalUrl = url + separator + '_t=' + Date.now();
+
+          // --- RECREATE IFRAME ---
+          const newIframe = document.createElement('iframe');
+          newIframe.id = 'embedIframe';
+          newIframe.allowFullscreen = true;
+          newIframe.referrerPolicy = 'no-referrer';
+          newIframe.allow = 'autoplay; encrypted-media';
+          newIframe.sandbox = 'allow-scripts allow-same-origin allow-forms allow-presentation';
+          newIframe.src = finalUrl;
+          newIframe.style.width = '100%';
+          newIframe.style.height = '100%';
+          newIframe.style.border = 'none';
+          newIframe.style.background = '#000';
+
+          // Replace the old iframe
+          embedContainer.innerHTML = '';
+          embedContainer.appendChild(newIframe);
+          embedIframe = newIframe;
+
+          // Optional: log for debugging
+          console.log('Player loaded:', finalUrl);
         } else {
-          embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
+          embedContainer.innerHTML =
+            '<div style="color:red;padding:2rem;text-align:center;">Invalid URL</div>';
         }
       }
 
@@ -1663,7 +1679,7 @@
       }
 
       async function copyVideoUrl() {
-        const url = embedIframe.src;
+        const url = embedIframe ? embedIframe.src : '';
         if (!url || url === 'about:blank') { showToast('No video URL'); return; }
         try {
           await navigator.clipboard.writeText(url);
