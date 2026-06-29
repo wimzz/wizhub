@@ -7,7 +7,8 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300A65F'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+  </script>
   <style>
     :root {
       --primary: #00A65F;
@@ -884,6 +885,14 @@
       let simklSyncedKeys = new Set();
       let simklPollInterval = null;
       let simklCurrentUserCode = null;
+      // flags for VidFast / VixSrc seek handling
+      let hasForcedSeekVidFast = false;
+      let seekCommandSent = false;
+      let forceSeekStartTime = 0;
+      let lastVidFastSave = 0;
+      let lastVixSrcSaved = 0;
+      let lastPositionForJump = 0;
+      let lastSaveTimestamp = 0;
 
       // ─── DOM REFS ──────────────────────────────────────────────
       const $ = id => document.getElementById(id);
@@ -1503,9 +1512,7 @@
           await saveProgress();
           currentSeason = parseInt(seasonSelect.value);
           currentEpisode = 1;
-          currentProgressSeconds = 0;
-          progressMinutesInput.value = 0;
-          loadedResumeTime = 0;
+          resetPlayerStateForNewMedia();
           await loadEpisodes(tvId, currentSeason);
           await saveProgress();
           renderContinueWatching();
@@ -1516,9 +1523,7 @@
         episodeSelect.onchange = async () => {
           await saveProgress();
           currentEpisode = parseInt(episodeSelect.value);
-          currentProgressSeconds = 0;
-          progressMinutesInput.value = 0;
-          loadedResumeTime = 0;
+          resetPlayerStateForNewMedia();
           await saveProgress();
           renderContinueWatching();
           updateEmbedStream();
@@ -1563,9 +1568,7 @@
           await saveProgress();
           currentEpisode = currentEpisodesList[idx - 1].episode_number;
           episodeSelect.value = currentEpisode;
-          currentProgressSeconds = 0;
-          progressMinutesInput.value = 0;
-          loadedResumeTime = 0;
+          resetPlayerStateForNewMedia();
           await saveProgress();
           renderContinueWatching();
           updateEmbedStream();
@@ -1577,7 +1580,6 @@
         if (!currentMedia || currentMedia.type !== 'tv') return;
         const idx = currentEpisodesList.findIndex(ep => ep.episode_number === currentEpisode);
         if (idx < currentEpisodesList.length - 1) {
-          // Auto-sync current episode to Simkl
           const { autoSync } = getSimklCreds();
           if (autoSync && isSimklConnected()) {
             const result = await syncToSimkl(currentMedia, currentSeason, currentEpisode);
@@ -1586,9 +1588,7 @@
           await saveProgress();
           currentEpisode = currentEpisodesList[idx + 1].episode_number;
           episodeSelect.value = currentEpisode;
-          currentProgressSeconds = 0;
-          progressMinutesInput.value = 0;
-          loadedResumeTime = 0;
+          resetPlayerStateForNewMedia();
           await saveProgress();
           renderContinueWatching();
           updateEmbedStream();
@@ -1597,6 +1597,22 @@
       }
 
       // ─── PLAYER ──────────────────────────────────────────────────
+
+      function resetPlayerStateForNewMedia() {
+        currentProgressSeconds = 0;
+        loadedResumeTime = 0;
+        hasForcedSeekVidFast = false;
+        seekCommandSent = false;
+        forceSeekStartTime = Date.now();
+        currentMediaEnded = false;
+        ignoreAutoSaveUntil = Date.now() + 5000;
+        lastPositionForJump = 0;
+        lastVidFastSave = 0;
+        lastVixSrcSaved = 0;
+        lastSaveTimestamp = 0;
+        lastSaveTime = Date.now();
+        progressMinutesInput.value = 0;
+      }
 
       async function updateEmbedStream() {
         if (!currentMedia) return;
@@ -1612,9 +1628,34 @@
         } else {
           url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
         }
+
+        // Handle promise-based URLs
+        if (url && typeof url.then === 'function') {
+          embedIframe.srcdoc =
+            '<div class="text-center py-20 text-gray-400"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+          try { url = await url; } catch (err) {
+            embedIframe.srcdoc = '<div style="color:red;padding:2rem">Failed to load</div>';
+            return;
+          }
+        }
+
         if (src.openInNewTab === true && url) { window.open(url, '_blank'); return; }
-        if (url) embedIframe.src = url;
-        else embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
+
+        // Reset state flags before loading
+        hasForcedSeekVidFast = false;
+        seekCommandSent = false;
+        forceSeekStartTime = Date.now();
+        currentMediaEnded = false;
+
+        if (url) {
+          // Force the iframe to reload by clearing src first,
+          // then set it after a microtask so the DOM updates.
+          embedIframe.src = 'about:blank';
+          await new Promise(r => requestAnimationFrame(r));
+          embedIframe.src = url;
+        } else {
+          embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
+        }
       }
 
       function nextSource() {
@@ -1653,7 +1694,9 @@
         detailYear.textContent = year;
         detailType.textContent = type === 'movie' ? 'Movie' : 'TV Series';
         currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
-        currentMediaEnded = false;
+
+        // Reset state for new media
+        resetPlayerStateForNewMedia();
 
         if (type === 'tv') {
           tvControls.classList.remove('hidden');
@@ -1665,21 +1708,16 @@
           tvControls.classList.add('hidden');
         }
 
+        // Load progress
         if (savedSeconds !== null) {
           currentProgressSeconds = savedSeconds;
-          currentProgressMinutes = Math.floor(currentProgressSeconds / 60);
-          progressMinutesInput.value = currentProgressMinutes;
+          progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
           loadedResumeTime = currentProgressSeconds;
         } else if (savedProgress !== null) {
           currentProgressSeconds = savedProgress * 60;
-          currentProgressMinutes = savedProgress;
           progressMinutesInput.value = savedProgress;
           loadedResumeTime = currentProgressSeconds;
         } else {
-          currentProgressSeconds = 0;
-          currentProgressMinutes = 0;
-          progressMinutesInput.value = 0;
-          loadedResumeTime = 0;
           // Try to load from DB
           if (currentUser) {
             try {
@@ -1687,8 +1725,7 @@
                 .eq('user_id', currentUser.id).eq('media_type', type).eq('tmdb_id', item.id).maybeSingle();
               if (data) {
                 currentProgressSeconds = data.progress_seconds || 0;
-                currentProgressMinutes = Math.floor(currentProgressSeconds / 60);
-                progressMinutesInput.value = currentProgressMinutes;
+                progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
                 loadedResumeTime = currentProgressSeconds;
                 if (type === 'tv') {
                   if (data.season_number) currentSeason = data.season_number;
@@ -1701,7 +1738,15 @@
         }
 
         ignoreAutoSaveUntil = Date.now() + 5000;
+        lastPositionForJump = currentProgressSeconds;
+        lastVidFastSave = currentProgressSeconds;
+        lastVixSrcSaved = currentProgressSeconds;
+        lastSaveTimestamp = currentProgressSeconds;
+        lastSaveTime = Date.now();
+
         updateSimklUI();
+        // Use a small delay to ensure the player panel is fully rendered
+        await new Promise(r => requestAnimationFrame(r));
         await updateEmbedStream();
         playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -1812,6 +1857,146 @@
         simklModal.style.display = 'flex';
       }
 
+      // ─── MESSAGE HANDLING ──────────────────────────────────────
+
+      function handleVideasyMessage(rawData) {
+        let parsed;
+        try { parsed = typeof rawData === 'string' ? JSON.parse(rawData) : rawData; } catch { return; }
+        if (!parsed) return;
+        let seconds = parsed?.timestamp ?? parsed?.data?.timestamp ?? parsed?.currentTime ?? parsed?.data?.currentTime ??
+          null;
+        let eventType = parsed?.event ?? parsed?.data?.event ?? null;
+        if (typeof seconds !== 'number' || seconds <= 0) return;
+        seconds = Math.floor(seconds);
+        if (eventType === 'ended') {
+          currentMediaEnded = true;
+          const { autoSync } = getSimklCreds();
+          if (autoSync && isSimklConnected()) {
+            const season = currentMedia?.type === 'tv' ? currentSeason : null;
+            const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
+            syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
+          }
+        }
+        if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
+          if (currentUser && currentMedia) {
+            currentProgressSeconds = seconds;
+            progressMinutesInput.value = Math.floor(seconds / 60);
+            saveProgress();
+          }
+        } else {
+          if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil) {
+            currentProgressSeconds = seconds;
+            progressMinutesInput.value = Math.floor(seconds / 60);
+            clearTimeout(window._autoSaveTimer);
+            window._autoSaveTimer = setTimeout(saveProgress, 500);
+          }
+        }
+      }
+
+      const vidfastOrigins = [
+        'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
+        'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
+      ];
+
+      function handleVidFastMessage(data, origin) {
+        if (!vidfastOrigins.some(o => origin === o)) return;
+        if (data?.type === 'PLAYER_EVENT' && data.data) {
+          const { event, currentTime } = data.data;
+          if (!hasForcedSeekVidFast && loadedResumeTime > 0 && !seekCommandSent) {
+            if (event === 'ready' || event === 'loaded' || event === 'canplay' || event === 'play' || event ===
+              'playing' || event === 'timeupdate') {
+              embedIframe.contentWindow.postMessage({ command: 'seek', time: loadedResumeTime }, '*');
+              seekCommandSent = true;
+            }
+          }
+          if (event === 'ended') {
+            currentMediaEnded = true;
+            const { autoSync } = getSimklCreds();
+            if (autoSync && isSimklConnected()) {
+              const season = currentMedia?.type === 'tv' ? currentSeason : null;
+              const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
+              syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
+            }
+          }
+          if (typeof currentTime === 'number' && currentTime > 0) {
+            if (!hasForcedSeekVidFast && loadedResumeTime > 0 && currentTime < loadedResumeTime - 5 && (Date.now() -
+                forceSeekStartTime < 15000)) return;
+            if (loadedResumeTime > 0 && Math.abs(currentTime - loadedResumeTime) <= 5) hasForcedSeekVidFast = true;
+            const seconds = Math.floor(currentTime);
+            if (event === 'seeked' || event === 'pause' || event === 'ended') {
+              if (currentUser && currentMedia) {
+                currentProgressSeconds = seconds;
+                progressMinutesInput.value = Math.floor(seconds / 60);
+                saveProgress();
+              }
+            } else if (event === 'timeupdate') {
+              if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && (seconds - lastVidFastSave) >=
+                15) {
+                lastVidFastSave = seconds;
+                currentProgressSeconds = seconds;
+                progressMinutesInput.value = Math.floor(seconds / 60);
+                clearTimeout(window._autoSaveTimer);
+                window._autoSaveTimer = setTimeout(saveProgress, 500);
+              }
+            }
+          }
+        }
+      }
+
+      function handleVixSrcMessage(data, origin) {
+        if (!origin.includes('vixsrc') && !origin.includes('vixcloud')) return;
+        if (data?.type !== "PLAYER_EVENT") return;
+        let eventName = data.data?.event;
+        let currentTime = Math.floor(data.data?.currentTime || 0);
+        if (!eventName && data.event?.event) {
+          eventName = data.event.event;
+          currentTime = Math.floor(data.event.currentTime || 0);
+        }
+        if (eventName === 'ended') {
+          currentMediaEnded = true;
+          const { autoSync } = getSimklCreds();
+          if (autoSync && isSimklConnected()) {
+            const season = currentMedia?.type === 'tv' ? currentSeason : null;
+            const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
+            syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
+          }
+        }
+        if (currentTime > 0) {
+          if (eventName === 'seeked' || eventName === 'pause' || eventName === 'ended') {
+            if (currentUser && currentMedia) {
+              currentProgressSeconds = currentTime;
+              progressMinutesInput.value = Math.floor(currentTime / 60);
+              saveProgress();
+            }
+          } else if (eventName === 'timeupdate') {
+            if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && (currentTime - lastVixSrcSaved) >=
+              15) {
+              lastVixSrcSaved = currentTime;
+              currentProgressSeconds = currentTime;
+              progressMinutesInput.value = Math.floor(currentTime / 60);
+              clearTimeout(window._autoSaveTimer);
+              window._autoSaveTimer = setTimeout(saveProgress, 500);
+            }
+          }
+        }
+      }
+
+      window.addEventListener('message', (event) => {
+        const { origin, data } = event;
+        if (!data) return;
+        if (origin.includes('videasy')) { handleVideasyMessage(data); return; }
+        if (vidfastOrigins.some(o => origin === o)) { handleVidFastMessage(data, origin); return; }
+        if (origin.includes('vixsrc') || origin.includes('vixcloud')) { handleVixSrcMessage(data, origin); return; }
+      });
+
+      // ─── PERIODIC SAVES ─────────────────────────────────────────
+
+      setInterval(() => {
+        if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && currentProgressSeconds > 0) {
+          saveProgress();
+        }
+      }, 30000);
+
       // ─── EVENT BINDINGS ─────────────────────────────────────────
 
       document.addEventListener('click', (e) => { if (!e.target.closest('.avatar-wrapper')) closeDropdown(); });
@@ -1844,8 +2029,7 @@
       closeOrderBtn.addEventListener('click', () => { orderModal.style.display = 'none'; });
 
       saveProgressBtn.addEventListener('click', async () => {
-        currentProgressMinutes = parseInt(progressMinutesInput.value) || 0;
-        currentProgressSeconds = currentProgressMinutes * 60;
+        currentProgressSeconds = (parseInt(progressMinutesInput.value) || 0) * 60;
         loadedResumeTime = currentProgressSeconds;
         await saveProgress();
         renderContinueWatching();
@@ -1951,136 +2135,6 @@
       simklSyncBtn.addEventListener('click', markCurrentWatched);
 
       simklModal.addEventListener('click', (e) => { if (e.target === simklModal) simklModal.style.display = 'none'; });
-
-      // ─── MESSAGE HANDLING ──────────────────────────────────────
-
-      window.addEventListener('message', (event) => {
-        const { origin, data } = event;
-        if (!data) return;
-        // Videasy
-        if (origin.includes('videasy')) {
-          let parsed;
-          try { parsed = typeof data === 'string' ? JSON.parse(data) : data; } catch { return; }
-          let seconds = parsed?.timestamp ?? parsed?.data?.timestamp ?? parsed?.currentTime ?? parsed?.data?.currentTime ??
-            null;
-          let eventType = parsed?.event ?? parsed?.data?.event ?? null;
-          if (typeof seconds === 'number' && seconds > 0) {
-            seconds = Math.floor(seconds);
-            if (eventType === 'ended') {
-              currentMediaEnded = true;
-              const { autoSync } = getSimklCreds();
-              if (autoSync && isSimklConnected()) {
-                const season = currentMedia?.type === 'tv' ? currentSeason : null;
-                const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
-                syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
-              }
-            }
-            if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
-              if (currentUser && currentMedia) {
-                currentProgressSeconds = seconds;
-                currentProgressMinutes = Math.floor(seconds / 60);
-                progressMinutesInput.value = currentProgressMinutes;
-                saveProgress();
-              }
-            } else {
-              if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil) {
-                currentProgressSeconds = seconds;
-                currentProgressMinutes = Math.floor(seconds / 60);
-                progressMinutesInput.value = currentProgressMinutes;
-                clearTimeout(window._autoSaveTimer);
-                window._autoSaveTimer = setTimeout(saveProgress, 500);
-              }
-            }
-          }
-          return;
-        }
-        // VidFast
-        const vidfastOrigins = [
-          'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
-          'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
-        ];
-        if (vidfastOrigins.some(o => origin === o)) {
-          if (data?.type === 'PLAYER_EVENT' && data.data) {
-            const { event, currentTime } = data.data;
-            if (event === 'ended') {
-              currentMediaEnded = true;
-              const { autoSync } = getSimklCreds();
-              if (autoSync && isSimklConnected()) {
-                const season = currentMedia?.type === 'tv' ? currentSeason : null;
-                const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
-                syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
-              }
-            }
-            if (typeof currentTime === 'number' && currentTime > 0) {
-              const secs = Math.floor(currentTime);
-              if (event === 'seeked' || event === 'pause' || event === 'ended') {
-                if (currentUser && currentMedia) {
-                  currentProgressSeconds = secs;
-                  currentProgressMinutes = Math.floor(secs / 60);
-                  progressMinutesInput.value = currentProgressMinutes;
-                  saveProgress();
-                }
-              } else if (event === 'timeupdate') {
-                if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil) {
-                  currentProgressSeconds = secs;
-                  currentProgressMinutes = Math.floor(secs / 60);
-                  progressMinutesInput.value = currentProgressMinutes;
-                  clearTimeout(window._autoSaveTimer);
-                  window._autoSaveTimer = setTimeout(saveProgress, 500);
-                }
-              }
-            }
-          }
-          return;
-        }
-        // VixSrc
-        if (origin.includes('vixsrc') || origin.includes('vixcloud')) {
-          if (data?.type === 'PLAYER_EVENT') {
-            let eventName = data.data?.event;
-            let currentTime = Math.floor(data.data?.currentTime || 0);
-            if (!eventName && data.event?.event) {
-              eventName = data.event.event;
-              currentTime = Math.floor(data.event.currentTime || 0);
-            }
-            if (eventName === 'ended') {
-              currentMediaEnded = true;
-              const { autoSync } = getSimklCreds();
-              if (autoSync && isSimklConnected()) {
-                const season = currentMedia?.type === 'tv' ? currentSeason : null;
-                const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
-                syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
-              }
-            }
-            if (currentTime > 0) {
-              if (eventName === 'seeked' || eventName === 'pause' || eventName === 'ended') {
-                if (currentUser && currentMedia) {
-                  currentProgressSeconds = currentTime;
-                  currentProgressMinutes = Math.floor(currentTime / 60);
-                  progressMinutesInput.value = currentProgressMinutes;
-                  saveProgress();
-                }
-              } else if (eventName === 'timeupdate') {
-                if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil) {
-                  currentProgressSeconds = currentTime;
-                  currentProgressMinutes = Math.floor(currentTime / 60);
-                  progressMinutesInput.value = currentProgressMinutes;
-                  clearTimeout(window._autoSaveTimer);
-                  window._autoSaveTimer = setTimeout(saveProgress, 500);
-                }
-              }
-            }
-          }
-          return;
-        }
-      });
-
-      // ─── PERIODIC SAVES ─────────────────────────────────────────
-
-      setInterval(() => {
-        if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && currentProgressSeconds > 0) {
-          saveProgress();
-        }
-      }, 30000);
 
       // ─── INIT ────────────────────────────────────────────────────
 
