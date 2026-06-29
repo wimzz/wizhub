@@ -619,7 +619,7 @@
       <button id="clearSearchBtn" class="clear-search" aria-label="Clear search"><i class="fas fa-times-circle"></i></button>
     </div>
     <div class="nav-right">
-      <a href="https://wimzz.github.io/wizhub/oglist" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
+      <a href="#" class="nav-btn" target="_self"><i class="fas fa-link mr-1"></i> OGList</a>
       <button id="simklNavBtn" class="nav-btn" title="Simkl Integration"><i class="fas fa-sync-alt mr-1"></i> <span id="simklNavLabel">Simkl</span></button>
       <div id="userContainer" class="hidden avatar-wrapper">
         <div class="user-avatar" id="userAvatar">U</div>
@@ -885,7 +885,6 @@
       let simklSyncedKeys = new Set();
       let simklPollInterval = null;
       let simklCurrentUserCode = null;
-      // flags for VidFast / VixSrc seek handling
       let hasForcedSeekVidFast = false;
       let seekCommandSent = false;
       let forceSeekStartTime = 0;
@@ -1209,6 +1208,102 @@
         toast.textContent = text;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 2500);
+      }
+
+      // ─── SOURCE ORDER MANAGEMENT ──────────────────────────────
+
+      function getLocalOrderKey() {
+        return currentUser ? `wizhub_${currentUser.id}_source_order` : 'wizhub_guest_source_order';
+      }
+
+      async function loadUserSourceOrder() {
+        if (!currentUser) {
+          // Guest: load from localStorage
+          try {
+            const saved = localStorage.getItem('wizhub_guest_source_order');
+            if (saved) {
+              const order = JSON.parse(saved);
+              if (Array.isArray(order) && order.length === SOURCE_DEFINITIONS.length) {
+                EMBED_SOURCES = buildSources(order);
+                populateSources();
+                return;
+              }
+            }
+          } catch (e) {}
+          EMBED_SOURCES = buildSources(DEFAULT_ORDER);
+          populateSources();
+          return;
+        }
+
+        // Logged in: try Supabase first
+        try {
+          const { data, error } = await sb.from('user_settings')
+            .select('source_order')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+
+          if (!error && data && data.source_order && Array.isArray(data.source_order)) {
+            const ordered = buildSources(data.source_order);
+            if (ordered.length === SOURCE_DEFINITIONS.length) {
+              EMBED_SOURCES = ordered;
+              populateSources();
+              // also store in localStorage as fallback
+              localStorage.setItem(getLocalOrderKey(), JSON.stringify(data.source_order));
+              return;
+            }
+          }
+        } catch (err) { /* fall through */ }
+
+        // Fallback: try localStorage
+        try {
+          const saved = localStorage.getItem(getLocalOrderKey());
+          if (saved) {
+            const order = JSON.parse(saved);
+            if (Array.isArray(order) && order.length === SOURCE_DEFINITIONS.length) {
+              EMBED_SOURCES = buildSources(order);
+              populateSources();
+              return;
+            }
+          }
+        } catch (e) {}
+
+        // Default
+        EMBED_SOURCES = buildSources(DEFAULT_ORDER);
+        populateSources();
+      }
+
+      async function saveUserSourceOrder() {
+        const namesOnly = EMBED_SOURCES.map(s => s.name);
+
+        // Always save locally as fallback
+        try {
+          localStorage.setItem(getLocalOrderKey(), JSON.stringify(namesOnly));
+        } catch (e) {}
+
+        if (!currentUser) {
+          showToast('Order saved locally (guest)');
+          return;
+        }
+
+        // Save to Supabase
+        try {
+          const { error } = await sb.from('user_settings')
+            .upsert({
+              id: currentUser.id,
+              source_order: namesOnly,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'id' });
+
+          if (error) {
+            console.warn('Supabase save failed, but local saved:', error);
+            showToast('Order saved locally (cloud sync failed)');
+          } else {
+            showToast('✓ Order saved to your account');
+          }
+        } catch (err) {
+          console.warn('Supabase save error:', err);
+          showToast('Order saved locally (cloud error)');
+        }
       }
 
       // ─── SOURCES UI ─────────────────────────────────────────────
@@ -1629,7 +1724,6 @@
           url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
         }
 
-        // Handle promise-based URLs
         if (url && typeof url.then === 'function') {
           embedIframe.srcdoc =
             '<div class="text-center py-20 text-gray-400"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
@@ -1641,15 +1735,12 @@
 
         if (src.openInNewTab === true && url) { window.open(url, '_blank'); return; }
 
-        // Reset state flags before loading
         hasForcedSeekVidFast = false;
         seekCommandSent = false;
         forceSeekStartTime = Date.now();
         currentMediaEnded = false;
 
         if (url) {
-          // Force the iframe to reload by clearing src first,
-          // then set it after a microtask so the DOM updates.
           embedIframe.src = 'about:blank';
           await new Promise(r => requestAnimationFrame(r));
           embedIframe.src = url;
@@ -1695,7 +1786,6 @@
         detailType.textContent = type === 'movie' ? 'Movie' : 'TV Series';
         currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
 
-        // Reset state for new media
         resetPlayerStateForNewMedia();
 
         if (type === 'tv') {
@@ -1708,7 +1798,6 @@
           tvControls.classList.add('hidden');
         }
 
-        // Load progress
         if (savedSeconds !== null) {
           currentProgressSeconds = savedSeconds;
           progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
@@ -1718,7 +1807,6 @@
           progressMinutesInput.value = savedProgress;
           loadedResumeTime = currentProgressSeconds;
         } else {
-          // Try to load from DB
           if (currentUser) {
             try {
               const { data } = await sb.from('watch_history').select('progress_seconds, season_number, episode_number')
@@ -1745,7 +1833,6 @@
         lastSaveTime = Date.now();
 
         updateSimklUI();
-        // Use a small delay to ensure the player panel is fully rendered
         await new Promise(r => requestAnimationFrame(r));
         await updateEmbedStream();
         playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1762,13 +1849,17 @@
           userAvatar.textContent = user.email ? user.email.charAt(0).toUpperCase() : 'U';
           watchedSection.classList.remove('watched-section-hidden');
           simklNavBtn.style.display = 'inline-block';
+          await loadUserSourceOrder(); // load source order for user
           renderContinueWatching();
         } else {
           document.getElementById('authContainer').classList.remove('hidden');
           document.getElementById('userContainer').classList.add('hidden');
           watchedSection.classList.add('watched-section-hidden');
           simklNavBtn.style.display = 'none';
+          // load guest order
+          await loadUserSourceOrder();
           renderContinueWatching();
+          playerPanel.classList.add('hidden');
         }
         updateSimklUI();
       }
@@ -2018,8 +2109,9 @@
       orderSourcesBtn.addEventListener('click', openOrderModal);
 
       saveOrderBtn.addEventListener('click', async () => {
-        orderModal.style.display = 'none';
+        await saveUserSourceOrder();
         populateSources();
+        orderModal.style.display = 'none';
         if (sourceSelect.options.length) {
           const old = parseInt(sourceSelect.value);
           if (old >= EMBED_SOURCES.length) sourceSelect.value = 0;
@@ -2140,7 +2232,8 @@
 
       async function init() {
         console.log('WIZHUB initializing...');
-        populateSources();
+        // Load source order before populating
+        await loadUserSourceOrder();
         updateSimklUI();
         await updateAuthUI();
         fetchTrending();
