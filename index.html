@@ -1422,10 +1422,7 @@
             }
 
             async function renderContinueWatching() {
-                if (!currentUser) {
-                    continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🔒 Log in to see your watch history.</div>';
-                    return;
-                }
+                if (currentUser) {
                 try {
                     const { data, error } = await sb.from('watch_history').select('*').eq('user_id', currentUser.id).order(
                         'last_watched', { ascending: false });
@@ -1477,6 +1474,7 @@
                         return;
                     }
                 } catch (err) { /* fall through to local */ }
+                }
 
                 const key = getLocalKey();
                 const all = localStorage.getItem(key);
@@ -1540,11 +1538,10 @@
             // ─── SAVE PROGRESS ──────────────────────────────────────────
 
             async function saveProgress() {
-                if (!currentUser || !currentMedia) return;
+                if (!currentMedia) return;
                 const season = currentMedia.type === 'tv' ? currentSeason : 0;
                 const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
                 const record = {
-                    user_id: currentUser.id,
                     media_type: currentMedia.type,
                     tmdb_id: currentMedia.id,
                     title: currentMedia.title,
@@ -1555,34 +1552,27 @@
                     progress_seconds: currentProgressSeconds,
                     season_number: season,
                     episode_number: episode,
-                    last_watched: new Date().toISOString(),
+                    last_watched: Date.now(),
                     updated_at: new Date().toISOString()
                 };
+                const key = getLocalKey();
                 try {
-                    const { error } = await sb.from('watch_history').upsert(record, {
-                        onConflict: 'user_id, media_type, tmdb_id'
-                    });
-                    if (error) throw error;
-                } catch (err) {
+                    const all = localStorage.getItem(key);
+                    const data = all ? JSON.parse(all) : {};
+                    data[`${record.media_type}_${record.tmdb_id}`] = record;
+                    localStorage.setItem(key, JSON.stringify(data));
+                } catch (storageError) {
+                    console.error('Could not save watch progress locally:', storageError);
+                }
+                if (currentUser) {
                     try {
-                        const key = getLocalKey();
-                        const all = localStorage.getItem(key);
-                        const data = all ? JSON.parse(all) : {};
-                        data[`${record.media_type}_${record.tmdb_id}`] = {
-                            media_type: record.media_type,
-                            tmdb_id: record.tmdb_id,
-                            title: record.title,
-                            poster_path: record.poster_path,
-                            media_year: record.media_year,
-                            rating: record.rating,
-                            progress_seconds: record.progress_seconds,
-                            season_number: record.season_number,
-                            episode_number: record.episode_number,
-                            last_watched: Date.now()
-                        };
-                        localStorage.setItem(key, JSON.stringify(data));
-                    } catch (storageError) {
-                        console.error('Could not save watch progress locally:', storageError);
+                        const dbRecord = { ...record, user_id: currentUser.id, last_watched: new Date().toISOString() };
+                        const { error } = await sb.from('watch_history').upsert(dbRecord, {
+                            onConflict: 'user_id, media_type, tmdb_id'
+                        });
+                        if (error) throw error;
+                    } catch (err) {
+                        console.warn('Watch progress saved locally; cloud sync failed:', err);
                     }
                 }
                 renderContinueWatching();
@@ -1789,6 +1779,7 @@
                 currentMedia = { type, id: item.id, title, posterPath: item.poster_path, overview, rating, year };
 
                 resetPlayerStateForNewMedia();
+                vidFastResumeToken = '';
 
                 if (type === 'tv') {
                     tvControls.classList.remove('hidden');
@@ -1960,13 +1951,117 @@
             }
 
             // ─── MESSAGE HANDLING ──────────────────────────────────────
+            const vidfastOrigins = [
+                'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
+                'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm',
+                'https://vidfast.vc', 'https://vidfast.bz', 'https://vidfast.xyz'
+            ];
+            let lastVidFastProgressSave = 0;
+            let vidFastResumeToken = '';
 
+            function requestVidFastResume() {
+                const selectedSource = EMBED_SOURCES[parseInt(sourceSelect.value)];
+                const resumeSeconds = Math.floor(Number(loadedResumeTime) || 0);
+                if (!selectedSource || selectedSource.name !== 'VidFast' || resumeSeconds <= 0 || !embedIframe.src) return;
+                const token = `${currentMedia?.type}_${currentMedia?.id}_${currentSeason}_${currentEpisode}_${resumeSeconds}`;
+                if (vidFastResumeToken === token) return;
+                vidFastResumeToken = token;
+                let attempts = 0;
+                const sendSeek = () => {
+                    if (!currentMedia || !embedIframe.contentWindow) return;
+                    try {
+                        const targetOrigin = new URL(embedIframe.src).origin;
+                        if (!vidfastOrigins.includes(targetOrigin)) return;
+                        embedIframe.contentWindow.postMessage({ command: 'seek', time: resumeSeconds }, targetOrigin);
+                    } catch (err) { /* ignore malformed or unavailable iframe URLs */ }
+                    attempts++;
+                    if (attempts < 4) setTimeout(sendSeek, 1200);
+                };
+                setTimeout(sendSeek, 900);
+            }
+            embedIframe.addEventListener('load', requestVidFastResume);
+
+            function storeVidFastMediaData(mediaData) {
+                if (!mediaData || typeof mediaData !== 'object') return;
+                try {
+                    const key = getLocalKey();
+                    const existing = JSON.parse(localStorage.getItem(key) || '{}');
+                    Object.values(mediaData).forEach(entry => {
+                        if (!entry || !entry.id || !['movie', 'tv'].includes(entry.type)) return;
+                        const progress = entry.progress || {};
+                        const watched = Number(progress.watched) || 0;
+                        const season = Number(entry.last_season_watched) || 0;
+                        const episode = Number(entry.last_episode_watched) || 0;
+                        existing[`${entry.type}_${entry.id}`] = {
+                            media_type: entry.type,
+                            tmdb_id: Number(entry.id),
+                            title: entry.title || 'Untitled',
+                            poster_path: entry.poster_path || null,
+                            progress_seconds: Math.max(0, Math.floor(watched)),
+                            season_number: season,
+                            episode_number: episode,
+                            last_watched: Number(entry.last_updated) || Date.now()
+                        };
+                    });
+                    localStorage.setItem(key, JSON.stringify(existing));
+                } catch (err) {
+                    console.warn('Could not store VidFast media data:', err);
+                }
+                renderContinueWatching();
+            }
+
+            function handleVidFastMessage(message, origin) {
+                if (!vidfastOrigins.includes(origin) || !message) return;
+                if (typeof message === 'string') {
+                    try { message = JSON.parse(message); } catch (err) { return; }
+                }
+                if (message.type === 'MEDIA_DATA') {
+                    storeVidFastMediaData(message.data);
+                    return;
+                }
+                if (message.type !== 'PLAYER_EVENT' || !message.data) return;
+                const d = message.data;
+                if (!currentMedia) return;
+                const eventId = Number(d.tmdbId ?? d.video_id);
+                const eventType = d.mediaType || currentMedia.type;
+                if (Number.isFinite(eventId) && eventId > 0 && eventId !== Number(currentMedia.id)) return;
+                if (eventType && eventType !== currentMedia.type) return;
+                const seconds = Number(d.currentTime);
+                const duration = Number(d.duration);
+                if (Number.isFinite(seconds) && seconds >= 0) {
+                    currentProgressSeconds = Math.floor(seconds);
+                    progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
+                }
+                if (currentMedia.type === 'tv') {
+                    const season = Number(d.season);
+                    const episode = Number(d.episode);
+                    if (Number.isInteger(season) && season > 0) currentSeason = season;
+                    if (Number.isInteger(episode) && episode > 0) currentEpisode = episode;
+                }
+                const now = Date.now();
+                const shouldSave = ['pause', 'seeked', 'ended'].includes(d.event) ||
+                    (d.event === 'timeupdate' && now - lastVidFastProgressSave >= 15000);
+                if (shouldSave && now > ignoreAutoSaveUntil) {
+                    lastVidFastProgressSave = now;
+                    saveProgress();
+                }
+                if (d.event === 'ended' && currentMedia) {
+                    currentMediaEnded = true;
+                    const { autoSync } = getSimklCreds();
+                    if (autoSync && isSimklConnected()) {
+                        if (currentMedia.type === 'tv') syncToSimkl(currentMedia, currentSeason, currentEpisode);
+                        else syncToSimkl(currentMedia);
+                    }
+                }
+            }
 
             window.addEventListener('message', (event) => {
                 const { origin, data } = event;
                 if (!data) return;
-
-                // VixSrc playback events use PLAYER_EVENT messages.
+                if (vidfastOrigins.includes(origin)) {
+                    handleVidFastMessage(data, origin);
+                    return;
+                }
                 if (origin === 'https://vixsrc.to' || origin === 'https://www.vixsrc.to') {
                     let message = data;
                     if (typeof message === 'string') {
@@ -1981,9 +2076,7 @@
                             currentProgressSeconds = Math.floor(seconds);
                             progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
                             if (Date.now() > ignoreAutoSaveUntil &&
-                                ['pause', 'seeked', 'ended'].includes(eventData.event)) {
-                                saveProgress();
-                            }
+                                ['pause', 'seeked', 'ended'].includes(eventData.event)) saveProgress();
                         }
                         if (eventData.event === 'ended' && currentMedia) {
                             const { autoSync } = getSimklCreds();
@@ -1993,22 +2086,13 @@
                             }
                         }
                     }
-                    return;
-                }
-
-                // Preserve VidFast handling if its optional integration is present.
-                if (typeof vidfastOrigins !== 'undefined' &&
-                    Array.isArray(vidfastOrigins) &&
-                    vidfastOrigins.includes(origin) &&
-                    typeof handleVidFastMessage === 'function') {
-                    handleVidFastMessage(data, origin);
                 }
             });
 
             // ─── PERIODIC SAVES ─────────────────────────────────────────
 
             setInterval(() => {
-                if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && currentProgressSeconds > 0) {
+                if (currentMedia && Date.now() > ignoreAutoSaveUntil && currentProgressSeconds > 0) {
                     saveProgress();
                 }
             }, 30000);
