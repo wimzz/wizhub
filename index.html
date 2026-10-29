@@ -844,12 +844,15 @@
                 { name: 'Viduki', url: (t, id, s, e) => t === 'movie' ?
                         `https://viduki.net/1/movie/${id}?color=00A65F` :
                         `https://viduki.net/1/tv/${id}/${s}/${e}?color=00A65F` },
+                { name: 'VixSrc', url: (t, id, s, e) => t === 'movie' ?
+                        `https://vixsrc.to/movie/${id}` :
+                        `https://vixsrc.to/tv/${id}/${s}/${e}` },
             ];
 
             const DEFAULT_ORDER = [
                 "VidFast", "Rivestream", "ZxcStream", "Peachify", "Nxsha", "VAPlayer",
                 "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "FilmU", "Vidsrc",
-                "VidRock", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs", "Mapple", "CineSrc", "Viduki"
+                "VidRock", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs", "Mapple", "CineSrc", "Viduki", "VixSrc"
             ];
 
             function buildSources(order) {
@@ -1556,24 +1559,31 @@
                     updated_at: new Date().toISOString()
                 };
                 try {
-                    await sb.from('watch_history').upsert(record, { onConflict: 'user_id, media_type, tmdb_id' });
+                    const { error } = await sb.from('watch_history').upsert(record, {
+                        onConflict: 'user_id, media_type, tmdb_id'
+                    });
+                    if (error) throw error;
                 } catch (err) {
-                    const key = getLocalKey();
-                    let all = localStorage.getItem(key);
-                    let data = all ? JSON.parse(all) : {};
-                    data[`${record.media_type}_${record.tmdb_id}`] = {
-                        media_type: record.media_type,
-                        tmdb_id: record.tmdb_id,
-                        title: record.title,
-                        poster_path: record.poster_path,
-                        media_year: record.media_year,
-                        rating: record.rating,
-                        progress_seconds: record.progress_seconds,
-                        season_number: record.season_number,
-                        episode_number: record.episode_number,
-                        last_watched: Date.now()
-                    };
-                    localStorage.setItem(key, JSON.stringify(data));
+                    try {
+                        const key = getLocalKey();
+                        const all = localStorage.getItem(key);
+                        const data = all ? JSON.parse(all) : {};
+                        data[`${record.media_type}_${record.tmdb_id}`] = {
+                            media_type: record.media_type,
+                            tmdb_id: record.tmdb_id,
+                            title: record.title,
+                            poster_path: record.poster_path,
+                            media_year: record.media_year,
+                            rating: record.rating,
+                            progress_seconds: record.progress_seconds,
+                            season_number: record.season_number,
+                            episode_number: record.episode_number,
+                            last_watched: Date.now()
+                        };
+                        localStorage.setItem(key, JSON.stringify(data));
+                    } catch (storageError) {
+                        console.error('Could not save watch progress locally:', storageError);
+                    }
                 }
                 renderContinueWatching();
             }
@@ -1955,8 +1965,44 @@
             window.addEventListener('message', (event) => {
                 const { origin, data } = event;
                 if (!data) return;
-                
-                if (vidfastOrigins.some(o => origin === o)) { handleVidFastMessage(data, origin); return; }
+
+                // VixSrc playback events use PLAYER_EVENT messages.
+                if (origin === 'https://vixsrc.to' || origin === 'https://www.vixsrc.to') {
+                    let message = data;
+                    if (typeof message === 'string') {
+                        try { message = JSON.parse(message); } catch (e) { return; }
+                    }
+                    if (message && message.type === 'PLAYER_EVENT' && message.data) {
+                        const eventData = message.data;
+                        const seconds = Number(eventData.currentTime);
+                        const selectedSource = EMBED_SOURCES[parseInt(sourceSelect.value)];
+                        if (Number.isFinite(seconds) && seconds >= 0 && currentMedia &&
+                            selectedSource && selectedSource.name === 'VixSrc') {
+                            currentProgressSeconds = Math.floor(seconds);
+                            progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
+                            if (Date.now() > ignoreAutoSaveUntil &&
+                                ['pause', 'seeked', 'ended'].includes(eventData.event)) {
+                                saveProgress();
+                            }
+                        }
+                        if (eventData.event === 'ended' && currentMedia) {
+                            const { autoSync } = getSimklCreds();
+                            if (autoSync && isSimklConnected()) {
+                                if (currentMedia.type === 'tv') syncToSimkl(currentMedia, currentSeason, currentEpisode);
+                                else syncToSimkl(currentMedia);
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                // Preserve VidFast handling if its optional integration is present.
+                if (typeof vidfastOrigins !== 'undefined' &&
+                    Array.isArray(vidfastOrigins) &&
+                    vidfastOrigins.includes(origin) &&
+                    typeof handleVidFastMessage === 'function') {
+                    handleVidFastMessage(data, origin);
+                }
             });
 
             // ─── PERIODIC SAVES ─────────────────────────────────────────
