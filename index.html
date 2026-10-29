@@ -789,16 +789,20 @@
             const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
             // ─── SOURCES ────────────────────────────────────────────────
-            // FIX: VixSrc now includes autoplay=0 to stop auto-play, so your video speed controller extension can work.
+            // VixSrc documented embed URLs and customization parameters.
+            // If vixsrc.to is ISP/domain-blocked, use only a custom domain registered
+            // and approved through VixSrc; changing iframe settings cannot bypass a domain block.
             const SOURCE_DEFINITIONS = [
                 { name: 'VixSrc', url: (t, id, s, e, p) => {
-                        let b = t === 'movie' ? `https://vixsrc.to/movie/${id}` :
+                        const base = t === 'movie' ? `https://vixsrc.to/movie/${id}` :
                             `https://vixsrc.to/tv/${id}/${s}/${e}`;
-                        let params = [];
-                        if (p > 0) params.push(`startAt=${p}`);
-                        // 🔥 CRITICAL FIX: add autoplay=0 to prevent VixSrc from auto-playing
-                        params.push('autoplay=0');
-                        return b + '?' + params.join('&');
+                        const params = new URLSearchParams({
+                            primaryColor: 'B20710',
+                            secondaryColor: '170000',
+                            autoplay: 'false'
+                        });
+                        if (Number(p) > 0) params.set('startAt', String(Math.floor(Number(p))));
+                        return `${base}?${params.toString()}`;
                     } },
                 { name: 'VidFast', url: (t, id, s, e) => t === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` :
                         `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
