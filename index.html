@@ -792,8 +792,8 @@
             // VixSrc documented embed format.
             const SOURCE_DEFINITIONS = [
                 { name: 'VixSrc', url: (t, id, s, e) => t === 'movie'
-                    ? `https://vixsrc.to/movie/${encodeURIComponent(id)}`
-                    : `https://vixsrc.to/tv/${encodeURIComponent(id)}/${encodeURIComponent(s)}/${encodeURIComponent(e)}` },
+                    ? `https://vixsrc.to/movie/${id}`
+                    : `https://vixsrc.to/tv/${id}/${s}/${e}` },
                 { name: 'VidFast', url: (t, id, s, e) => t === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` :
                         `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
                 { name: 'Rivestream', url: (t, id, s, e) => t === 'movie' ?
@@ -898,7 +898,8 @@
             const trendingTvGrid = $('trendingTvGrid');
             const playerPanel = $('playerPanel');
             const embedIframe = $('embedIframe');
-            // Explicitly send the site origin to VixSrc; do not use no-referrer.
+            // Use the standard origin policy for all embedded providers.
+            embedIframe.setAttribute('referrerpolicy', 'origin');
             embedIframe.referrerPolicy = 'origin';
             const sourceSelect = $('sourceSelect');
             const tvControls = $('tvControls');
@@ -1716,12 +1717,7 @@
                     embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid source</div>';
                     return;
                 }
-                let url = '';
-                if (src.name === 'VixSrc') {
-                    url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
-                } else {
-                    url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
-                }
+                let url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
 
                 if (url && typeof url.then === 'function') {
                     embedIframe.srcdoc =
