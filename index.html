@@ -7,602 +7,212 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300A65F'%3E%3Cpath d='M12 2L15 8.5L22 9.5L17 14L18.5 21L12 17.5L5.5 21L7 14L2 9.5L9 8.5L12 2Z'/%3E%3C/svg%3E" />
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary: #00A65F;
             --primary-dark: #008a4a;
             --primary-bg: rgba(0, 166, 95, 0.15);
         }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            background: #0a0c10;
-            font-family: 'Inter', system-ui, sans-serif;
-            color: #e5e7eb;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0c10; font-family: 'Inter', system-ui, sans-serif; color: #e5e7eb; }
         .glass-nav {
             background: rgba(10, 12, 16, 0.85);
             backdrop-filter: blur(12px);
             border-bottom: 1px solid rgba(0, 166, 95, 0.25);
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 50;
-            padding: 0.75rem 1rem;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
+            position: fixed; top: 0; left: 0; width: 100%; z-index: 50;
+            padding: 0.75rem 1rem; display: flex; flex-wrap: wrap;
+            align-items: center; justify-content: space-between; gap: 1rem;
         }
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            cursor: pointer;
-        }
-        .brand i {
-            font-size: 1.8rem;
-            color: var(--primary);
-        }
+        .brand { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+        .brand i { font-size: 1.8rem; color: var(--primary); }
         .brand span {
-            font-size: 1.5rem;
-            font-weight: 800;
+            font-size: 1.5rem; font-weight: 800;
             background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: 1px;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 1px;
         }
-        .search-wrapper {
-            flex: 1 1 auto;
-            min-width: 200px;
-            position: relative;
-        }
-        .search-icon {
-            position: absolute;
-            left: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #9ca3af;
-            pointer-events: none;
-        }
+        .search-wrapper { flex: 1 1 auto; min-width: 200px; position: relative; }
+        .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #9ca3af; pointer-events: none; }
         .search-input {
-            width: 100%;
-            background: #1a1d24;
-            border: 1px solid #2d2f3e;
-            border-radius: 2rem;
-            padding: 0.6rem 2.5rem 0.6rem 2.5rem;
-            color: #f0f0f0;
-            font-size: 0.9rem;
-            transition: all 0.2s;
+            width: 100%; background: #1a1d24; border: 1px solid #2d2f3e;
+            border-radius: 2rem; padding: 0.6rem 2.5rem 0.6rem 2.5rem;
+            color: #f0f0f0; font-size: 0.9rem; transition: all 0.2s;
         }
-        .search-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px var(--primary-bg);
-        }
-        .clear-search {
-            position: absolute;
-            right: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: #9ca3af;
-            cursor: pointer;
-            display: none;
-        }
-        .clear-search:hover {
-            color: var(--primary);
-        }
-        .nav-right {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            flex-shrink: 0;
-        }
+        .search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-bg); }
+        .clear-search { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #9ca3af; cursor: pointer; display: none; }
+        .clear-search:hover { color: var(--primary); }
+        .nav-right { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
         .nav-btn {
-            background: transparent;
-            border: 1px solid var(--primary);
-            color: var(--primary);
-            padding: 0.4rem 1rem;
-            border-radius: 2rem;
-            font-size: 0.85rem;
-            font-weight: 500;
-            transition: all 0.2s;
-            cursor: pointer;
-            white-space: nowrap;
+            background: transparent; border: 1px solid var(--primary); color: var(--primary);
+            padding: 0.4rem 1rem; border-radius: 2rem; font-size: 0.85rem; font-weight: 500;
+            transition: all 0.2s; cursor: pointer; white-space: nowrap;
         }
-        .nav-btn:hover {
-            background: var(--primary);
-            color: #0a0c10;
-        }
-        .nav-btn-disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            border-color: gray;
-            color: gray;
-        }
-        .nav-btn-disabled:hover {
-            background: transparent;
-            color: gray;
-        }
-        #simklNavBtn {
-            display: none;
-        }
-        .avatar-wrapper {
-            position: relative;
-        }
+        .nav-btn:hover { background: var(--primary); color: #0a0c10; }
+        .nav-btn-disabled { opacity: 0.6; cursor: not-allowed; border-color: gray; color: gray; }
+        .nav-btn-disabled:hover { background: transparent; color: gray; }
+        #simklNavBtn { display: none; }
+        .avatar-wrapper { position: relative; }
         .user-avatar {
-            width: 40px;
-            height: 40px;
-            background: var(--primary);
-            color: #0a0c10;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 1.2rem;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: transform 0.1s;
+            width: 40px; height: 40px; background: var(--primary); color: #0a0c10;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 1.2rem; text-transform: uppercase; cursor: pointer; transition: transform 0.1s;
         }
-        .user-avatar:hover {
-            transform: scale(1.02);
-        }
+        .user-avatar:hover { transform: scale(1.02); }
         .avatar-dropdown {
-            position: absolute;
-            top: 48px;
-            right: 0;
-            background: #1e212b;
-            border: 1px solid var(--primary);
-            border-radius: 0.75rem;
-            padding: 0.5rem;
-            min-width: 160px;
-            z-index: 60;
-            display: none;
-            flex-direction: column;
-            gap: 0.25rem;
-            backdrop-filter: blur(8px);
+            position: absolute; top: 48px; right: 0; background: #1e212b;
+            border: 1px solid var(--primary); border-radius: 0.75rem; padding: 0.5rem;
+            min-width: 160px; z-index: 60; display: none; flex-direction: column;
+            gap: 0.25rem; backdrop-filter: blur(8px);
         }
-        .avatar-dropdown.show {
-            display: flex;
-        }
+        .avatar-dropdown.show { display: flex; }
         .dropdown-item {
-            background: transparent;
-            color: #e0e0e0;
-            border: none;
-            padding: 0.5rem 0.75rem;
-            border-radius: 0.5rem;
-            text-align: left;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 0.85rem;
-            width: 100%;
+            background: transparent; color: #e0e0e0; border: none;
+            padding: 0.5rem 0.75rem; border-radius: 0.5rem; text-align: left;
+            cursor: pointer; transition: all 0.2s; font-size: 0.85rem; width: 100%;
         }
-        .dropdown-item:hover {
-            background: var(--primary);
-            color: #0a0c10;
-        }
-        @media (max-width: 768px) {
-            main {
-                padding-top: 8rem !important;
-            }
-        }
+        .dropdown-item:hover { background: var(--primary); color: #0a0c10; }
+        @media (max-width: 768px) { main { padding-top: 8rem !important; } }
         .movie-card {
             transition: transform 0.25s ease, box-shadow 0.25s;
-            cursor: pointer;
-            background: #14161f;
-            border-radius: 1rem;
-            overflow: hidden;
-            position: relative;
+            cursor: pointer; background: #14161f; border-radius: 1rem;
+            overflow: hidden; position: relative;
         }
-        .movie-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.6);
-        }
-        .movie-card .p-2 {
-            color: #f0f0f0;
-        }
-        .movie-card .font-semibold {
-            color: #ffffff;
-        }
-        .movie-card .text-xs {
-            color: #b0b8cc;
-        }
-        .progress-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            height: 4px;
-            background: var(--primary);
-            width: 0%;
-            transition: width 0.2s;
-        }
+        .movie-card:hover { transform: translateY(-6px); box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.6); }
+        .movie-card .p-2 { color: #f0f0f0; }
+        .movie-card .font-semibold { color: #ffffff; }
+        .movie-card .text-xs { color: #b0b8cc; }
+        .progress-overlay { position: absolute; bottom: 0; left: 0; height: 4px; background: var(--primary); width: 0%; transition: width 0.2s; }
         .delete-btn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #ff5555;
-            cursor: pointer;
-            z-index: 20;
+            position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.7);
+            border-radius: 50%; width: 28px; height: 28px; display: flex;
+            align-items: center; justify-content: center; color: #ff5555; cursor: pointer; z-index: 20;
         }
-        .delete-btn:hover {
-            background: #ff5555;
-            color: white;
-        }
-        .embed-container {
-            background: #000;
-            border-radius: 1rem;
-            overflow: hidden;
-            aspect-ratio: 16/9;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
-        }
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #1e1f2c;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: 10px;
-        }
+        .delete-btn:hover { background: #ff5555; color: white; }
+        .embed-container { background: #000; border-radius: 1rem; overflow: hidden; aspect-ratio: 16/9; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5); }
+        iframe { width: 100%; height: 100%; border: none; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e1f2c; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
         .horizontal-scroll {
-            display: flex;
-            overflow-x: auto;
-            gap: 1rem;
-            scrollbar-width: thin;
-            padding-bottom: 0.5rem;
-            -webkit-overflow-scrolling: touch;
+            display: flex; overflow-x: auto; gap: 1rem;
+            scrollbar-width: thin; padding-bottom: 0.5rem; -webkit-overflow-scrolling: touch;
         }
-        .horizontal-scroll .movie-card {
-            flex: 0 0 140px;
-        }
-        @media (min-width: 768px) {
-            .horizontal-scroll .movie-card {
-                flex: 0 0 160px;
-            }
-        }
+        .horizontal-scroll .movie-card { flex: 0 0 140px; }
+        @media (min-width: 768px) { .horizontal-scroll .movie-card { flex: 0 0 160px; } }
         .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            align-items: center;
-            justify-content: center;
-            z-index: 200;
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8); align-items: center; justify-content: center; z-index: 200;
         }
         .modal-content {
-            background: #1e1f2c;
-            border-radius: 1rem;
-            padding: 1.5rem;
-            width: 90%;
-            max-width: 500px;
-            max-height: 80vh;
-            overflow-y: auto;
-            color: #e5e7eb;
+            background: #1e1f2c; border-radius: 1rem; padding: 1.5rem;
+            width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; color: #e5e7eb;
         }
         .source-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem;
-            background: #2a2c38;
-            margin-bottom: 0.5rem;
-            border-radius: 0.5rem;
-            color: #f0f0f0;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.5rem; background: #2a2c38; margin-bottom: 0.5rem;
+            border-radius: 0.5rem; color: #f0f0f0;
         }
-        .trending-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-        }
-        @media (min-width: 640px) {
-            .trending-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
-        @media (min-width: 768px) {
-            .trending-grid {
-                grid-template-columns: repeat(4, 1fr);
-            }
-        }
-        @media (min-width: 1024px) {
-            .trending-grid {
-                grid-template-columns: repeat(5, 1fr);
-            }
-        }
-        @media (min-width: 1280px) {
-            .trending-grid {
-                grid-template-columns: repeat(6, 1fr);
-            }
-        }
-        input,
-        select,
-        button {
-            font-size: 16px;
-        }
+        .trending-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        @media (min-width: 640px) { .trending-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 768px) { .trending-grid { grid-template-columns: repeat(4, 1fr); } }
+        @media (min-width: 1024px) { .trending-grid { grid-template-columns: repeat(5, 1fr); } }
+        @media (min-width: 1280px) { .trending-grid { grid-template-columns: repeat(6, 1fr); } }
+        input, select, button { font-size: 16px; }
         .player-modern {
             background: linear-gradient(145deg, #101218, #0b0d12);
-            border-radius: 1.5rem;
-            border: 1px solid var(--primary-bg);
-            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
-            color: #e5e7eb;
+            border-radius: 1.5rem; border: 1px solid var(--primary-bg);
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.5); overflow: hidden; color: #e5e7eb;
         }
-        .info-section {
-            padding: 1.5rem;
-        }
-        .info-row {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
+        .info-section { padding: 1.5rem; }
+        .info-row { display: flex; flex-direction: column; gap: 1.5rem; }
         @media (min-width: 768px) {
-            .info-row {
-                flex-direction: row;
-                align-items: flex-start;
-            }
-            .poster-col {
-                flex: 0 0 140px;
-            }
-            .details-col {
-                flex: 1;
-            }
+            .info-row { flex-direction: row; align-items: flex-start; }
+            .poster-col { flex: 0 0 140px; }
+            .details-col { flex: 1; }
         }
-        .poster-wrapper {
-            border-radius: 1rem;
-            overflow: hidden;
-            background: #07090e;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
-        }
-        .poster-wrapper img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
+        .poster-wrapper { border-radius: 1rem; overflow: hidden; background: #07090e; box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4); }
+        .poster-wrapper img { width: 100%; height: auto; display: block; }
         .rating-badge {
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(4px);
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            color: #f0f0f0;
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
+            padding: 4px 10px; border-radius: 20px; font-size: 0.8rem;
+            font-weight: 500; display: inline-flex; align-items: center; gap: 6px; color: #f0f0f0;
         }
         .type-badge {
-            background: var(--primary-bg);
-            border: 1px solid var(--primary);
-            padding: 2px 10px;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            font-weight: 500;
-            color: #f0f0f0;
+            background: var(--primary-bg); border: 1px solid var(--primary);
+            padding: 2px 10px; border-radius: 20px; font-size: 0.7rem;
+            text-transform: uppercase; font-weight: 500; color: #f0f0f0;
         }
-        .overview-text {
-            color: #b0b8cc;
-            line-height: 1.5;
-            font-size: 0.9rem;
-        }
-        .control-group {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 1rem;
-            padding: 0.75rem;
-        }
+        .overview-text { color: #b0b8cc; line-height: 1.5; font-size: 0.9rem; }
+        .control-group { background: rgba(0, 0, 0, 0.3); border-radius: 1rem; padding: 0.75rem; }
         .select-modern {
-            background: #1a1d24;
-            border: 1px solid #2d2f3e;
-            border-radius: 2rem;
-            padding: 0.4rem 1rem;
-            font-size: 0.85rem;
-            color: white;
-            transition: all 0.2s;
+            background: #1a1d24; border: 1px solid #2d2f3e; border-radius: 2rem;
+            padding: 0.4rem 1rem; font-size: 0.85rem; color: white; transition: all 0.2s;
         }
-        .select-modern:hover,
-        .select-modern:focus {
-            border-color: var(--primary);
-            outline: none;
-        }
+        .select-modern:hover, .select-modern:focus { border-color: var(--primary); outline: none; }
         .btn-icon {
-            background: #1e212b;
-            border: none;
-            border-radius: 2rem;
-            padding: 0.4rem 1rem;
-            font-size: 0.8rem;
-            font-weight: 500;
-            transition: all 0.2s;
-            color: #e0e0e0;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+            background: #1e212b; border: none; border-radius: 2rem;
+            padding: 0.4rem 1rem; font-size: 0.8rem; font-weight: 500;
+            transition: all 0.2s; color: #e0e0e0; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 6px;
         }
-        .btn-icon:hover {
-            background: #2a2e3a;
-            color: var(--primary);
-            transform: translateY(-1px);
-        }
+        .btn-icon:hover { background: #2a2e3a; color: var(--primary); transform: translateY(-1px); }
         .btn-primary {
-            background: var(--primary);
-            color: #0a0c10;
-            border: none;
-            border-radius: 2rem;
-            padding: 0.4rem 1.2rem;
-            font-weight: 600;
-            transition: all 0.2s;
+            background: var(--primary); color: #0a0c10; border: none;
+            border-radius: 2rem; padding: 0.4rem 1.2rem; font-weight: 600; transition: all 0.2s;
         }
-        .btn-primary:hover {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px var(--primary-bg);
-        }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 8px var(--primary-bg); }
         .progress-input {
-            background: #1a1d24;
-            border: 1px solid #2d2f3e;
-            border-radius: 2rem;
-            padding: 0.4rem 1rem;
-            width: 90px;
-            text-align: center;
-            color: white;
+            background: #1a1d24; border: 1px solid #2d2f3e; border-radius: 2rem;
+            padding: 0.4rem 1rem; width: 90px; text-align: center; color: white;
         }
-        .episode-nav-modern {
-            display: flex;
-            gap: 0.8rem;
-            flex-wrap: wrap;
-        }
+        .episode-nav-modern { display: flex; gap: 0.8rem; flex-wrap: wrap; }
         .episode-nav-modern button {
-            background: #1e212b;
-            border: none;
-            border-radius: 2rem;
-            padding: 0.3rem 1rem;
-            font-size: 0.8rem;
-            transition: all 0.2s;
-            color: #e0e0e0;
+            background: #1e212b; border: none; border-radius: 2rem;
+            padding: 0.3rem 1rem; font-size: 0.8rem; transition: all 0.2s; color: #e0e0e0;
         }
-        .episode-nav-modern button:hover:not(:disabled) {
-            background: var(--primary);
-            color: #0a0c10;
-        }
-        .episode-nav-modern button:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
+        .episode-nav-modern button:hover:not(:disabled) { background: var(--primary); color: #0a0c10; }
+        .episode-nav-modern button:disabled { opacity: 0.4; cursor: not-allowed; }
         @media (max-width: 768px) {
-            .info-section {
-                padding: 1rem;
-            }
-            .control-group .flex-wrap {
-                justify-content: center;
-            }
+            .info-section { padding: 1rem; }
+            .control-group .flex-wrap { justify-content: center; }
         }
-        .copy-title-icon {
-            cursor: pointer;
-            margin-left: 0.5rem;
-            font-size: 0.9rem;
-            color: #9ca3af;
-            transition: color 0.2s;
-        }
-        .copy-title-icon:hover {
-            color: var(--primary);
-        }
-        .title-wrapper {
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        .continue-section-hidden {
-            display: none !important;
-        }
-        .watched-section-hidden {
-            display: none !important;
-        }
+        .copy-title-icon { cursor: pointer; margin-left: 0.5rem; font-size: 0.9rem; color: #9ca3af; transition: color 0.2s; }
+        .copy-title-icon:hover { color: var(--primary); }
+        .title-wrapper { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .continue-section-hidden { display: none !important; }
+        .watched-section-hidden { display: none !important; }
         .toast-notification {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #2a2c38;
-            color: var(--primary);
-            padding: 8px 16px;
-            border-radius: 9999px;
-            font-size: 14px;
-            z-index: 300;
-            animation: fadeOut 2s forwards;
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #2a2c38; color: var(--primary); padding: 8px 16px;
+            border-radius: 9999px; font-size: 14px; z-index: 300; animation: fadeOut 2s forwards;
         }
-        @keyframes fadeOut {
-            0% {
-                opacity: 1;
-            }
-            70% {
-                opacity: 1;
-            }
-            100% {
-                opacity: 0;
-                visibility: hidden;
-            }
-        }
+        @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
         .simkl-pin-box {
-            background: #0a0c10;
-            border-radius: 0.5rem;
-            padding: 0.75rem;
-            font-family: monospace;
-            font-size: 1.5rem;
-            font-weight: bold;
-            text-align: center;
-            color: var(--primary);
-            border: 1px solid var(--primary);
-            letter-spacing: 4px;
-            margin: 0.5rem 0;
-            user-select: all;
+            background: #0a0c10; border-radius: 0.5rem; padding: 0.75rem;
+            font-family: monospace; font-size: 1.5rem; font-weight: bold;
+            text-align: center; color: var(--primary); border: 1px solid var(--primary);
+            letter-spacing: 4px; margin: 0.5rem 0; user-select: all;
         }
-        .simkl-step {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #2d2f3e33;
-        }
+        .simkl-step { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid #2d2f3e33; }
         .simkl-step-num {
-            background: var(--primary-bg);
-            color: var(--primary);
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: 700;
-            flex-shrink: 0;
-            margin-top: 2px;
+            background: var(--primary-bg); color: var(--primary); border-radius: 50%;
+            width: 24px; height: 24px; display: flex; align-items: center;
+            justify-content: center; font-size: 0.75rem; font-weight: 700;
+            flex-shrink: 0; margin-top: 2px;
         }
-        h2 {
-            color: #f0f0f0;
+        h2 { color: #f0f0f0; }
+        .text-gray-400 { color: #b0b8cc; }
+        .text-gray-300 { color: #d1d5db; }
+        .text-sm { color: #d1d5db; }
+        .text-xs { color: #9ca3af; }
+        .text-white { color: #ffffff; }
+        /* 🔧 FIX: 拦截告警条 */
+        .cloudflare-alert {
+            background: #7f1d1d; border: 1px solid #ef4444; color: #fecaca;
+            border-radius: 0.75rem; padding: 0.75rem 1rem; font-size: 0.85rem;
+            display: none; align-items: center; gap: 0.75rem; flex-wrap: wrap;
         }
-        .text-gray-400 {
-            color: #b0b8cc;
-        }
-        .text-gray-300 {
-            color: #d1d5db;
-        }
-        .text-sm {
-            color: #d1d5db;
-        }
-        .text-xs {
-            color: #9ca3af;
-        }
-        .text-white {
-            color: #ffffff;
-        }
+        .cloudflare-alert.show { display: flex; }
     </style>
 </head>
 <body>
@@ -646,6 +256,19 @@
 
         <div id="playerPanel" class="hidden mb-12 player-modern">
             <div class="embed-container"><iframe id="embedIframe" title="Video player" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div>
+
+            <!-- 🔧 FIX: Cloudflare 拦截告警条 -->
+            <div id="cloudflareAlert" class="cloudflare-alert mx-4 mt-3">
+                <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                <span>当前源可能被 Cloudflare 拦截。请尝试：</span>
+                <button id="alertNextSourceBtn" class="btn-icon" style="background:#7f1d1d;border:1px solid #ef4444;color:#fecaca;">
+                    <i class="fas fa-forward"></i> 切换到下一个源
+                </button>
+                <button id="alertVideasyBtn" class="btn-icon" style="background:#7f1d1d;border:1px solid #ef4444;color:#fecaca;">
+                    <i class="fas fa-play"></i> 切换到 Videasy
+                </button>
+            </div>
+
             <div class="info-section">
                 <div id="tvControls" class="hidden mb-4">
                     <div class="control-group flex flex-wrap items-center justify-between gap-3">
@@ -668,6 +291,8 @@
                             <button id="nextSourceBtn" class="btn-icon"><i class="fas fa-forward"></i> Next</button>
                             <button id="copyUrlBtn" class="btn-icon"><i class="fas fa-copy"></i> Copy URL</button>
                             <button id="orderSourcesBtn" class="btn-icon"><i class="fas fa-arrows-alt"></i> Order</button>
+                            <!-- 🔧 FIX: 自定义域名按钮 -->
+                            <button id="customDomainBtn" class="btn-icon"><i class="fas fa-globe"></i> 自定义域名</button>
                             <button id="simklSyncBtn" class="btn-icon"><i class="fas fa-cloud-upload-alt"></i> Simkl</button>
                         </div>
                     </div>
@@ -702,6 +327,33 @@
 
     <!-- ===== ORDER MODAL ===== -->
     <div id="orderModal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Reorder Sources</h3><div id="sourceList" class="mb-4" style="max-height:50vh;overflow-y:auto;"></div><div class="flex gap-2"><button id="saveOrderBtn" class="bg-green-600 px-4 py-2 rounded-full">Save</button><button id="closeOrderBtn" class="bg-gray-600 px-4 py-2 rounded-full">Cancel</button></div></div></div>
+
+    <!-- 🔧 FIX: 自定义域名模态框 -->
+    <div id="customDomainModal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4"><i class="fas fa-globe" style="color:var(--primary);"></i> VixSrc 自定义域名 / 绕过配置</h3>
+            <p class="text-sm text-gray-400 mb-4">
+                VixSrc 官方支持“Custom domains”（自定义域名）来绕过 ISP 封锁和 Cloudflare 检测[reference:3]。
+                如果你拥有可用的自定义域名，或使用 MediaFlow 代理，请在下方填写。
+            </p>
+            <label class="text-sm text-gray-300 block mb-1">自定义域名（仅域名，不含 https://）</label>
+            <input type="text" id="vixsrcCustomDomain" placeholder="例如：vixsrc.mydomain.com" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-white" />
+            <p class="text-xs text-gray-500 mb-4">
+                留空则使用默认的 <code class="bg-gray-700 px-1 rounded">vixsrc.to</code>。
+                自定义域名需要在 VixSrc 官网提交并验证后才能生效。
+            </p>
+            <label class="text-sm text-gray-300 block mb-1">MediaFlow 代理地址（可选）</label>
+            <input type="text" id="vixsrcMediaflowProxy" placeholder="例如：https://your-mediaflow.example.com" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 mb-3 text-white" />
+            <p class="text-xs text-gray-500 mb-4">
+                MediaFlow 支持 VixSrc 的 <code class="bg-gray-700 px-1 rounded">b</code> 查询参数，
+                可通过代理绕过部分拦截[reference:4]。
+            </p>
+            <div class="flex gap-2">
+                <button id="saveCustomDomainBtn" class="btn-primary"><i class="fas fa-save"></i> 保存并重载</button>
+                <button id="closeCustomDomainBtn" class="bg-gray-600 px-4 py-2 rounded-full text-sm">取消</button>
+            </div>
+        </div>
+    </div>
 
     <!-- ===== LOGIN MODAL ===== -->
     <div id="loginModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
@@ -788,12 +440,53 @@
 
             const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+            // ─── VIXSRC 自定义域名/代理配置 ────────────────────────────
+            // 🔧 FIX: 从 localStorage 读取用户配置的 VixSrc 自定义域名和 MediaFlow 代理
+            function getVixsrcConfig() {
+                try {
+                    return {
+                        customDomain: localStorage.getItem('wizhub_vixsrc_custom_domain') || '',
+                        mediaflowProxy: localStorage.getItem('wizhub_vixsrc_mediaflow_proxy') || ''
+                    };
+                } catch { return { customDomain: '', mediaflowProxy: '' }; }
+            }
+
+            function saveVixsrcConfig(customDomain, mediaflowProxy) {
+                if (customDomain) localStorage.setItem('wizhub_vixsrc_custom_domain', customDomain.trim());
+                else localStorage.removeItem('wizhub_vixsrc_custom_domain');
+                if (mediaflowProxy) localStorage.setItem('wizhub_vixsrc_mediaflow_proxy', mediaflowProxy.trim());
+                else localStorage.removeItem('wizhub_vixsrc_mediaflow_proxy');
+            }
+
+            // 🔧 FIX: 构建 VixSrc URL，支持自定义域名和 MediaFlow b 参数
+            function buildVixSrcUrl(type, id, season, episode) {
+                const cfg = getVixsrcConfig();
+                const domain = cfg.customDomain || 'vixsrc.to';
+                let basePath = type === 'movie'
+                    ? `https://${domain}/movie/${id}`
+                    : `https://${domain}/tv/${id}/${season}/${episode}`;
+
+                // 如果配置了 MediaFlow 代理，通过 b 参数包装
+                // MediaFlow 的 VixSrc 支持文档提到 b 查询参数处理[reference:5]
+                if (cfg.mediaflowProxy) {
+                    const proxyBase = cfg.mediaflowProxy.replace(/\/+$/, '');
+                    // MediaFlow 通用代理格式：{proxy}/proxy?url={encodedUrl}
+                    // 部分版本也支持 b 参数：?b=base64(url)
+                    try {
+                        const encoded = btoa(unescape(encodeURIComponent(basePath)));
+                        return `${proxyBase}/proxy?b=${encodeURIComponent(encoded)}`;
+                    } catch {
+                        return `${proxyBase}/proxy?url=${encodeURIComponent(basePath)}`;
+                    }
+                }
+
+                return basePath;
+            }
+
             // ─── SOURCES ────────────────────────────────────────────────
-            // VixSrc uses only the documented movie and TV embed URL formats.
             const SOURCE_DEFINITIONS = [
-                { name: 'VixSrc', url: (t, id, s, e) => t === 'movie'
-                    ? `https://vixsrc.to/movie/${id}`
-                    : `https://vixsrc.to/tv/${id}/${s}/${e}` },
+                // 🔧 FIX: VixSrc 使用动态 URL 构建函数，支持自定义域名和代理
+                { name: 'VixSrc', url: (t, id, s, e) => buildVixSrcUrl(t, id, s, e) },
                 { name: 'Videasy', url: (t, id, s, e, p) => {
                         let b = t === 'movie' ? `https://player.videasy.net/movie/${id}` :
                             `https://player.videasy.net/tv/${id}/${s}/${e}`;
@@ -801,37 +494,29 @@
                     } },
                 { name: 'VidFast', url: (t, id, s, e) => t === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` :
                         `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
+                { name: 'VidLink', url: (t, id, s, e) => t === 'movie' ? `https://vidlink.pro/movie/${id}` :
+                        `https://vidlink.pro/tv/${id}/${s}/${e}` },
                 { name: 'Rivestream', url: (t, id, s, e) => t === 'movie' ?
                         `https://watch.rivestream.app/embed?type=movie&id=${id}` :
                         `https://watch.rivestream.app/embed?type=tv&id=${id}&season=${s}&episode=${e}` },
-                { name: 'ZxcStream', url: (t, id, s, e) => t === 'movie' ? `https://zxcstream.xyz/player/movie/${id}` :
-                        `https://zxcstream.xyz/player/tv/${id}/${s}/${e}` },
+                { name: 'Vidsrc', url: (t, id, s, e) => t === 'movie' ? `https://vidsrc.to/embed/movie/${id}` :
+                        `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
+                { name: '2Embed', url: (t, id, s, e) => t === 'movie' ? `https://www.2embed.cc/embed/${id}` :
+                        `https://www.2embed.cc/embedtv/${id}&s=${s}&e=${e}` },
                 { name: 'Peachify', url: (t, id, s, e) => t === 'movie' ? `https://peachify.top/embed/movie/${id}` :
                         `https://peachify.top/embed/tv/${id}/${s}/${e}` },
                 { name: 'VidSync', url: (t, id, s, e) => t === 'movie' ? `https://vidsync.live/embed/movie/${id}?autoPlay=true` :
                         `https://vidsync.live/embed/tv/${id}/${s}/${e}?autoPlay=true&autoNext=true` },
-                { name: 'Nxsha', url: (t, id, s, e) => t === 'movie' ? `https://web.nxsha.app/embed/movie/${id}` :
-                        `https://web.nxsha.app/embed/tv/${id}/${s}/${e}` },
-                { name: 'VAPlayer', url: (t, id, s, e) => t === 'movie' ? `https://vaplayer.ru/embed/movie/${id}` :
-                        `https://vaplayer.ru/embed/tv/${id}/${s}/${e}` },
-                { name: 'VidLink', url: (t, id, s, e) => t === 'movie' ? `https://vidlink.pro/movie/${id}` :
-                        `https://vidlink.pro/tv/${id}/${s}/${e}` },
-                { name: 'VidUp', url: (t, id, s, e) => t === 'movie' ? `https://vidup.to/movie/${id}` :
-                        `https://vidup.to/tv/${id}/${s}/${e}` },
-                { name: 'VidCore', url: (t, id, s, e) => t === 'movie' ? `https://vidcore.net/movie/${id}` :
-                        `https://vidcore.net/tv/${id}/${s}/${e}` },
                 { name: '111Movies', url: (t, id, s, e) => t === 'movie' ? `https://111movies.net/movie/${id}` :
                         `https://111movies.net/tv/${id}/${s}/${e}` },
+                { name: 'NHD API', url: (t, id, s, e) => t === 'movie' ? `https://nhdapi.com/embed/movie/${id}` :
+                        `https://nhdapi.com/embed/tv/${id}/${s}/${e}` },
                 { name: 'EmbedMaster', url: (t, id, s, e) => t === 'movie' ? `https://embedmaster.link/movie/${id}` :
                         `https://embedmaster.link/tv/${id}/${s}/${e}` },
                 { name: 'AnyEmbed', url: (t, id, s, e) => t === 'movie' ? `https://anyembed.xyz/embed/tmdb-movie-${id}` :
                         `https://anyembed.xyz/embed/tmdb-tv-${id}-${s}-${e}` },
-                { name: 'NHD API', url: (t, id, s, e) => t === 'movie' ? `https://nhdapi.com/embed/movie/${id}` :
-                        `https://nhdapi.com/embed/tv/${id}/${s}/${e}` },
                 { name: 'FilmU', url: (t, id, s, e) => t === 'movie' ? `https://embed.filmu.in/movie/${id}` :
                         `https://embed.filmu.in/tv/${id}/${s}/${e}` },
-                { name: 'Vidsrc', url: (t, id, s, e) => t === 'movie' ? `https://vidsrc.to/embed/movie/${id}` :
-                        `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
                 { name: 'VidRock', url: (t, id, s, e) => t === 'movie' ? `https://vidrock.ru/movie/${id}` :
                         `https://vidrock.ru/tv/${id}/${s}/${e}` },
                 { name: 'Vidzee', url: (t, id, s, e) => t === 'movie' ? `https://player.vidzee.wtf/v2/embed/movie/${id}` :
@@ -840,8 +525,6 @@
                         `https://player.cinezo.live/embed/tv/${id}/${s}/${e}` },
                 { name: '1Embed', url: (t, id, s, e) => t === 'movie' ? `https://1embed.cc/embed/movie/${id}` :
                         `https://1embed.cc/embed/tv/${id}/${s}/${e}` },
-                { name: '2Embed', url: (t, id, s, e) => t === 'movie' ? `https://www.2embed.cc/embed/${id}` :
-                        `https://www.2embed.cc/embedtv/${id}&s=${s}&e=${e}` },
                 { name: 'NontonGo', url: (t, id, s, e) => t === 'movie' ? `https://www.NontonGo.win/embed/movie/${id}` :
                         `https://www.NontonGo.win/embed/tv/${id}/${s}/${e}` },
                 { name: 'Xpass', url: (t, id, s, e) => t === 'movie' ? `https://play.xpass.top/e/movie/${id}` :
@@ -856,9 +539,9 @@
             ];
 
             const DEFAULT_ORDER = [
-                "VixSrc", "Videasy", "VidFast", "Rivestream", "ZxcStream", "Peachify", "VidSync", "Nxsha", "VAPlayer",
-                "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "NHD API", "FilmU", "Vidsrc",
-                "VidRock", "Vidzee", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs",
+                "VixSrc", "Videasy", "VidFast", "VidLink", "Rivestream", "Vidsrc", "2Embed", "Peachify", "VidSync",
+                "111Movies", "NHD API", "EmbedMaster", "AnyEmbed", "FilmU", "VidRock", "Vidzee", "Cinezo", "1Embed",
+                "NontonGo", "Xpass", "CinemaOS", "SpencerDevs",
                 "Netplayz (Site)", "🎬 CinemaOS (Site)", "🎌 AnimePahe (Site)"
             ];
 
@@ -879,8 +562,7 @@
             // ─── STATE ──────────────────────────────────────────────────
             let currentUser = null;
             let currentMedia = null;
-            let currentSeason = 1,
-                currentEpisode = 1;
+            let currentSeason = 1, currentEpisode = 1;
             let currentProgressSeconds = 0;
             let currentEpisodesList = [];
             let loadedResumeTime = 0;
@@ -897,6 +579,10 @@
             let lastVixSrcSaved = 0;
             let lastPositionForJump = 0;
             let lastSaveTimestamp = 0;
+
+            // 🔧 FIX: Cloudflare 检测状态
+            let cloudflareCheckTimeout = null;
+            let sourceLoadFailed = false;
 
             // ─── DOM REFS ──────────────────────────────────────────────
             const $ = id => document.getElementById(id);
@@ -917,6 +603,7 @@
             const nextSourceBtn = $('nextSourceBtn');
             const copyUrlBtn = $('copyUrlBtn');
             const orderSourcesBtn = $('orderSourcesBtn');
+            const customDomainBtn = $('customDomainBtn'); // 🔧 FIX
             const closePlayerBtn = $('closePlayerBtn');
             const detailTitle = $('detailTitle');
             const detailPoster = $('detailPoster');
@@ -940,6 +627,16 @@
             const sourceListDiv = $('sourceList');
             const saveOrderBtn = $('saveOrderBtn');
             const closeOrderBtn = $('closeOrderBtn');
+
+            // 🔧 FIX: Cloudflare 告警与自定义域名 DOM
+            const cloudflareAlert = $('cloudflareAlert');
+            const alertNextSourceBtn = $('alertNextSourceBtn');
+            const alertVideasyBtn = $('alertVideasyBtn');
+            const customDomainModal = $('customDomainModal');
+            const vixsrcCustomDomainInput = $('vixsrcCustomDomain');
+            const vixsrcMediaflowProxyInput = $('vixsrcMediaflowProxy');
+            const saveCustomDomainBtn = $('saveCustomDomainBtn');
+            const closeCustomDomainBtn = $('closeCustomDomainBtn');
 
             // Simkl modal
             const simklModal = $('simklModal');
@@ -969,7 +666,7 @@
             const doLoginBtn = $('doLoginBtn');
             const showLoginBtn = $('showLoginBtn');
 
-            // ─── SIMKL HELPERS ──────────────────────────────────────────
+            // ─── SIMKL HELPERS (unchanged) ─────────────────────────────
 
             function getSimklCreds() {
                 try {
@@ -1042,7 +739,7 @@
                 setTimeout(() => simklMessage.classList.add('hidden'), 5000);
             }
 
-            // ─── SIMKL OAUTH ────────────────────────────────────────────
+            // ─── SIMKL OAUTH (unchanged) ───────────────────────────────
 
             async function startSimklOAuth() {
                 const apiKey = simklApiKeyInput.value.trim();
@@ -1141,7 +838,7 @@
                 }
             }
 
-            // ─── SIMKL API ──────────────────────────────────────────────
+            // ─── SIMKL API (unchanged) ─────────────────────────────────
 
             async function testSimkl() {
                 const { apiKey, token } = getSimklCreds();
@@ -1216,7 +913,7 @@
                 setTimeout(() => toast.remove(), 2500);
             }
 
-            // ─── SOURCE ORDER MANAGEMENT ──────────────────────────────
+            // ─── SOURCE ORDER MANAGEMENT (unchanged) ──────────────────
 
             function getLocalOrderKey() {
                 return currentUser ? `wizhub_${currentUser.id}_source_order` : 'wizhub_guest_source_order';
@@ -1325,7 +1022,7 @@
 
             function saveSelectedSource(idx) { localStorage.setItem('wizhub_selected_source', idx); }
 
-            // ─── FETCH ──────────────────────────────────────────────────
+            // ─── FETCH (unchanged) ──────────────────────────────────────
 
             async function fetchWithRetry(url, retries = 3, delay = 1000) {
                 for (let i = 0; i < retries; i++) {
@@ -1339,7 +1036,7 @@
                 }
             }
 
-            // ─── RENDER CARDS ───────────────────────────────────────────
+            // ─── RENDER CARDS (unchanged) ───────────────────────────────
 
             function renderCards(container, items, mediaType) {
                 if (!items || !items.length) {
@@ -1419,7 +1116,7 @@
                 }
             }
 
-            // ─── CONTINUE WATCHING ──────────────────────────────────────
+            // ─── CONTINUE WATCHING (unchanged) ──────────────────────────
 
             function getLocalKey() {
                 if (!currentUser) return 'wizhub_guest_progress';
@@ -1542,7 +1239,7 @@
                 }
             }
 
-            // ─── SAVE PROGRESS ──────────────────────────────────────────
+            // ─── SAVE PROGRESS (unchanged) ──────────────────────────────
 
             async function saveProgress() {
                 if (!currentUser || !currentMedia) return;
@@ -1586,7 +1283,7 @@
                 renderContinueWatching();
             }
 
-            // ─── TV HELPERS ─────────────────────────────────────────────
+            // ─── TV HELPERS (unchanged) ─────────────────────────────────
 
             async function loadTVSeasons(tvId, forcedSeason = null, forcedEpisode = null) {
                 const res = await fetchWithRetry(`https://api.themoviedb.org/3/tv/${tvId}?api_key=${TMDB_API_KEY}`);
@@ -1709,6 +1406,34 @@
                 lastSaveTimestamp = 0;
                 lastSaveTime = Date.now();
                 progressMinutesInput.value = 0;
+                // 🔧 FIX: 重置 Cloudflare 检测
+                cloudflareAlert.classList.remove('show');
+                sourceLoadFailed = false;
+                if (cloudflareCheckTimeout) { clearTimeout(cloudflareCheckTimeout);
+                    cloudflareCheckTimeout = null; }
+            }
+
+            // 🔧 FIX: 检测 iframe 是否被 Cloudflare 拦截
+            function checkForCloudflareBlock(srcName) {
+                if (cloudflareCheckTimeout) clearTimeout(cloudflareCheckTimeout);
+                cloudflareCheckTimeout = setTimeout(() => {
+                    try {
+                        const iframeDoc = embedIframe.contentDocument || embedIframe.contentWindow?.document;
+                        if (!iframeDoc) return; // 跨域无法访问，不处理
+                        const bodyText = (iframeDoc.body?.innerText || '').toLowerCase();
+                        const blocked = bodyText.includes('cloudflare') ||
+                            bodyText.includes('you have been blocked') ||
+                            bodyText.includes('enable javascript and cookies');
+                        if (blocked) {
+                            cloudflareAlert.classList.add('show');
+                            sourceLoadFailed = true;
+                            showToast(`⚠ ${srcName} 可能被 Cloudflare 拦截，请切换源`);
+                        }
+                    } catch (e) {
+                        // 跨域 iframe 通常无法访问 contentDocument，这是正常的
+                        // 不做处理，避免误判
+                    }
+                }, 6000); // 6 秒后检测，给页面加载时间
             }
 
             async function updateEmbedStream() {
@@ -1741,11 +1466,16 @@
                 seekCommandSent = false;
                 forceSeekStartTime = Date.now();
                 currentMediaEnded = false;
+                cloudflareAlert.classList.remove('show'); // 🔧 FIX
 
                 if (url) {
                     embedIframe.src = 'about:blank';
                     await new Promise(r => requestAnimationFrame(r));
                     embedIframe.src = url;
+                    // 🔧 FIX: 如果是 VixSrc，启动 Cloudflare 检测
+                    if (src.name === 'VixSrc') {
+                        checkForCloudflareBlock(src.name);
+                    }
                 } else {
                     embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
                 }
@@ -1760,6 +1490,19 @@
                 updateEmbedStream();
             }
 
+            // 🔧 FIX: 切换到指定源名称
+            function switchToSourceByName(name) {
+                const idx = EMBED_SOURCES.findIndex(s => s.name === name);
+                if (idx >= 0) {
+                    sourceSelect.value = idx;
+                    saveSelectedSource(idx);
+                    updateEmbedStream();
+                    cloudflareAlert.classList.remove('show');
+                } else {
+                    showToast(`未找到源: ${name}`);
+                }
+            }
+
             async function copyVideoUrl() {
                 const url = embedIframe.src;
                 if (!url || url === 'about:blank') { alert('No video URL'); return; }
@@ -1769,7 +1512,7 @@
                 } catch (err) { alert('Could not copy URL'); }
             }
 
-            // ─── SHOW DETAILS ───────────────────────────────────────────
+            // ─── SHOW DETAILS (unchanged) ───────────────────────────────
 
             async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null, savedSeconds =
                 null) {
@@ -1843,7 +1586,7 @@
                 playerPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
 
-            // ─── AUTH ────────────────────────────────────────────────────
+            // ─── AUTH (unchanged) ────────────────────────────────────────
 
             async function updateAuthUI() {
                 const { data: { user } } = await sb.auth.getUser();
@@ -1868,7 +1611,7 @@
                 updateSimklUI();
             }
 
-            // ─── ORDER MODAL ────────────────────────────────────────────
+            // ─── ORDER MODAL (unchanged) ────────────────────────────────
 
             function openOrderModal() {
                 sourceListDiv.innerHTML = '';
@@ -1901,7 +1644,7 @@
                 orderModal.style.display = 'flex';
             }
 
-            // ─── UI HELPERS ─────────────────────────────────────────────
+            // ─── UI HELPERS (unchanged) ─────────────────────────────────
 
             function updateContinueVisibility() {
                 const query = globalSearch.value.trim();
@@ -1937,7 +1680,7 @@
                 navigator.clipboard.writeText(title).then(() => showToast('✓ Title copied')).catch(() => {});
             }
 
-            // ─── SIMKL MODAL OPEN ───────────────────────────────────────
+            // ─── SIMKL MODAL OPEN (unchanged) ───────────────────────────
 
             function openSimklModal() {
                 const creds = getSimklCreds();
@@ -1954,7 +1697,53 @@
                 simklModal.style.display = 'flex';
             }
 
-            // ─── MESSAGE HANDLING ──────────────────────────────────────
+            // 🔧 FIX: 打开自定义域名模态框
+            function openCustomDomainModal() {
+                const cfg = getVixsrcConfig();
+                vixsrcCustomDomainInput.value = cfg.customDomain;
+                vixsrcMediaflowProxyInput.value = cfg.mediaflowProxy;
+                customDomainModal.style.display = 'flex';
+            }
+
+            // ─── MESSAGE HANDLING (VixSrc + VidFast) ────────────────────
+
+            // 🔧 FIX: 增强 VixSrc 事件处理，兼容文档中描述的 PLAYER_EVENT 结构
+            function handleVixSrcMessage(rawData) {
+                let parsed;
+                try { parsed = typeof rawData === 'string' ? JSON.parse(rawData) : rawData; } catch { return; }
+                if (!parsed) return;
+
+                // VixSrc 文档中的事件结构：{ type: "PLAYER_EVENT", data: { event, currentTime, duration } }
+                if (parsed.type === 'PLAYER_EVENT' && parsed.data) {
+                    const { event, currentTime } = parsed.data;
+                    if (typeof currentTime !== 'number' || currentTime <= 0) return;
+                    const seconds = Math.floor(currentTime);
+
+                    if (event === 'ended') {
+                        currentMediaEnded = true;
+                        const { autoSync } = getSimklCreds();
+                        if (autoSync && isSimklConnected()) {
+                            const season = currentMedia?.type === 'tv' ? currentSeason : null;
+                            const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
+                            syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
+                        }
+                    }
+                    if (event === 'pause' || event === 'seeked' || event === 'ended') {
+                        if (currentUser && currentMedia) {
+                            currentProgressSeconds = seconds;
+                            progressMinutesInput.value = Math.floor(seconds / 60);
+                            saveProgress();
+                        }
+                    } else if (event === 'timeupdate') {
+                        if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil) {
+                            currentProgressSeconds = seconds;
+                            progressMinutesInput.value = Math.floor(seconds / 60);
+                            clearTimeout(window._autoSaveTimer);
+                            window._autoSaveTimer = setTimeout(saveProgress, 500);
+                        }
+                    }
+                }
+            }
 
             function handleVideasyMessage(rawData) {
                 let parsed;
@@ -2045,15 +1834,22 @@
                 }
             }
 
-
             window.addEventListener('message', (event) => {
                 const { origin, data } = event;
                 if (!data) return;
+                // 🔧 FIX: 检测 VixSrc 来源（包括自定义域名）
+                const cfg = getVixsrcConfig();
+                const vixsrcDomains = ['vixsrc.to'];
+                if (cfg.customDomain) vixsrcDomains.push(cfg.customDomain);
+                if (vixsrcDomains.some(d => origin.includes(d))) {
+                    handleVixSrcMessage(data);
+                    return;
+                }
                 if (origin.includes('videasy')) { handleVideasyMessage(data); return; }
                 if (vidfastOrigins.some(o => origin === o)) { handleVidFastMessage(data, origin); return; }
             });
 
-            // ─── PERIODIC SAVES ─────────────────────────────────────────
+            // ─── PERIODIC SAVES (unchanged) ─────────────────────────────
 
             setInterval(() => {
                 if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && currentProgressSeconds > 0) {
@@ -2080,6 +1876,20 @@
             nextSourceBtn.addEventListener('click', nextSource);
             copyUrlBtn.addEventListener('click', copyVideoUrl);
             orderSourcesBtn.addEventListener('click', openOrderModal);
+            customDomainBtn.addEventListener('click', openCustomDomainModal); // 🔧 FIX
+
+            // 🔧 FIX: Cloudflare 告警条按钮
+            alertNextSourceBtn.addEventListener('click', nextSource);
+            alertVideasyBtn.addEventListener('click', () => switchToSourceByName('Videasy'));
+
+            // 🔧 FIX: 保存自定义域名配置
+            saveCustomDomainBtn.addEventListener('click', () => {
+                saveVixsrcConfig(vixsrcCustomDomainInput.value, vixsrcMediaflowProxyInput.value);
+                customDomainModal.style.display = 'none';
+                showToast('✓ VixSrc 配置已保存，正在重载...');
+                updateEmbedStream();
+            });
+            closeCustomDomainBtn.addEventListener('click', () => { customDomainModal.style.display = 'none'; });
 
             saveOrderBtn.addEventListener('click', async () => {
                 await saveUserSourceOrder();
@@ -2198,8 +2008,9 @@
             simklSyncBtn.addEventListener('click', markCurrentWatched);
 
             simklModal.addEventListener('click', (e) => { if (e.target === simklModal) simklModal.style.display = 'none'; });
+            customDomainModal.addEventListener('click', (e) => { if (e.target === customDomainModal) customDomainModal.style.display = 'none'; }); // 🔧 FIX
 
-            // ─── INIT ────────────────────────────────────────────────────
+            // ─── INIT (unchanged) ────────────────────────────────────────
 
             async function init() {
                 console.log('WIZHUB initializing...');
