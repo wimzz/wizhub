@@ -645,7 +645,7 @@
         </section>
 
         <div id="playerPanel" class="hidden mb-12 player-modern">
-            <div class="embed-container"><iframe id="embedIframe" title="Video player" allowfullscreen referrerpolicy="origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div>
+            <div class="embed-container"><iframe id="embedIframe" title="Video player" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div>
             <div class="info-section">
                 <div id="tvControls" class="hidden mb-4">
                     <div class="control-group flex flex-wrap items-center justify-between gap-3">
@@ -665,7 +665,6 @@
                         <select id="sourceSelect" class="select-modern flex-1 min-w-[130px]"></select>
                         <div class="flex flex-wrap gap-2">
                             <button id="reloadEmbedBtn" class="btn-icon"><i class="fas fa-sync-alt"></i> Reload</button>
-                            <button id="openVixSrcBtn" class="btn-icon" title="Open the selected VixSrc video directly in a new tab"><i class="fas fa-external-link-alt"></i> Open VixSrc</button>
                             <button id="nextSourceBtn" class="btn-icon"><i class="fas fa-forward"></i> Next</button>
                             <button id="copyUrlBtn" class="btn-icon"><i class="fas fa-copy"></i> Copy URL</button>
                             <button id="orderSourcesBtn" class="btn-icon"><i class="fas fa-arrows-alt"></i> Order</button>
@@ -792,18 +791,9 @@
             // ─── SOURCES ────────────────────────────────────────────────
             // VixSrc documented embed format.
             const SOURCE_DEFINITIONS = [
-                { name: 'VixSrc', url: (t, id, s, e, p) => {
-                        const base = t === 'movie'
-                            ? `https://vixsrc.to/movie/${encodeURIComponent(id)}`
-                            : `https://vixsrc.to/tv/${encodeURIComponent(id)}/${encodeURIComponent(s)}/${encodeURIComponent(e)}`;
-                        const params = new URLSearchParams({
-                            primaryColor: 'B20710',
-                            secondaryColor: '170000',
-                            autoplay: 'false'
-                        });
-                        if (Number.isFinite(Number(p)) && Number(p) > 0) params.set('startAt', String(Math.floor(Number(p))));
-                        return `${base}?${params.toString()}`;
-                    } },
+                { name: 'VixSrc', url: (t, id, s, e) => t === 'movie'
+                    ? `https://vixsrc.to/movie/${encodeURIComponent(id)}`
+                    : `https://vixsrc.to/tv/${encodeURIComponent(id)}/${encodeURIComponent(s)}/${encodeURIComponent(e)}` },
                 { name: 'VidFast', url: (t, id, s, e) => t === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` :
                         `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
                 { name: 'Rivestream', url: (t, id, s, e) => t === 'movie' ?
@@ -898,7 +888,6 @@
             let seekCommandSent = false;
             let forceSeekStartTime = 0;
             let lastVidFastSave = 0;
-            let lastVixSrcSaved = 0;
             let lastPositionForJump = 0;
             let lastSaveTimestamp = 0;
 
@@ -918,7 +907,6 @@
             const progressMinutesInput = $('progressMinutes');
             const saveProgressBtn = $('saveProgressBtn');
             const reloadEmbedBtn = $('reloadEmbedBtn');
-            const openVixSrcBtn = $('openVixSrcBtn');
             const nextSourceBtn = $('nextSourceBtn');
             const copyUrlBtn = $('copyUrlBtn');
             const orderSourcesBtn = $('orderSourcesBtn');
@@ -1713,7 +1701,6 @@
                 ignoreAutoSaveUntil = Date.now() + 5000;
                 lastPositionForJump = 0;
                 lastVidFastSave = 0;
-                lastVixSrcSaved = 0;
                 lastSaveTimestamp = 0;
                 lastSaveTime = Date.now();
                 progressMinutesInput.value = 0;
@@ -1729,7 +1716,7 @@
                 }
                 let url = '';
                 if (src.name === 'VixSrc') {
-                    url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
+                    url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
                 } else {
                     url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
                 }
@@ -1759,20 +1746,6 @@
                 }
             }
 
-            function openVixSrcDirectly() {
-                if (!currentMedia) return;
-                const src = EMBED_SOURCES[Number.parseInt(sourceSelect.value, 10)];
-                if (!src || src.name !== 'VixSrc' || typeof src.url !== 'function') {
-                    showToast('Select VixSrc first');
-                    return;
-                }
-                const url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
-                if (typeof url === 'string' && /^https:\/\/vixsrc\.to\/(movie|tv)\//i.test(url)) {
-                    window.open(url, '_blank', 'noopener');
-                } else {
-                    showToast('Could not create the VixSrc URL');
-                }
-            }
 
             function nextSource() {
                 if (!sourceSelect.options.length) return;
@@ -1780,7 +1753,6 @@
                 if (newIdx >= sourceSelect.options.length) newIdx = 0;
                 sourceSelect.value = newIdx;
                 saveSelectedSource(newIdx);
-                openVixSrcBtn.style.display = EMBED_SOURCES[newIdx]?.name === 'VixSrc' ? '' : 'none';
                 updateEmbedStream();
             }
 
@@ -1858,7 +1830,6 @@
                 ignoreAutoSaveUntil = Date.now() + 5000;
                 lastPositionForJump = currentProgressSeconds;
                 lastVidFastSave = currentProgressSeconds;
-                lastVixSrcSaved = currentProgressSeconds;
                 lastSaveTimestamp = currentProgressSeconds;
                 lastSaveTime = Date.now();
 
@@ -2014,10 +1985,7 @@
                             saveProgress();
                         }
                     } else if (eventName === 'timeupdate') {
-                        if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && (currentTime -
-                                lastVixSrcSaved) >=
-                            15) {
-                            lastVixSrcSaved = currentTime;
+                        if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && (currentTime - currentProgressSeconds) >= 15) {
                             currentProgressSeconds = currentTime;
                             progressMinutesInput.value = Math.floor(currentTime / 60);
                             clearTimeout(window._autoSaveTimer);
@@ -2055,13 +2023,10 @@
             });
 
             reloadEmbedBtn.addEventListener('click', updateEmbedStream);
-            openVixSrcBtn.addEventListener('click', openVixSrcDirectly);
             sourceSelect.addEventListener('change', () => {
                 saveSelectedSource(parseInt(sourceSelect.value));
-                openVixSrcBtn.style.display = EMBED_SOURCES[Number.parseInt(sourceSelect.value, 10)]?.name === 'VixSrc' ? '' : 'none';
                 updateEmbedStream();
             });
-            openVixSrcBtn.style.display = EMBED_SOURCES[Number.parseInt(sourceSelect.value, 10)]?.name === 'VixSrc' ? '' : 'none';
             nextSourceBtn.addEventListener('click', nextSource);
             copyUrlBtn.addEventListener('click', copyVideoUrl);
             orderSourcesBtn.addEventListener('click', openOrderModal);
