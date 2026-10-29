@@ -645,7 +645,7 @@
         </section>
 
         <div id="playerPanel" class="hidden mb-12 player-modern">
-            <div class="embed-container"><iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="encrypted-media"></iframe></div>
+            <div class="embed-container"><iframe id="embedIframe" title="Video player" referrerpolicy="origin" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div>
             <div class="info-section">
                 <div id="tvControls" class="hidden mb-4">
                     <div class="control-group flex flex-wrap items-center justify-between gap-3">
@@ -681,7 +681,7 @@
                     <div class="poster-col"><div class="poster-wrapper"><img id="detailPoster" src="https://placehold.co/300x450" alt="poster" /></div></div>
                     <div class="details-col">
                         <div class="flex justify-between items-start flex-wrap gap-2">
-                            <div class="title-wrapper"><h2 id="detailTitle" class="text-xl md:text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent cursor-pointer"></h2><i class="fas fa-copy copy-title-icon"></i></div>
+                            <div class="title-wrapper"><h2 id="detailTitle" class="text-xl md:text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent cursor-pointer"></h2><button id="copyTitleBtn" type="button" class="btn-icon" title="Copy title"><i class="fas fa-copy"></i> Copy name</button><span class="text-sm text-gray-300">ID: <code id="detailId" class="text-green-400"></code></span><button id="copyIdBtn" type="button" class="btn-icon" title="Copy TMDB ID"><i class="fas fa-copy"></i> Copy ID</button></div>
                             <button id="closePlayerBtn" class="text-gray-400 hover:text-white text-xl">&times;</button>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 mt-2">
@@ -790,28 +790,21 @@
 
             // ─── SOURCES ────────────────────────────────────────────────
             const SOURCE_DEFINITIONS = [
-                { name: 'Videasy', url: (t, id, s, e, p) => {
-                        let b = t === 'movie' ? `https://player.videasy.net/movie/${id}` :
-                            `https://player.videasy.net/tv/${id}/${s}/${e}`;
-                        return p > 0 ? b + `?progress=${p}` : b;
-                    } },
                 { name: 'VidFast', url: (t, id, s, e) => t === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` :
                         `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
                 { name: 'Rivestream', url: (t, id, s, e) => t === 'movie' ?
                         `https://watch.rivestream.app/embed?type=movie&id=${id}` :
                         `https://watch.rivestream.app/embed?type=tv&id=${id}&season=${s}&episode=${e}` },
-                { name: 'ZxcStream', url: (t, id, s, e) => t === 'movie' ? `https://zxcstream.xyz/player/movie/${id}` :
-                        `https://zxcstream.xyz/player/tv/${id}/${s}/${e}` },
+                { name: 'ZxcStream', url: (t, id, s, e) => t === 'movie' ? `https://zxcstream.cc/player/movie/${id}` :
+                        `https://zxcstream.cc/player/tv/${id}/${s}/${e}` },
                 { name: 'Peachify', url: (t, id, s, e) => t === 'movie' ? `https://peachify.top/embed/movie/${id}` :
                         `https://peachify.top/embed/tv/${id}/${s}/${e}` },
-                { name: 'VidSync', url: (t, id, s, e) => t === 'movie' ? `https://vidsync.live/embed/movie/${id}?autoPlay=true` :
-                        `https://vidsync.live/embed/tv/${id}/${s}/${e}?autoPlay=true&autoNext=true` },
                 { name: 'Nxsha', url: (t, id, s, e) => t === 'movie' ? `https://web.nxsha.app/embed/movie/${id}` :
                         `https://web.nxsha.app/embed/tv/${id}/${s}/${e}` },
                 { name: 'VAPlayer', url: (t, id, s, e) => t === 'movie' ? `https://vaplayer.ru/embed/movie/${id}` :
                         `https://vaplayer.ru/embed/tv/${id}/${s}/${e}` },
-                { name: 'VidLink', url: (t, id, s, e) => t === 'movie' ? `https://vidlink.pro/movie/${id}` :
-                        `https://vidlink.pro/tv/${id}/${s}/${e}` },
+                { name: 'VidLink', url: (t, id, s, e) => t === 'movie' ? `https://vidlink.pro/movie/${id}?player=jw` :
+                        `https://vidlink.pro/tv/${id}/${s}/${e}?player=jw` },
                 { name: 'VidUp', url: (t, id, s, e) => t === 'movie' ? `https://vidup.to/movie/${id}` :
                         `https://vidup.to/tv/${id}/${s}/${e}` },
                 { name: 'VidCore', url: (t, id, s, e) => t === 'movie' ? `https://vidcore.net/movie/${id}` :
@@ -822,16 +815,12 @@
                         `https://embedmaster.link/tv/${id}/${s}/${e}` },
                 { name: 'AnyEmbed', url: (t, id, s, e) => t === 'movie' ? `https://anyembed.xyz/embed/tmdb-movie-${id}` :
                         `https://anyembed.xyz/embed/tmdb-tv-${id}-${s}-${e}` },
-                { name: 'NHD API', url: (t, id, s, e) => t === 'movie' ? `https://nhdapi.com/embed/movie/${id}` :
-                        `https://nhdapi.com/embed/tv/${id}/${s}/${e}` },
                 { name: 'FilmU', url: (t, id, s, e) => t === 'movie' ? `https://embed.filmu.in/movie/${id}` :
                         `https://embed.filmu.in/tv/${id}/${s}/${e}` },
                 { name: 'Vidsrc', url: (t, id, s, e) => t === 'movie' ? `https://vidsrc.to/embed/movie/${id}` :
                         `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
                 { name: 'VidRock', url: (t, id, s, e) => t === 'movie' ? `https://vidrock.ru/movie/${id}` :
                         `https://vidrock.ru/tv/${id}/${s}/${e}` },
-                { name: 'Vidzee', url: (t, id, s, e) => t === 'movie' ? `https://player.vidzee.wtf/v2/embed/movie/${id}` :
-                        `https://player.vidzee.wtf/v2/embed/tv/${id}/${s}/${e}` },
                 { name: 'Cinezo', url: (t, id, s, e) => t === 'movie' ? `https://player.cinezo.live/embed/movie/${id}` :
                         `https://player.cinezo.live/embed/tv/${id}/${s}/${e}` },
                 { name: '1Embed', url: (t, id, s, e) => t === 'movie' ? `https://1embed.cc/embed/movie/${id}` :
@@ -846,16 +835,21 @@
                         `https://cinemaos.tech/player/${id}/${s}/${e}` },
                 { name: 'SpencerDevs', url: (t, id, s, e) => t === 'movie' ? `https://spencerdevs.xyz/movie/${id}` :
                         `https://spencerdevs.xyz/tv/${id}/${s}/${e}` },
-                { name: 'Netplayz (Site)', url: () => `https://netplayz.live`, openInNewTab: true },
-                { name: '🎬 CinemaOS (Site)', url: () => `https://cinemaos.live`, openInNewTab: true },
-                { name: '🎌 AnimePahe (Site)', url: () => `https://animepahe.org`, openInNewTab: true }
+                { name: 'Mapple', url: (t, id, s, e) => t === 'movie' ?
+                        `https://mapple.fun/watch/movie/${id}?autoPlay=true` :
+                        `https://mapple.fun/watch/tv/${id}-${s}-${e}?autoPlay=true` },
+                { name: 'CineSrc', url: (t, id, s, e) => t === 'movie' ?
+                        `https://cinesrc.st/embed/movie/${id}` :
+                        `https://cinesrc.st/embed/tv/${id}?s=${s}&e=${e}` },
+                { name: 'Viduki', url: (t, id, s, e) => t === 'movie' ?
+                        `https://viduki.net/1/movie/${id}?color=00A65F` :
+                        `https://viduki.net/1/tv/${id}/${s}/${e}?color=00A65F` },
             ];
 
             const DEFAULT_ORDER = [
-                "Videasy", "VidFast", "Rivestream", "ZxcStream", "Peachify", "VidSync", "Nxsha", "VAPlayer",
-                "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "NHD API", "FilmU", "Vidsrc",
-                "VidRock", "Vidzee", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs",
-                "Netplayz (Site)", "🎬 CinemaOS (Site)", "🎌 AnimePahe (Site)"
+                "VidFast", "Rivestream", "ZxcStream", "Peachify", "Nxsha", "VAPlayer",
+                "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "FilmU", "Vidsrc",
+                "VidRock", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs", "Mapple", "CineSrc", "Viduki"
             ];
 
             function buildSources(order) {
@@ -914,6 +908,9 @@
             const orderSourcesBtn = $('orderSourcesBtn');
             const closePlayerBtn = $('closePlayerBtn');
             const detailTitle = $('detailTitle');
+            const detailId = $('detailId');
+            const copyTitleBtn = $('copyTitleBtn');
+            const copyIdBtn = $('copyIdBtn');
             const detailPoster = $('detailPoster');
             const detailOverview = $('detailOverview');
             const detailRating = $('detailRating');
@@ -1714,11 +1711,7 @@
                     return;
                 }
                 let url = '';
-                if (src.name === 'Videasy') {
-                    url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
-                } else {
-                    url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
-                }
+                url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
 
                 if (url && typeof url.then === 'function') {
                     embedIframe.srcdoc =
@@ -1744,6 +1737,7 @@
                     embedIframe.srcdoc = '<div style="color:red;padding:2rem">Invalid URL</div>';
                 }
             }
+
 
             function nextSource() {
                 if (!sourceSelect.options.length) return;
@@ -1777,6 +1771,7 @@
                     'N/A');
                 detailPoster.src = poster;
                 detailTitle.textContent = title;
+                detailId.textContent = item.id;
                 detailOverview.textContent = overview;
                 detailRating.textContent = rating;
                 detailYear.textContent = year;
@@ -1930,6 +1925,13 @@
                 navigator.clipboard.writeText(title).then(() => showToast('✓ Title copied')).catch(() => {});
             }
 
+            function copyMediaId() {
+                if (!currentMedia || currentMedia.id == null) return;
+                navigator.clipboard.writeText(String(currentMedia.id))
+                    .then(() => showToast('✓ TMDB ID copied'))
+                    .catch(() => showToast('Could not copy ID'));
+            }
+
             // ─── SIMKL MODAL OPEN ───────────────────────────────────────
 
             function openSimklModal() {
@@ -1949,100 +1951,11 @@
 
             // ─── MESSAGE HANDLING ──────────────────────────────────────
 
-            function handleVideasyMessage(rawData) {
-                let parsed;
-                try { parsed = typeof rawData === 'string' ? JSON.parse(rawData) : rawData; } catch { return; }
-                if (!parsed) return;
-                let seconds = parsed?.timestamp ?? parsed?.data?.timestamp ?? parsed?.currentTime ?? parsed?.data
-                    ?.currentTime ??
-                    null;
-                let eventType = parsed?.event ?? parsed?.data?.event ?? null;
-                if (typeof seconds !== 'number' || seconds <= 0) return;
-                seconds = Math.floor(seconds);
-                if (eventType === 'ended') {
-                    currentMediaEnded = true;
-                    const { autoSync } = getSimklCreds();
-                    if (autoSync && isSimklConnected()) {
-                        const season = currentMedia?.type === 'tv' ? currentSeason : null;
-                        const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
-                        syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
-                    }
-                }
-                if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
-                    if (currentUser && currentMedia) {
-                        currentProgressSeconds = seconds;
-                        progressMinutesInput.value = Math.floor(seconds / 60);
-                        saveProgress();
-                    }
-                } else {
-                    if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil) {
-                        currentProgressSeconds = seconds;
-                        progressMinutesInput.value = Math.floor(seconds / 60);
-                        clearTimeout(window._autoSaveTimer);
-                        window._autoSaveTimer = setTimeout(saveProgress, 500);
-                    }
-                }
-            }
-
-            const vidfastOrigins = [
-                'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
-                'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
-            ];
-
-            function handleVidFastMessage(data, origin) {
-                if (!vidfastOrigins.some(o => origin === o)) return;
-                if (data?.type === 'PLAYER_EVENT' && data.data) {
-                    const { event, currentTime } = data.data;
-                    if (!hasForcedSeekVidFast && loadedResumeTime > 0 && !seekCommandSent) {
-                        if (event === 'ready' || event === 'loaded' || event === 'canplay' || event === 'play' || event ===
-                            'playing' || event === 'timeupdate') {
-                            embedIframe.contentWindow.postMessage({ command: 'seek', time: loadedResumeTime }, '*');
-                            seekCommandSent = true;
-                        }
-                    }
-                    if (event === 'ended') {
-                        currentMediaEnded = true;
-                        const { autoSync } = getSimklCreds();
-                        if (autoSync && isSimklConnected()) {
-                            const season = currentMedia?.type === 'tv' ? currentSeason : null;
-                            const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
-                            syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast(
-                                    '✓ Synced to Simkl'); });
-                        }
-                    }
-                    if (typeof currentTime === 'number' && currentTime > 0) {
-                        if (!hasForcedSeekVidFast && loadedResumeTime > 0 && currentTime < loadedResumeTime - 5 && (Date
-                                .now() -
-                                forceSeekStartTime < 15000)) return;
-                        if (loadedResumeTime > 0 && Math.abs(currentTime - loadedResumeTime) <= 5) hasForcedSeekVidFast =
-                            true;
-                        const seconds = Math.floor(currentTime);
-                        if (event === 'seeked' || event === 'pause' || event === 'ended') {
-                            if (currentUser && currentMedia) {
-                                currentProgressSeconds = seconds;
-                                progressMinutesInput.value = Math.floor(seconds / 60);
-                                saveProgress();
-                            }
-                        } else if (event === 'timeupdate') {
-                            if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && (seconds -
-                                    lastVidFastSave) >=
-                                15) {
-                                lastVidFastSave = seconds;
-                                currentProgressSeconds = seconds;
-                                progressMinutesInput.value = Math.floor(seconds / 60);
-                                clearTimeout(window._autoSaveTimer);
-                                window._autoSaveTimer = setTimeout(saveProgress, 500);
-                            }
-                        }
-                    }
-                }
-            }
-
 
             window.addEventListener('message', (event) => {
                 const { origin, data } = event;
                 if (!data) return;
-                if (origin.includes('videasy')) { handleVideasyMessage(data); return; }
+                
                 if (vidfastOrigins.some(o => origin === o)) { handleVidFastMessage(data, origin); return; }
             });
 
@@ -2107,7 +2020,10 @@
                 openSimklModal(); });
 
             detailTitle.addEventListener('click', copyTitle);
-            document.querySelector('.copy-title-icon').addEventListener('click', copyTitle);
+            if (copyTitleBtn) copyTitleBtn.addEventListener('click', copyTitle);
+            if (copyIdBtn) copyIdBtn.addEventListener('click', copyMediaId);
+            const copyTitleIcon = document.querySelector('.copy-title-icon');
+            if (copyTitleIcon) copyTitleIcon.addEventListener('click', copyTitle);
 
             globalSearch.addEventListener('input', handleSearch);
             clearSearchBtn.addEventListener('click', clearSearch);
