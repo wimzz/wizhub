@@ -645,7 +645,7 @@
         </section>
 
         <div id="playerPanel" class="hidden mb-12 player-modern">
-            <div class="embed-container"><iframe id="embedIframe" allowfullscreen referrerpolicy="no-referrer" allow="encrypted-media"></iframe></div>
+            <div class="embed-container"><iframe id="embedIframe" allowfullscreen referrerpolicy="origin" allow="encrypted-media"></iframe></div>
             <div class="info-section">
                 <div id="tvControls" class="hidden mb-4">
                     <div class="control-group flex flex-wrap items-center justify-between gap-3">
@@ -800,11 +800,6 @@
                         params.push('autoplay=0');
                         return b + '?' + params.join('&');
                     } },
-                { name: 'Videasy', url: (t, id, s, e, p) => {
-                        let b = t === 'movie' ? `https://player.videasy.net/movie/${id}` :
-                            `https://player.videasy.net/tv/${id}/${s}/${e}`;
-                        return p > 0 ? b + `?progress=${p}` : b;
-                    } },
                 { name: 'VidFast', url: (t, id, s, e) => t === 'movie' ? `https://vidfast.pro/movie/${id}?autoPlay=true` :
                         `https://vidfast.pro/tv/${id}/${s}/${e}?autoPlay=true` },
                 { name: 'Rivestream', url: (t, id, s, e) => t === 'movie' ?
@@ -862,7 +857,7 @@
             ];
 
             const DEFAULT_ORDER = [
-                "VixSrc", "Videasy", "VidFast", "Rivestream", "ZxcStream", "Peachify", "Nxsha", "VAPlayer",
+                "VixSrc", "VidFast", "Rivestream", "ZxcStream", "Peachify", "Nxsha", "VAPlayer",
                 "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "FilmU", "Vidsrc",
                 "VidRock", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs", "Mapple", "CineSrc", "Viduki"
             ];
@@ -1728,7 +1723,7 @@
                     return;
                 }
                 let url = '';
-                if (src.name === 'Videasy' || src.name === 'VixSrc') {
+                if (src.name === 'VixSrc') {
                     url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode, currentProgressSeconds);
                 } else {
                     url = src.url(currentMedia.type, currentMedia.id, currentSeason, currentEpisode);
@@ -1972,95 +1967,6 @@
 
             // ─── MESSAGE HANDLING ──────────────────────────────────────
 
-            function handleVideasyMessage(rawData) {
-                let parsed;
-                try { parsed = typeof rawData === 'string' ? JSON.parse(rawData) : rawData; } catch { return; }
-                if (!parsed) return;
-                let seconds = parsed?.timestamp ?? parsed?.data?.timestamp ?? parsed?.currentTime ?? parsed?.data
-                    ?.currentTime ??
-                    null;
-                let eventType = parsed?.event ?? parsed?.data?.event ?? null;
-                if (typeof seconds !== 'number' || seconds <= 0) return;
-                seconds = Math.floor(seconds);
-                if (eventType === 'ended') {
-                    currentMediaEnded = true;
-                    const { autoSync } = getSimklCreds();
-                    if (autoSync && isSimklConnected()) {
-                        const season = currentMedia?.type === 'tv' ? currentSeason : null;
-                        const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
-                        syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast('✓ Synced to Simkl'); });
-                    }
-                }
-                if (eventType === 'pause' || eventType === 'seeked' || eventType === 'ended') {
-                    if (currentUser && currentMedia) {
-                        currentProgressSeconds = seconds;
-                        progressMinutesInput.value = Math.floor(seconds / 60);
-                        saveProgress();
-                    }
-                } else {
-                    if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil) {
-                        currentProgressSeconds = seconds;
-                        progressMinutesInput.value = Math.floor(seconds / 60);
-                        clearTimeout(window._autoSaveTimer);
-                        window._autoSaveTimer = setTimeout(saveProgress, 500);
-                    }
-                }
-            }
-
-            const vidfastOrigins = [
-                'https://vidfast.pro', 'https://vidfast.in', 'https://vidfast.io',
-                'https://vidfast.me', 'https://vidfast.net', 'https://vidfast.pm', 'https://vidfast.xyz'
-            ];
-
-            function handleVidFastMessage(data, origin) {
-                if (!vidfastOrigins.some(o => origin === o)) return;
-                if (data?.type === 'PLAYER_EVENT' && data.data) {
-                    const { event, currentTime } = data.data;
-                    if (!hasForcedSeekVidFast && loadedResumeTime > 0 && !seekCommandSent) {
-                        if (event === 'ready' || event === 'loaded' || event === 'canplay' || event === 'play' || event ===
-                            'playing' || event === 'timeupdate') {
-                            embedIframe.contentWindow.postMessage({ command: 'seek', time: loadedResumeTime }, '*');
-                            seekCommandSent = true;
-                        }
-                    }
-                    if (event === 'ended') {
-                        currentMediaEnded = true;
-                        const { autoSync } = getSimklCreds();
-                        if (autoSync && isSimklConnected()) {
-                            const season = currentMedia?.type === 'tv' ? currentSeason : null;
-                            const ep = currentMedia?.type === 'tv' ? currentEpisode : null;
-                            syncToSimkl(currentMedia, season, ep).then(r => { if (r.success) showToast(
-                                    '✓ Synced to Simkl'); });
-                        }
-                    }
-                    if (typeof currentTime === 'number' && currentTime > 0) {
-                        if (!hasForcedSeekVidFast && loadedResumeTime > 0 && currentTime < loadedResumeTime - 5 && (Date
-                                .now() -
-                                forceSeekStartTime < 15000)) return;
-                        if (loadedResumeTime > 0 && Math.abs(currentTime - loadedResumeTime) <= 5) hasForcedSeekVidFast =
-                            true;
-                        const seconds = Math.floor(currentTime);
-                        if (event === 'seeked' || event === 'pause' || event === 'ended') {
-                            if (currentUser && currentMedia) {
-                                currentProgressSeconds = seconds;
-                                progressMinutesInput.value = Math.floor(seconds / 60);
-                                saveProgress();
-                            }
-                        } else if (event === 'timeupdate') {
-                            if (currentUser && currentMedia && Date.now() > ignoreAutoSaveUntil && (seconds -
-                                    lastVidFastSave) >=
-                                15) {
-                                lastVidFastSave = seconds;
-                                currentProgressSeconds = seconds;
-                                progressMinutesInput.value = Math.floor(seconds / 60);
-                                clearTimeout(window._autoSaveTimer);
-                                window._autoSaveTimer = setTimeout(saveProgress, 500);
-                            }
-                        }
-                    }
-                }
-            }
-
             function handleVixSrcMessage(data, origin) {
                 if (!origin.includes('vixsrc') && !origin.includes('vixcloud')) return;
                 if (data?.type !== "PLAYER_EVENT") return;
@@ -2103,7 +2009,7 @@
             window.addEventListener('message', (event) => {
                 const { origin, data } = event;
                 if (!data) return;
-                if (origin.includes('videasy')) { handleVideasyMessage(data); return; }
+                
                 if (vidfastOrigins.some(o => origin === o)) { handleVidFastMessage(data, origin); return; }
                 if (origin.includes('vixsrc') || origin.includes('vixcloud')) { handleVixSrcMessage(data, origin); return; }
             });
