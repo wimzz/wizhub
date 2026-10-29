@@ -645,7 +645,7 @@
         </section>
 
         <div id="playerPanel" class="hidden mb-12 player-modern">
-            <div class="embed-container"><iframe id="embedIframe" title="Video player" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div>
+            <div class="embed-container"><iframe id="embedIframe" title="Video player" referrerpolicy="origin" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div>
             <div class="info-section">
                 <div id="tvControls" class="hidden mb-4">
                     <div class="control-group flex flex-wrap items-center justify-between gap-3">
@@ -898,6 +898,8 @@
             const trendingTvGrid = $('trendingTvGrid');
             const playerPanel = $('playerPanel');
             const embedIframe = $('embedIframe');
+            // Explicitly send the site origin to VixSrc; do not use no-referrer.
+            embedIframe.referrerPolicy = 'origin';
             const sourceSelect = $('sourceSelect');
             const tvControls = $('tvControls');
             const seasonSelect = $('seasonSelect');
