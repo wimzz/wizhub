@@ -835,6 +835,27 @@
                             ? `https://embed.vidrift.net/embed/movie/${id}?title=${title}`
                             : `https://embed.vidrift.net/embed/tv/${id}/${s}/${e}?title=${title}`;
                     } },
+                { name: 'Vidly', url: (t, id, s, e) => t === 'movie'
+                        ? `https://vidly.pro/movie/${id}`
+                        : `https://vidly.pro/tv/${id}/${s}/${e}` },
+                { name: 'CineXStream', url: (t, id, s, e) => t === 'movie'
+                        ? `https://cinextream.net/api/embed/movie/${id}`
+                        : `https://cinextream.net/api/embed/tv/${id}/${s}/${e}` },
+                { name: 'ModiPlay', url: (t, id, s, e) => t === 'movie'
+                        ? `https://rozgarlelo.modiplay.xyz/embed/tmdb/movie?id=${id}`
+                        : `https://rozgarlelo.modiplay.xyz/embed/tmdb/tv?id=${id}` },
+                { name: 'VidBolt', url: (t, id, s, e) => t === 'movie'
+                        ? `https://vidbolt.xyz/movie/${id}`
+                        : `https://vidbolt.xyz/tv/${id}/${s}/${e}` },
+                { name: 'VidOut', url: (t, id, s, e) => t === 'movie'
+                        ? `https://vidout.pages.dev/movie/${id}`
+                        : `https://vidout.pages.dev/tv/${id}/s${s}/e${e}` },
+                { name: 'MoviesNexus', url: (t, id, s, e) => t === 'movie'
+                        ? `https://www.moviesnexus.fun/movie/${id}`
+                        : `https://www.moviesnexus.fun/tv/${id}/${s}/${e}` },
+                { name: 'IQSmartGames', url: (t, id, s, e) => t === 'movie'
+                        ? `https://streams.iqsmartgames.com/embed/movie/${id}?key=e11a7debaaa4f5d25b671706ffe4d2acb56efbd4`
+                        : `https://streams.iqsmartgames.com/embed/tv/${id}/${s}/${e}?key=e11a7debaaa4f5d25b671706ffe4d2acb56efbd4` },
                 { name: 'VidRock', url: (t, id, s, e) => t === 'movie' ? `https://vidrock.ru/movie/${id}` :
                         `https://vidrock.ru/tv/${id}/${s}/${e}` },
                 { name: 'Cinezo', url: (t, id, s, e) => t === 'movie' ? `https://player.cinezo.live/embed/movie/${id}` :
@@ -867,7 +888,7 @@
 
             const DEFAULT_ORDER = [
                 "VidFast", "Rivestream", "ZxcStream", "Peachify", "Nxsha", "VAPlayer",
-                "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "FilmU", "VidSrc", "Vidy", "Vidrift",
+                "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "FilmU", "VidSrc", "Vidy", "Vidrift", "Vidly", "CineXStream", "ModiPlay", "VidBolt", "VidOut", "MoviesNexus", "IQSmartGames",
                 "VidRock", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs", "Mapple", "CineSrc", "Viduki", "VixSrc"
             ];
 
