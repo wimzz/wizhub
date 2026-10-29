@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="referrer" content="origin" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover" />
     <title>WIZHUB</title>
@@ -645,7 +646,7 @@
         </section>
 
         <div id="playerPanel" class="hidden mb-12 player-modern">
-            <div class="embed-container"><iframe id="embedIframe" title="Video player" referrerpolicy="origin" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div>
+            <div class="embed-container"><iframe id="embedIframe" title="Video player" loading="eager" referrerpolicy="origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write" allowfullscreen></iframe></div>
             <div class="info-section">
                 <div id="tvControls" class="hidden mb-4">
                     <div class="control-group flex flex-wrap items-center justify-between gap-3">
@@ -665,6 +666,7 @@
                         <select id="sourceSelect" class="select-modern flex-1 min-w-[130px]"></select>
                         <div class="flex flex-wrap gap-2">
                             <button id="reloadEmbedBtn" class="btn-icon"><i class="fas fa-sync-alt"></i> Reload</button>
+                            <button id="openEmbedTabBtn" class="btn-icon" type="button" title="Open the selected player in a new tab"><i class="fas fa-external-link-alt"></i> Open in tab</button>
                             <button id="nextSourceBtn" class="btn-icon"><i class="fas fa-forward"></i> Next</button>
                             <button id="copyUrlBtn" class="btn-icon"><i class="fas fa-copy"></i> Copy URL</button>
                             <button id="orderSourcesBtn" class="btn-icon"><i class="fas fa-arrows-alt"></i> Order</button>
@@ -906,6 +908,7 @@
             const progressMinutesInput = $('progressMinutes');
             const saveProgressBtn = $('saveProgressBtn');
             const reloadEmbedBtn = $('reloadEmbedBtn');
+            const openEmbedTabBtn = $('openEmbedTabBtn');
             const nextSourceBtn = $('nextSourceBtn');
             const copyUrlBtn = $('copyUrlBtn');
             const orderSourcesBtn = $('orderSourcesBtn');
@@ -1730,6 +1733,7 @@
                 currentMediaEnded = false;
 
                 if (url) {
+                    embedIframe.referrerPolicy = 'origin';
                     embedIframe.src = 'about:blank';
                     await new Promise(r => requestAnimationFrame(r));
                     embedIframe.src = url;
@@ -2109,6 +2113,19 @@
             });
 
             reloadEmbedBtn.addEventListener('click', updateEmbedStream);
+            openEmbedTabBtn.addEventListener('click', () => {
+                const url = embedIframe.src;
+                if (!url || url === 'about:blank' || url.startsWith('about:')) {
+                    updateEmbedStream().then(() => {
+                        const nextUrl = embedIframe.src;
+                        if (nextUrl && nextUrl !== 'about:blank' && !nextUrl.startsWith('about:')) {
+                            window.open(nextUrl, '_blank', 'noopener,noreferrer');
+                        }
+                    });
+                    return;
+                }
+                window.open(url, '_blank', 'noopener,noreferrer');
+            });
             sourceSelect.addEventListener('change', () => {
                 saveSelectedSource(parseInt(sourceSelect.value));
                 updateEmbedStream();
