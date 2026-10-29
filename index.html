@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta name="referrer" content="origin" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover" />
     <title>WIZHUB</title>
@@ -646,7 +645,7 @@
         </section>
 
         <div id="playerPanel" class="hidden mb-12 player-modern">
-            <div class="embed-container"><iframe id="embedIframe" title="Video player" loading="eager" referrerpolicy="origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write" allowfullscreen></iframe></div>
+            <div class="embed-container"><iframe id="embedIframe" title="Video player" referrerpolicy="origin" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe></div>
             <div class="info-section">
                 <div id="tvControls" class="hidden mb-4">
                     <div class="control-group flex flex-wrap items-center justify-between gap-3">
@@ -666,7 +665,6 @@
                         <select id="sourceSelect" class="select-modern flex-1 min-w-[130px]"></select>
                         <div class="flex flex-wrap gap-2">
                             <button id="reloadEmbedBtn" class="btn-icon"><i class="fas fa-sync-alt"></i> Reload</button>
-                            <button id="openEmbedTabBtn" class="btn-icon" type="button" title="Open the selected player in a new tab"><i class="fas fa-external-link-alt"></i> Open in tab</button>
                             <button id="nextSourceBtn" class="btn-icon"><i class="fas fa-forward"></i> Next</button>
                             <button id="copyUrlBtn" class="btn-icon"><i class="fas fa-copy"></i> Copy URL</button>
                             <button id="orderSourcesBtn" class="btn-icon"><i class="fas fa-arrows-alt"></i> Order</button>
@@ -819,8 +817,24 @@
                         `https://anyembed.xyz/embed/tmdb-tv-${id}-${s}-${e}` },
                 { name: 'FilmU', url: (t, id, s, e) => t === 'movie' ? `https://embed.filmu.in/movie/${id}` :
                         `https://embed.filmu.in/tv/${id}/${s}/${e}` },
-                { name: 'Vidsrc', url: (t, id, s, e) => t === 'movie' ? `https://vidsrc.to/embed/movie/${id}` :
-                        `https://vidsrc.to/embed/tv/${id}/${s}/${e}` },
+                { name: 'VidSrc', url: (t, id, s, e) => {
+                        const resume = Math.max(0, Math.floor(Number(currentProgressSeconds) || 0));
+                        const path = t === 'movie'
+                            ? `https://vidsrc.sh/embed/movie/${id}`
+                            : `https://vidsrc.sh/embed/tv/${id}/${s}/${e}`;
+                        const params = new URLSearchParams({ autoplay: '1', ds_lang: 'en' });
+                        if (resume > 0) params.set('startAt', String(resume));
+                        return `${path}?${params.toString()}`;
+                    } },
+                { name: 'Vidy', url: (t, id, s, e) => t === 'movie'
+                        ? `https://www.vidy.st/movie/${id}?color=DC2626`
+                        : `https://www.vidy.st/tv/${id}/${s}/${e}?color=DC2626&nextEpisode=true&episodeSelector=true` },
+                { name: 'Vidrift', url: (t, id, s, e) => {
+                        const title = encodeURIComponent(currentMedia?.title || '');
+                        return t === 'movie'
+                            ? `https://embed.vidrift.net/embed/movie/${id}?title=${title}`
+                            : `https://embed.vidrift.net/embed/tv/${id}/${s}/${e}?title=${title}`;
+                    } },
                 { name: 'VidRock', url: (t, id, s, e) => t === 'movie' ? `https://vidrock.ru/movie/${id}` :
                         `https://vidrock.ru/tv/${id}/${s}/${e}` },
                 { name: 'Cinezo', url: (t, id, s, e) => t === 'movie' ? `https://player.cinezo.live/embed/movie/${id}` :
@@ -853,7 +867,7 @@
 
             const DEFAULT_ORDER = [
                 "VidFast", "Rivestream", "ZxcStream", "Peachify", "Nxsha", "VAPlayer",
-                "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "FilmU", "Vidsrc",
+                "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "FilmU", "VidSrc", "Vidy", "Vidrift",
                 "VidRock", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs", "Mapple", "CineSrc", "Viduki", "VixSrc"
             ];
 
@@ -908,7 +922,6 @@
             const progressMinutesInput = $('progressMinutes');
             const saveProgressBtn = $('saveProgressBtn');
             const reloadEmbedBtn = $('reloadEmbedBtn');
-            const openEmbedTabBtn = $('openEmbedTabBtn');
             const nextSourceBtn = $('nextSourceBtn');
             const copyUrlBtn = $('copyUrlBtn');
             const orderSourcesBtn = $('orderSourcesBtn');
@@ -1733,7 +1746,6 @@
                 currentMediaEnded = false;
 
                 if (url) {
-                    embedIframe.referrerPolicy = 'origin';
                     embedIframe.src = 'about:blank';
                     await new Promise(r => requestAnimationFrame(r));
                     embedIframe.src = url;
@@ -2066,6 +2078,49 @@
                     handleVidFastMessage(data, origin);
                     return;
                 }
+                if (origin === 'https://vidsrc.sh' && data) {
+                    let message = data;
+                    if (typeof message === 'string') {
+                        try { message = JSON.parse(message); } catch (e) { return; }
+                    }
+                    if (message && message.type === 'PLAYER_EVENT' && message.data) {
+                        const d = message.data;
+                        const selectedSource = EMBED_SOURCES[parseInt(sourceSelect.value)];
+                        if (!currentMedia || !selectedSource || selectedSource.name !== 'VidSrc') return;
+                        const info = d.player_info || {};
+                        const mediaId = Number(info.tmdb || info.imdb);
+                        if (Number.isFinite(mediaId) && mediaId > 0 && mediaId !== Number(currentMedia.id)) return;
+                        const seconds = Number(d.player_progress);
+                        if (Number.isFinite(seconds) && seconds >= 0) {
+                            currentProgressSeconds = Math.floor(seconds);
+                            progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
+                        }
+                        if (currentMedia.type === 'tv') {
+                            const season = Number(info.season);
+                            const episode = Number(info.episode);
+                            if (Number.isInteger(season) && season > 0) currentSeason = season;
+                            if (Number.isInteger(episode) && episode > 0) currentEpisode = episode;
+                        }
+                        const status = d.player_status;
+                        const now = Date.now();
+                        if (['paused', 'seeked', 'completed'].includes(status) ||
+                            (status === 'playing' && now - lastVidFastProgressSave >= 15000)) {
+                            if (now > ignoreAutoSaveUntil) {
+                                lastVidFastProgressSave = now;
+                                saveProgress();
+                            }
+                        }
+                        if (status === 'completed' && currentMedia) {
+                            currentMediaEnded = true;
+                            const { autoSync } = getSimklCreds();
+                            if (autoSync && isSimklConnected()) {
+                                if (currentMedia.type === 'tv') syncToSimkl(currentMedia, currentSeason, currentEpisode);
+                                else syncToSimkl(currentMedia);
+                            }
+                        }
+                    }
+                    return;
+                }
                 if (origin === 'https://vixsrc.to' || origin === 'https://www.vixsrc.to') {
                     let message = data;
                     if (typeof message === 'string') {
@@ -2113,19 +2168,6 @@
             });
 
             reloadEmbedBtn.addEventListener('click', updateEmbedStream);
-            openEmbedTabBtn.addEventListener('click', () => {
-                const url = embedIframe.src;
-                if (!url || url === 'about:blank' || url.startsWith('about:')) {
-                    updateEmbedStream().then(() => {
-                        const nextUrl = embedIframe.src;
-                        if (nextUrl && nextUrl !== 'about:blank' && !nextUrl.startsWith('about:')) {
-                            window.open(nextUrl, '_blank', 'noopener,noreferrer');
-                        }
-                    });
-                    return;
-                }
-                window.open(url, '_blank', 'noopener,noreferrer');
-            });
             sourceSelect.addEventListener('change', () => {
                 saveSelectedSource(parseInt(sourceSelect.value));
                 updateEmbedStream();
