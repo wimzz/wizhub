@@ -316,6 +316,32 @@
             border-radius: 0.5rem;
             color: #f0f0f0;
         }
+        .source-item {
+            gap: 0.75rem;
+            transition: background 0.15s, border-color 0.15s, transform 0.15s;
+            border: 1px solid transparent;
+        }
+        .source-item.dragging {
+            opacity: 0.55;
+            border-color: var(--primary);
+            background: rgba(0, 166, 95, 0.16);
+        }
+        .source-item.drag-over {
+            border-color: var(--primary);
+            background: rgba(0, 166, 95, 0.12);
+        }
+        .source-item .source-name { flex: 1; min-width: 0; }
+        .drag-handle {
+            color: #9ca3af;
+            cursor: grab;
+            padding: 0.35rem 0.55rem;
+            border-radius: 0.4rem;
+            touch-action: none;
+            user-select: none;
+        }
+        .drag-handle:active { cursor: grabbing; color: var(--primary); }
+        .source-order-actions { display: flex; align-items: center; flex-shrink: 0; }
+        .source-order-actions button { padding: 0.25rem 0.4rem; }
         .trending-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -1896,34 +1922,81 @@
 
             // ─── ORDER MODAL ────────────────────────────────────────────
 
-            function openOrderModal() {
+            let draggedSourceName = null;
+
+            function renderSourceOrderList() {
                 sourceListDiv.innerHTML = '';
                 EMBED_SOURCES.forEach((src, idx) => {
                     const div = document.createElement('div');
                     div.className = 'source-item';
-                    div.innerHTML =
-                        `<span>${src.name}</span><div><button class="move-up text-green-400 mr-2" data-idx="${idx}"><i class="fas fa-arrow-up"></i></button><button class="move-down text-green-400" data-idx="${idx}"><i class="fas fa-arrow-down"></i></button></div>`;
+                    div.dataset.sourceName = src.name;
+                    div.innerHTML = `
+                        <button type="button" class="drag-handle" aria-label="Drag ${src.name} to reorder" title="Drag to reorder">
+                            <i class="fas fa-grip-vertical"></i>
+                        </button>
+                        <span class="source-name">${src.name}</span>
+                        <div class="source-order-actions">
+                            <button type="button" class="move-up text-green-400 mr-2" data-idx="${idx}" aria-label="Move ${src.name} up" ${idx === 0 ? 'disabled' : ''}><i class="fas fa-arrow-up"></i></button>
+                            <button type="button" class="move-down text-green-400" data-idx="${idx}" aria-label="Move ${src.name} down" ${idx === EMBED_SOURCES.length - 1 ? 'disabled' : ''}><i class="fas fa-arrow-down"></i></button>
+                        </div>`;
                     sourceListDiv.appendChild(div);
                 });
+
                 sourceListDiv.querySelectorAll('.move-up').forEach(btn => {
                     btn.addEventListener('click', () => {
-                        const idx = parseInt(btn.dataset.idx);
-                        if (idx > 0) { [EMBED_SOURCES[idx - 1], EMBED_SOURCES[idx]] = [EMBED_SOURCES[idx],
-                                EMBED_SOURCES[
-                                    idx - 1]
-                            ];
-                            openOrderModal(); }
+                        const idx = Number(btn.dataset.idx);
+                        if (idx > 0) {
+                            [EMBED_SOURCES[idx - 1], EMBED_SOURCES[idx]] = [EMBED_SOURCES[idx], EMBED_SOURCES[idx - 1]];
+                            renderSourceOrderList();
+                        }
                     });
                 });
                 sourceListDiv.querySelectorAll('.move-down').forEach(btn => {
                     btn.addEventListener('click', () => {
-                        const idx = parseInt(btn.dataset.idx);
-                        if (idx < EMBED_SOURCES.length - 1) { [EMBED_SOURCES[idx], EMBED_SOURCES[idx + 1]] = [
-                                EMBED_SOURCES[idx + 1], EMBED_SOURCES[idx]
-                            ];
-                            openOrderModal(); }
+                        const idx = Number(btn.dataset.idx);
+                        if (idx < EMBED_SOURCES.length - 1) {
+                            [EMBED_SOURCES[idx], EMBED_SOURCES[idx + 1]] = [EMBED_SOURCES[idx + 1], EMBED_SOURCES[idx]];
+                            renderSourceOrderList();
+                        }
                     });
                 });
+
+                sourceListDiv.querySelectorAll('.drag-handle').forEach(handle => {
+                    handle.addEventListener('pointerdown', event => {
+                        if (event.button !== undefined && event.button !== 0) return;
+                        const row = handle.closest('.source-item');
+                        draggedSourceName = row.dataset.sourceName;
+                        row.classList.add('dragging');
+                        event.preventDefault();
+                    });
+                });
+            }
+
+            function finishSourceDrag() {
+                if (!draggedSourceName) return;
+                draggedSourceName = null;
+                sourceListDiv.querySelectorAll('.source-item').forEach(row => row.classList.remove('dragging', 'drag-over'));
+            }
+
+            document.addEventListener('pointermove', event => {
+                if (!draggedSourceName) return;
+                const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('.source-item');
+                if (!target || !sourceListDiv.contains(target)) return;
+                const fromIndex = EMBED_SOURCES.findIndex(src => src.name === draggedSourceName);
+                const toIndex = EMBED_SOURCES.findIndex(src => src.name === target.dataset.sourceName);
+                if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+                const [moved] = EMBED_SOURCES.splice(fromIndex, 1);
+                EMBED_SOURCES.splice(toIndex, 0, moved);
+                renderSourceOrderList();
+                const movedRow = [...sourceListDiv.querySelectorAll('.source-item')].find(row => row.dataset.sourceName === draggedSourceName);
+                if (movedRow) movedRow.classList.add('dragging');
+            });
+            document.addEventListener('pointerup', finishSourceDrag);
+            document.addEventListener('pointercancel', finishSourceDrag);
+
+            function openOrderModal() {
+                draggedSourceName = null;
+                renderSourceOrderList();
                 orderModal.style.display = 'flex';
             }
 
