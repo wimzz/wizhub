@@ -938,6 +938,7 @@
             let currentSeason = 1,
                 currentEpisode = 1;
             let currentProgressSeconds = 0;
+            let currentDurationSeconds = 0;
             let currentEpisodesList = [];
             let loadedResumeTime = 0;
             let ignoreAutoSaveUntil = 0;
@@ -1484,115 +1485,117 @@
                 return `wizhub_${currentUser.id}_progress`;
             }
 
-            async function renderContinueWatching() {
-                if (currentUser) {
+            function getWatchProgressPercent(item) {
+                const duration = Number(item.duration_seconds) || 0;
+                const position = Number(item.progress_seconds) || 0;
+                if (!duration || duration <= 0) return null;
+                return Math.max(0, Math.min(100, Math.round((position / duration) * 100)));
+            }
+
+            function getWatchItemKey(item) {
+                return `${item.media_type}_${item.tmdb_id}`;
+            }
+
+            async function removeContinueItem(item) {
+                const key = getLocalKey();
                 try {
-                    const { data, error } = await sb.from('watch_history').select('*').eq('user_id', currentUser.id).order(
-                        'last_watched', { ascending: false });
-                    if (!error && data && data.length > 0) {
-                        continueContainer.innerHTML = '';
-                        for (const item of data) {
-                            const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
-                            const card = document.createElement('div');
-                            card.className = 'movie-card relative';
-                            card.style.flex = '0 0 140px';
-                            const progressPercent = Math.min(((item.progress_seconds || 0) / 7200) * 100, 100);
-                            const label = item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` :
-                            'Movie';
-                            const minutes = Math.floor((item.progress_seconds || 0) / 60);
-                            card.innerHTML = `
-                          <div class="delete-btn" data-media-type="${item.media_type}" data-tmdb="${item.tmdb_id}">
-                            <i class="fas fa-trash-alt text-xs"></i>
-                          </div>
-                          <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
-                          <div class="p-2">
-                            <div class="font-semibold text-sm truncate text-white">${item.title}</div>
-                            <div class="text-xs text-gray-400">${label} • ${minutes} min</div>
-                          </div>
-                          <div class="progress-overlay" style="width: ${progressPercent}%;"></div>
-                        `;
-                            const del = card.querySelector('.delete-btn');
-                            del.addEventListener('click', async (e) => {
-                                e.stopPropagation();
-                                if (confirm(`Delete "${item.title}"?`)) {
-                                    await sb.from('watch_history').delete().eq('user_id', currentUser.id).eq(
-                                        'media_type', item
-                                        .media_type).eq('tmdb_id', item.tmdb_id);
-                                    renderContinueWatching();
-                                }
-                            });
-                            card.addEventListener('click', async () => {
-                                try {
-                                    const res = await fetchWithRetry(
-                                        `https://api.themoviedb.org/3/${item.media_type}/${item.tmdb_id}?api_key=${TMDB_API_KEY}`
-                                        );
-                                    const data = await res.json();
-                                    showDetails(data, item.media_type, null, item.season_number, item.episode_number,
-                                        item
-                                        .progress_seconds);
-                                } catch (err) { alert('Failed to load'); }
-                            });
-                            continueContainer.appendChild(card);
-                        }
-                        return;
+                    const saved = JSON.parse(localStorage.getItem(key) || '{}');
+                    delete saved[getWatchItemKey(item)];
+                    localStorage.setItem(key, JSON.stringify(saved));
+                } catch (err) {
+                    console.warn('Could not remove local watch history:', err);
+                }
+                if (currentUser) {
+                    const { error } = await sb.from('watch_history').delete()
+                        .eq('user_id', currentUser.id)
+                        .eq('media_type', item.media_type)
+                        .eq('tmdb_id', item.tmdb_id);
+                    if (error) console.warn('Could not remove cloud watch history:', error);
+                }
+                renderContinueWatching();
+            }
+
+            async function renderContinueWatching() {
+                let cloudItems = [];
+                let localItems = [];
+                if (currentUser) {
+                    try {
+                        const { data, error } = await sb.from('watch_history').select('*')
+                            .eq('user_id', currentUser.id)
+                            .order('last_watched', { ascending: false });
+                        if (error) throw error;
+                        cloudItems = data || [];
+                    } catch (err) {
+                        console.warn('Cloud watch history unavailable; using local history:', err);
                     }
-                } catch (err) { /* fall through to local */ }
+                }
+                try {
+                    const localData = JSON.parse(localStorage.getItem(getLocalKey()) || '{}');
+                    localItems = Object.values(localData);
+                } catch (err) {
+                    localItems = [];
                 }
 
-                const key = getLocalKey();
-                const all = localStorage.getItem(key);
-                if (!all) {
-                    continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet.</div>';
-                    return;
-                }
-                const data = JSON.parse(all);
-                const items = Object.values(data).sort((a, b) => b.last_watched - a.last_watched);
+                const merged = new Map();
+                [...cloudItems, ...localItems].forEach(item => {
+                    const key = getWatchItemKey(item);
+                    const previous = merged.get(key);
+                    const itemTime = new Date(item.last_watched || 0).getTime();
+                    const previousTime = previous ? new Date(previous.last_watched || 0).getTime() : -1;
+                    if (!previous || itemTime >= previousTime) merged.set(key, item);
+                });
+                let items = Array.from(merged.values());
+
+                items = items.filter(item => {
+                    const percent = getWatchProgressPercent(item);
+                    return !item.is_completed && (percent === null || percent < 95);
+                }).sort((a, b) => new Date(b.last_watched).getTime() - new Date(a.last_watched).getTime());
+
                 if (!items.length) {
                     continueContainer.innerHTML = '<div class="text-gray-400 text-sm">🎬 No watch history yet.</div>';
                     return;
                 }
+
                 continueContainer.innerHTML = '';
                 for (const item of items) {
                     const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
                     const card = document.createElement('div');
                     card.className = 'movie-card relative';
                     card.style.flex = '0 0 140px';
-                    const progressPercent = Math.min(((item.progress_seconds || 0) / 7200) * 100, 100);
+                    const percent = getWatchProgressPercent(item);
+                    const progressPercent = percent === null ? 0 : percent;
                     const label = item.media_type === 'tv' ? `S${item.season_number}E${item.episode_number}` : 'Movie';
                     const minutes = Math.floor((item.progress_seconds || 0) / 60);
+                    const progressLabel = percent === null ? `${minutes} min watched` : `${percent}% watched`;
                     card.innerHTML = `
-                        <div class="delete-btn" data-media-type="${item.media_type}" data-tmdb="${item.tmdb_id}">
-                          <i class="fas fa-trash-alt text-xs"></i>
+                        <div class="delete-btn" title="Remove from Continue Watching">
+                            <i class="fas fa-trash-alt text-xs"></i>
                         </div>
                         <img src="${poster}" class="w-full h-64 object-cover" loading="lazy">
                         <div class="p-2">
-                          <div class="font-semibold text-sm truncate text-white">${item.title}</div>
-                          <div class="text-xs text-gray-400">${label} • ${minutes} min</div>
+                            <div class="font-semibold text-sm truncate text-white"></div>
+                            <div class="text-xs text-gray-400">${label} • ${progressLabel}</div>
                         </div>
                         <div class="progress-overlay" style="width: ${progressPercent}%;"></div>
-                      `;
-                    const del = card.querySelector('.delete-btn');
-                    del.addEventListener('click', (e) => {
+                    `;
+                    card.querySelector('.font-semibold').textContent = item.title || 'Untitled';
+                    card.querySelector('.delete-btn').addEventListener('click', async (e) => {
                         e.stopPropagation();
-                        if (confirm(`Delete "${item.title}"?`)) {
-                            const all2 = localStorage.getItem(key);
-                            if (all2) {
-                                const parsed = JSON.parse(all2);
-                                delete parsed[`${item.media_type}_${item.tmdb_id}`];
-                                localStorage.setItem(key, JSON.stringify(parsed));
-                                renderContinueWatching();
-                            }
+                        if (confirm(`Remove "${item.title || 'this title'}" from Continue Watching?`)) {
+                            await removeContinueItem(item);
                         }
                     });
                     card.addEventListener('click', async () => {
                         try {
                             const res = await fetchWithRetry(
                                 `https://api.themoviedb.org/3/${item.media_type}/${item.tmdb_id}?api_key=${TMDB_API_KEY}`
-                                );
-                            const data = await res.json();
-                            showDetails(data, item.media_type, null, item.season_number, item.episode_number, item
-                                .progress_seconds);
-                        } catch (err) { alert('Failed to load'); }
+                            );
+                            const details = await res.json();
+                            showDetails(details, item.media_type, null, item.season_number, item.episode_number,
+                                item.progress_seconds, item.duration_seconds);
+                        } catch (err) {
+                            alert('Failed to load');
+                        }
                     });
                     continueContainer.appendChild(card);
                 }
@@ -1613,6 +1616,8 @@
                     rating: currentMedia.rating,
                     progress_minutes: Math.floor(currentProgressSeconds / 60),
                     progress_seconds: currentProgressSeconds,
+                    duration_seconds: currentDurationSeconds || null,
+                    is_completed: currentMediaEnded || (currentDurationSeconds > 0 && currentProgressSeconds / currentDurationSeconds >= 0.95),
                     season_number: season,
                     episode_number: episode,
                     last_watched: Date.now(),
@@ -1752,6 +1757,7 @@
 
             function resetPlayerStateForNewMedia() {
                 currentProgressSeconds = 0;
+                currentDurationSeconds = 0;
                 loadedResumeTime = 0;
                 hasForcedSeekVidFast = false;
                 seekCommandSent = false;
@@ -1823,7 +1829,7 @@
             // ─── SHOW DETAILS ───────────────────────────────────────────
 
             async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null, savedSeconds =
-                null) {
+                null, savedDuration = null) {
                 playerPanel.classList.remove('hidden');
                 const title = item.title || item.name || 'Untitled';
                 const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
@@ -1854,6 +1860,7 @@
                     tvControls.classList.add('hidden');
                 }
 
+                if (savedDuration !== null) currentDurationSeconds = Number(savedDuration) || 0;
                 if (savedSeconds !== null) {
                     currentProgressSeconds = savedSeconds;
                     progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
@@ -1866,11 +1873,13 @@
                     if (currentUser) {
                         try {
                             const { data } = await sb.from('watch_history').select(
-                                'progress_seconds, season_number, episode_number')
+                                'progress_seconds, duration_seconds, is_completed, season_number, episode_number')
                                 .eq('user_id', currentUser.id).eq('media_type', type).eq('tmdb_id', item.id)
                                 .maybeSingle();
                             if (data) {
                                 currentProgressSeconds = data.progress_seconds || 0;
+                                currentDurationSeconds = data.duration_seconds || 0;
+                                currentMediaEnded = !!data.is_completed;
                                 progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
                                 loadedResumeTime = currentProgressSeconds;
                                 if (type === 'tv') {
@@ -2138,6 +2147,8 @@
                 if (eventType && eventType !== currentMedia.type) return;
                 const seconds = Number(d.currentTime);
                 const duration = Number(d.duration);
+                if (Number.isFinite(duration) && duration > 0) currentDurationSeconds = Math.floor(duration);
+                if (d.event === 'ended') currentMediaEnded = true;
                 if (Number.isFinite(seconds) && seconds >= 0) {
                     currentProgressSeconds = Math.floor(seconds);
                     progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
@@ -2185,6 +2196,10 @@
                         const mediaId = Number(info.tmdb || info.imdb);
                         if (Number.isFinite(mediaId) && mediaId > 0 && mediaId !== Number(currentMedia.id)) return;
                         const seconds = Number(d.player_progress);
+                        const duration = Number(d.player_duration);
+                        const status = d.player_status;
+                        if (Number.isFinite(duration) && duration > 0) currentDurationSeconds = Math.floor(duration);
+                        if (status === 'completed') currentMediaEnded = true;
                         if (Number.isFinite(seconds) && seconds >= 0) {
                             currentProgressSeconds = Math.floor(seconds);
                             progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
@@ -2195,7 +2210,6 @@
                             if (Number.isInteger(season) && season > 0) currentSeason = season;
                             if (Number.isInteger(episode) && episode > 0) currentEpisode = episode;
                         }
-                        const status = d.player_status;
                         const now = Date.now();
                         if (['paused', 'seeked', 'completed'].includes(status) ||
                             (status === 'playing' && now - lastVidFastProgressSave >= 15000)) {
@@ -2223,6 +2237,9 @@
                     if (message && message.type === 'PLAYER_EVENT' && message.data) {
                         const eventData = message.data;
                         const seconds = Number(eventData.currentTime);
+                        const duration = Number(eventData.duration);
+                        if (Number.isFinite(duration) && duration > 0) currentDurationSeconds = Math.floor(duration);
+                        if (eventData.event === 'ended') currentMediaEnded = true;
                         const selectedSource = EMBED_SOURCES[parseInt(sourceSelect.value)];
                         if (Number.isFinite(seconds) && seconds >= 0 && currentMedia &&
                             selectedSource && selectedSource.name === 'VixSrc') {
