@@ -869,7 +869,7 @@
                         : `https://cinextream.net/api/embed/tv/${id}/${s}/${e}` },
                 { name: 'ModiPlay', url: (t, id, s, e) => t === 'movie'
                         ? `https://rozgarlelo.modiplay.xyz/embed/tmdb/movie?id=${id}`
-                        : `https://rozgarlelo.modiplay.xyz/embed/tmdb/tv?id=${id}` },
+                        : `https://rozgarlelo.modiplay.xyz/embed/tmdb/tv?id=${id}&s=${s}&e=${e}` },
                 { name: 'VidBolt', url: (t, id, s, e) => t === 'movie'
                         ? `https://vidbolt.xyz/movie/${id}`
                         : `https://vidbolt.xyz/tv/${id}/${s}/${e}` },
