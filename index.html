@@ -1379,17 +1379,37 @@
                 return currentUser ? `wizhub_${currentUser.id}_source_order` : 'wizhub_guest_source_order';
             }
 
+            function normalizeSourceOrder(order) {
+                if (!Array.isArray(order)) return null;
+
+                // Keep the user's saved order, remove invalid/duplicate names,
+                // then append any servers added in newer website versions.
+                const knownNames = new Set(SOURCE_DEFINITIONS.map(src => src.name));
+                const names = [];
+                const seen = new Set();
+                for (const name of order) {
+                    if (typeof name === 'string' && knownNames.has(name) && !seen.has(name)) {
+                        names.push(name);
+                        seen.add(name);
+                    }
+                }
+                if (!names.length) return null;
+                for (const src of SOURCE_DEFINITIONS) {
+                    if (!seen.has(src.name)) names.push(src.name);
+                }
+                return names;
+            }
+
             function applySourceOrder(order) {
-                if (!Array.isArray(order)) return false;
-                const names = order.filter(name => SOURCE_DEFINITIONS.some(src => src.name === name));
-                if (names.length !== SOURCE_DEFINITIONS.length) return false;
+                const names = normalizeSourceOrder(order);
+                if (!names) return false;
                 EMBED_SOURCES = buildSources(names);
                 populateSources();
                 return true;
             }
 
             async function loadUserSourceOrder() {
-                // Everyone reads the same global order, whether logged in or not.
+                // Prefer the shared order. Older saved orders remain valid when new servers are added.
                 try {
                     const { data, error } = await sb.from('global_settings')
                         .select('source_order')
@@ -1397,19 +1417,28 @@
                         .maybeSingle();
                     if (error) throw error;
                     if (data && applySourceOrder(data.source_order)) {
-                        try { localStorage.setItem(getLocalOrderKey(), JSON.stringify(data.source_order)); } catch (e) {}
+                        const normalized = EMBED_SOURCES.map(src => src.name);
+                        try { localStorage.setItem(getLocalOrderKey(), JSON.stringify(normalized)); } catch (e) {}
+
+                        // If the admin's shared order predates a newly added server,
+                        // extend the saved row without changing the existing sequence.
+                        const original = Array.isArray(data.source_order) ? data.source_order : [];
+                        if (isMasterAdmin() && (original.length !== normalized.length ||
+                            original.some((name, index) => name !== normalized[index]))) {
+                            await saveGlobalSourceOrder(false);
+                        }
                         return;
                     }
                 } catch (err) {
                     console.warn('Could not load global source order:', err);
                 }
 
-                // First-time migration: seed the shared order from the admin's existing account order.
+                // Recover the previous personal order if the shared row is not available yet.
                 if (isMasterAdmin()) {
                     try {
-                        const { data: personal } = await sb.from('user_settings')
+                        const { data: personal, error } = await sb.from('user_settings')
                             .select('source_order').eq('id', currentUser.id).maybeSingle();
-                        if (personal && applySourceOrder(personal.source_order)) {
+                        if (!error && personal && applySourceOrder(personal.source_order)) {
                             await saveGlobalSourceOrder(false);
                             return;
                         }
@@ -1418,7 +1447,15 @@
                     }
                 }
 
-                // Before the admin has seeded the global row, use the default order for everyone.
+                // Last-resort recovery from this browser's cached order.
+                try {
+                    const cached = JSON.parse(localStorage.getItem(getLocalOrderKey()) || 'null');
+                    if (applySourceOrder(cached)) return;
+                } catch (err) {
+                    console.warn('Could not restore cached source order:', err);
+                }
+
+                // Only use defaults when no saved order can be recovered.
                 EMBED_SOURCES = buildSources(DEFAULT_ORDER);
                 populateSources();
             }
