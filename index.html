@@ -953,6 +953,13 @@
             let lastVidFastSave = 0;
             let lastPositionForJump = 0;
             let lastSaveTimestamp = 0;
+            // Runtime-only guards prevent an in-flight save or stale player message
+            // from recreating an item while it is being deleted. Nothing is persisted.
+            const deletingWatchKeys = new Set();
+            const deletedWatchKeys = new Set();
+            const pendingWatchWrites = new Map();
+            const watchDeletionPromises = new Map();
+            let continueRenderToken = 0;
 
             // ─── DOM REFS ──────────────────────────────────────────────
             const $ = id => document.getElementById(id);
@@ -1511,25 +1518,57 @@
             }
 
             async function removeContinueItem(item) {
-                const key = getLocalKey();
-                try {
-                    const saved = JSON.parse(localStorage.getItem(key) || '{}');
-                    delete saved[getWatchItemKey(item)];
-                    localStorage.setItem(key, JSON.stringify(saved));
-                } catch (err) {
-                    console.warn('Could not remove local watch history:', err);
+                const itemKey = getWatchItemKey(item);
+                const localKey = getLocalKey();
+                if (deletingWatchKeys.has(itemKey)) return;
+                deletingWatchKeys.add(itemKey);
+
+                // Stop this title immediately so periodic/player events cannot save it again.
+                if (currentMedia && currentMedia.type === item.media_type &&
+                    Number(currentMedia.id) === Number(item.tmdb_id)) {
+                    currentMedia = null;
+                    currentProgressSeconds = 0;
+                    currentDurationSeconds = 0;
+                    currentMediaEnded = false;
+                    embedIframe.src = 'about:blank';
+                    playerPanel.classList.add('hidden');
                 }
-                if (currentUser) {
-                    const { error } = await sb.from('watch_history').delete()
-                        .eq('user_id', currentUser.id)
-                        .eq('media_type', item.media_type)
-                        .eq('tmdb_id', item.tmdb_id);
-                    if (error) console.warn('Could not remove cloud watch history:', error);
-                }
-                renderContinueWatching();
+
+                const deletion = (async () => {
+                    try {
+                        // Finish any save that began before the delete click, then delete last.
+                        const pendingWrite = pendingWatchWrites.get(itemKey);
+                        if (pendingWrite) await pendingWrite;
+
+                        if (currentUser) {
+                            const { error } = await sb.from('watch_history').delete()
+                                .eq('user_id', currentUser.id)
+                                .eq('media_type', item.media_type)
+                                .eq('tmdb_id', item.tmdb_id);
+                            if (error) throw error;
+                        }
+
+                        // Remove the local copy only after the cloud deletion succeeds.
+                        const saved = JSON.parse(localStorage.getItem(localKey) || '{}');
+                        delete saved[itemKey];
+                        localStorage.setItem(localKey, JSON.stringify(saved));
+                        deletedWatchKeys.add(itemKey);
+                        showToast('Removed from Continue Watching');
+                    } catch (err) {
+                        console.error('Could not permanently remove watch history:', err);
+                        showToast('Could not delete watch history. Please try again.');
+                    } finally {
+                        deletingWatchKeys.delete(itemKey);
+                        watchDeletionPromises.delete(itemKey);
+                        await renderContinueWatching();
+                    }
+                })();
+                watchDeletionPromises.set(itemKey, deletion);
+                await deletion;
             }
 
             async function renderContinueWatching() {
+                const renderToken = ++continueRenderToken;
                 let cloudItems = [];
                 let localItems = [];
                 if (currentUser) {
@@ -1550,9 +1589,11 @@
                     localItems = [];
                 }
 
+                if (renderToken !== continueRenderToken) return;
                 const merged = new Map();
                 [...cloudItems, ...localItems].forEach(item => {
                     const key = getWatchItemKey(item);
+                    if (deletingWatchKeys.has(key) || deletedWatchKeys.has(key)) return;
                     const previous = merged.get(key);
                     const itemTime = new Date(item.last_watched || 0).getTime();
                     const previousTime = previous ? new Date(previous.last_watched || 0).getTime() : -1;
@@ -1619,15 +1660,20 @@
 
             async function saveProgress() {
                 if (!currentMedia) return;
-                const season = currentMedia.type === 'tv' ? currentSeason : 0;
-                const episode = currentMedia.type === 'tv' ? currentEpisode : 0;
+                // Snapshot the active title so a later player change cannot redirect this save.
+                const media = { ...currentMedia };
+                const itemKey = `${media.type}_${media.id}`;
+                if (deletingWatchKeys.has(itemKey) || deletedWatchKeys.has(itemKey)) return;
+
+                const season = media.type === 'tv' ? currentSeason : 0;
+                const episode = media.type === 'tv' ? currentEpisode : 0;
                 const record = {
-                    media_type: currentMedia.type,
-                    tmdb_id: currentMedia.id,
-                    title: currentMedia.title,
-                    poster_path: currentMedia.posterPath,
-                    media_year: currentMedia.year,
-                    rating: currentMedia.rating,
+                    media_type: media.type,
+                    tmdb_id: media.id,
+                    title: media.title,
+                    poster_path: media.posterPath,
+                    media_year: media.year,
+                    rating: media.rating,
                     progress_minutes: Math.floor(currentProgressSeconds / 60),
                     progress_seconds: currentProgressSeconds,
                     duration_seconds: currentDurationSeconds || null,
@@ -1637,24 +1683,37 @@
                     last_watched: Date.now(),
                     updated_at: new Date().toISOString()
                 };
-                const key = getLocalKey();
+                const localKey = getLocalKey();
                 try {
-                    const all = localStorage.getItem(key);
+                    const all = localStorage.getItem(localKey);
                     const data = all ? JSON.parse(all) : {};
-                    data[`${record.media_type}_${record.tmdb_id}`] = record;
-                    localStorage.setItem(key, JSON.stringify(data));
+                    if (!deletingWatchKeys.has(itemKey) && !deletedWatchKeys.has(itemKey)) {
+                        data[itemKey] = record;
+                        localStorage.setItem(localKey, JSON.stringify(data));
+                    }
                 } catch (storageError) {
                     console.error('Could not save watch progress locally:', storageError);
                 }
-                if (currentUser) {
-                    try {
-                        const dbRecord = { ...record, user_id: currentUser.id, last_watched: new Date().toISOString() };
-                        const { error } = await sb.from('watch_history').upsert(dbRecord, {
-                            onConflict: 'user_id, media_type, tmdb_id'
-                        });
-                        if (error) throw error;
-                    } catch (err) {
-                        console.warn('Watch progress saved locally; cloud sync failed:', err);
+
+                if (currentUser && !deletingWatchKeys.has(itemKey) && !deletedWatchKeys.has(itemKey)) {
+                    const userId = currentUser.id;
+                    const previousWrite = pendingWatchWrites.get(itemKey) || Promise.resolve();
+                    const writePromise = previousWrite.catch(() => {}).then(async () => {
+                        try {
+                            if (deletingWatchKeys.has(itemKey) || deletedWatchKeys.has(itemKey)) return;
+                            const dbRecord = { ...record, user_id: userId, last_watched: new Date().toISOString() };
+                            const { error } = await sb.from('watch_history').upsert(dbRecord, {
+                                onConflict: 'user_id, media_type, tmdb_id'
+                            });
+                            if (error) throw error;
+                        } catch (err) {
+                            console.warn('Watch progress saved locally; cloud sync failed:', err);
+                        }
+                    });
+                    pendingWatchWrites.set(itemKey, writePromise);
+                    try { await writePromise; }
+                    finally {
+                        if (pendingWatchWrites.get(itemKey) === writePromise) pendingWatchWrites.delete(itemKey);
                     }
                 }
                 renderContinueWatching();
@@ -1844,6 +1903,11 @@
 
             async function showDetails(item, type, savedProgress = null, savedSeason = null, savedEpisode = null, savedSeconds =
                 null, savedDuration = null) {
+                const itemKey = `${type}_${item.id}`;
+                const pendingDeletion = watchDeletionPromises.get(itemKey);
+                if (pendingDeletion) await pendingDeletion;
+                // Explicitly opening a title starts a new watch-history lifecycle after deletion.
+                deletedWatchKeys.delete(itemKey);
                 playerPanel.classList.remove('hidden');
                 const title = item.title || item.name || 'Untitled';
                 const poster = item.poster_path ? IMG_BASE + item.poster_path : 'https://placehold.co/300x450';
@@ -2127,7 +2191,9 @@
                         const watched = Number(progress.watched) || 0;
                         const season = Number(entry.last_season_watched) || 0;
                         const episode = Number(entry.last_episode_watched) || 0;
-                        existing[`${entry.type}_${entry.id}`] = {
+                        const entryKey = `${entry.type}_${entry.id}`;
+                        if (deletingWatchKeys.has(entryKey) || deletedWatchKeys.has(entryKey)) return;
+                        existing[entryKey] = {
                             media_type: entry.type,
                             tmdb_id: Number(entry.id),
                             title: entry.title || 'Untitled',
