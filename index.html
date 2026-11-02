@@ -982,6 +982,9 @@
                 { name: 'CineSrc', url: (t, id, s, e) => t === 'movie' ?
                         `https://cinesrc.st/embed/movie/${id}` :
                         `https://cinesrc.st/embed/tv/${id}?s=${s}&e=${e}` },
+                { name: 'Atlantic', url: (t, id, s, e) => t === 'movie' ?
+                        `https://atlantic.st/embed/movie/${id}` :
+                        `https://atlantic.st/embed/tv/${id}/${s}/${e}` },
                 { name: 'Viduki', url: (t, id, s, e) => t === 'movie' ?
                         `https://viduki.net/1/movie/${id}?color=00A65F` :
                         `https://viduki.net/1/tv/${id}/${s}/${e}?color=00A65F` },
@@ -993,7 +996,7 @@
             const DEFAULT_ORDER = [
                 "VidFast", "Rivestream", "ZxcStream", "Peachify", "Nxsha", "VAPlayer",
                 "VidLink", "VidUp", "VidCore", "111Movies", "EmbedMaster", "AnyEmbed", "FilmU", "VidSrc", "Vidy", "Vidrift", "Vidly", "CineXStream", "ModiPlay", "VidBolt", "VidOut", "MoviesNexus", "IQSmartGames",
-                "VidRock", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs", "Mapple", "CineSrc", "Viduki", "VixSrc"
+                "VidRock", "Cinezo", "1Embed", "2Embed", "NontonGo", "Xpass", "CinemaOS", "SpencerDevs", "Mapple", "CineSrc", "Atlantic", "Viduki", "VixSrc"
             ];
 
             function buildSources(order) {
@@ -1599,13 +1602,17 @@
 
             async function removeContinueItem(item) {
                 const itemKey = getWatchItemKey(item);
-                const localKey = getLocalKey();
+                const mediaType = item.media_type;
+                const tmdbId = Number(item.tmdb_id);
+                const userId = currentUser?.id || null;
+                const localKeys = new Set([getLocalKey(), 'wizhub_guest_progress']);
+                if (userId) localKeys.add(`wizhub_${userId}_progress`);
                 if (deletingWatchKeys.has(itemKey)) return;
                 deletingWatchKeys.add(itemKey);
 
-                // Stop this title immediately so periodic/player events cannot save it again.
-                if (currentMedia && currentMedia.type === item.media_type &&
-                    Number(currentMedia.id) === Number(item.tmdb_id)) {
+                // Stop playback immediately so this title cannot generate another save.
+                if (currentMedia && currentMedia.type === mediaType &&
+                    Number(currentMedia.id) === tmdbId) {
                     currentMedia = null;
                     currentProgressSeconds = 0;
                     currentDurationSeconds = 0;
@@ -1616,27 +1623,51 @@
 
                 const deletion = (async () => {
                     try {
-                        // Finish any save that began before the delete click, then delete last.
+                        // Wait for every save already queued for this title before deleting it.
                         const pendingWrite = pendingWatchWrites.get(itemKey);
                         if (pendingWrite) await pendingWrite;
 
-                        if (currentUser) {
-                            const { error } = await sb.from('watch_history').delete()
-                                .eq('user_id', currentUser.id)
-                                .eq('media_type', item.media_type)
-                                .eq('tmdb_id', item.tmdb_id);
-                            if (error) throw error;
+                        if (userId) {
+                            const { error: deleteError } = await sb.from('watch_history').delete()
+                                .eq('user_id', userId)
+                                .eq('media_type', mediaType)
+                                .eq('tmdb_id', tmdbId);
+                            if (deleteError) throw deleteError;
+
+                            // Verify the database row is actually gone. A successful HTTP response
+                            // alone is not enough when row-level security can silently hide deletes.
+                            const { data: remaining, error: verifyError } = await sb.from('watch_history')
+                                .select('tmdb_id')
+                                .eq('user_id', userId)
+                                .eq('media_type', mediaType)
+                                .eq('tmdb_id', tmdbId)
+                                .maybeSingle();
+                            if (verifyError) throw verifyError;
+                            if (remaining) {
+                                throw new Error('The watch_history row still exists. Check the Supabase DELETE policy for watch_history.');
+                            }
                         }
 
-                        // Remove the local copy only after the cloud deletion succeeds.
-                        const saved = JSON.parse(localStorage.getItem(localKey) || '{}');
-                        delete saved[itemKey];
-                        localStorage.setItem(localKey, JSON.stringify(saved));
+                        // The cloud deletion is confirmed; now remove every local copy of this item.
+                        for (const localKey of localKeys) {
+                            try {
+                                const saved = JSON.parse(localStorage.getItem(localKey) || '{}');
+                                if (Object.prototype.hasOwnProperty.call(saved, itemKey)) {
+                                    delete saved[itemKey];
+                                    localStorage.setItem(localKey, JSON.stringify(saved));
+                                }
+                            } catch (storageError) {
+                                console.warn(`Could not clear local watch history (${localKey}):`, storageError);
+                            }
+                        }
+
                         deletedWatchKeys.add(itemKey);
-                        showToast('Removed from Continue Watching');
+                        showToast('Permanently deleted from Continue Watching');
                     } catch (err) {
                         console.error('Could not permanently remove watch history:', err);
-                        showToast('Could not delete watch history. Please try again.');
+                        showToast(err?.message?.includes('DELETE policy')
+                            ? 'Database blocked deletion. Check the Supabase watch_history DELETE policy.'
+                            : 'Could not verify deletion. Please check the database permissions and try again.');
                     } finally {
                         deletingWatchKeys.delete(itemKey);
                         watchDeletionPromises.delete(itemKey);
@@ -2272,6 +2303,11 @@
                     const existing = JSON.parse(localStorage.getItem(key) || '{}');
                     Object.values(mediaData).forEach(entry => {
                         if (!entry || !entry.id || !['movie', 'tv'].includes(entry.type)) return;
+                        // Only accept progress for the title currently open in WIZHUB.
+                        // Importing VidFast's entire historical library can resurrect items
+                        // that the user deliberately deleted from Continue Watching.
+                        if (!currentMedia || currentMedia.type !== entry.type ||
+                            Number(currentMedia.id) !== Number(entry.id)) return;
                         const progress = entry.progress || {};
                         const watched = Number(progress.watched) || 0;
                         const season = Number(entry.last_season_watched) || 0;
