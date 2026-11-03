@@ -979,9 +979,14 @@
                 { name: 'Mapple', url: (t, id, s, e) => t === 'movie' ?
                         `https://mapple.fun/watch/movie/${id}?autoPlay=true` :
                         `https://mapple.fun/watch/tv/${id}-${s}-${e}?autoPlay=true` },
-                { name: 'CineSrc', url: (t, id, s, e) => t === 'movie' ?
-                        `https://cinesrc.st/embed/movie/${id}` :
-                        `https://cinesrc.st/embed/tv/${id}?s=${s}&e=${e}` },
+                { name: 'CineSrc', url: (t, id, s, e) => {
+                        const resume = Math.max(0, Math.floor(Number(currentProgressSeconds) || 0));
+                        const params = new URLSearchParams({ autoplay: 'true', controls: 'true', continueprompt: 'false' });
+                        if (resume > 0) params.set('t', String(resume));
+                        return t === 'movie'
+                            ? `https://cinesrc.st/embed/movie/${id}?${params.toString()}`
+                            : `https://cinesrc.st/embed/tv/${id}?s=${s}&e=${e}&${params.toString()}`;
+                    } },
                 { name: 'Atlantic', url: (t, id, s, e) => t === 'movie' ?
                         `https://atlantic.st/embed/movie/${id}` :
                         `https://atlantic.st/embed/tv/${id}/${s}/${e}` },
@@ -2465,6 +2470,45 @@
                                 if (currentMedia.type === 'tv') syncToSimkl(currentMedia, currentSeason, currentEpisode);
                                 else syncToSimkl(currentMedia);
                             }
+                        }
+                    }
+                    return;
+                }
+                if (origin === 'https://cinesrc.st') {
+                    let message = data;
+                    if (typeof message === 'string') {
+                        try { message = JSON.parse(message); } catch (e) { return; }
+                    }
+                    if (!message || typeof message.type !== 'string') return;
+                    const selectedSource = EMBED_SOURCES[parseInt(sourceSelect.value)];
+                    if (!currentMedia || !selectedSource || selectedSource.name !== 'CineSrc') return;
+                    const eventName = message.type;
+                    const seconds = Number(message.currentTime);
+                    const duration = Number(message.duration);
+                    if (Number.isFinite(duration) && duration > 0) currentDurationSeconds = Math.floor(duration);
+                    if (Number.isFinite(seconds) && seconds >= 0) {
+                        currentProgressSeconds = Math.floor(seconds);
+                        progressMinutesInput.value = Math.floor(currentProgressSeconds / 60);
+                    }
+                    if (eventName === 'cinesrc:ended') currentMediaEnded = true;
+                    if (currentMedia.type === 'tv' && eventName === 'cinesrc:nextepisode' && message.internalNavigation !== true) {
+                        const season = Number(message.season);
+                        const episode = Number(message.episode);
+                        if (Number.isInteger(season) && season > 0) currentSeason = season;
+                        if (Number.isInteger(episode) && episode > 0) currentEpisode = episode;
+                    }
+                    if (Date.now() > ignoreAutoSaveUntil &&
+                        ['cinesrc:timeupdate', 'cinesrc:pause', 'cinesrc:seeked', 'cinesrc:ended', 'cinesrc:loadedmetadata'].includes(eventName)) {
+                        if (eventName !== 'cinesrc:timeupdate' || Date.now() - lastVidFastProgressSave >= 15000) {
+                            lastVidFastProgressSave = Date.now();
+                            saveProgress();
+                        }
+                    }
+                    if (eventName === 'cinesrc:ended' && currentMedia) {
+                        const { autoSync } = getSimklCreds();
+                        if (autoSync && isSimklConnected()) {
+                            if (currentMedia.type === 'tv') syncToSimkl(currentMedia, currentSeason, currentEpisode);
+                            else syncToSimkl(currentMedia);
                         }
                     }
                     return;
